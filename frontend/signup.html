@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Create New Account</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #0c111c;
+      color: #f0f4ff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .container {
+      max-width: 400px;
+      width: 100%;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+    .form-group {
+      text-align: left;
+      margin-bottom: 15px;
+    }
+    label {
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      background-color: #234561;
+      border: 1px solid #90a0b5;
+      color: #fff;
+      border-radius: 4px;
+      margin-top: 5px;
+      
+    }
+    .note {
+      font-size: 10px;
+      color: #a0a8b5;
+      margin-top: 5px;
+    }
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 10px;
+      background-color: #a2b8c8;
+      border: none;
+      color: #123456;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .link-text {
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="container">
+    <h1>Create new Account</h1>
+    <div class="link-text">Already Registered? <a href="#" style="color: #a2b8c8;">Log in here.</a></div>
+    
+    <div class="form-group">
+      <label for="name">NAME</label>
+      <input type="text" id="name" v-model="form.name" placeholder="Enter your name">
+    </div>
+
+    <div class="form-group">
+      <label for="email">EMAIL</label>
+      <input type="email" id="email" v-model="form.email" placeholder="Enter your email">
+      <div class="note">Use organizational email for administrative privileges</div>
+    </div>
+
+    <div class="form-group">
+      <label for="password">PASSWORD</label>
+      <input type="password" id="password" v-model="form.password" placeholder="Enter your password">
+    </div>
+
+    <div class="form-group">
+      <label for="role">ROLE</label>
+      <select id="role" v-model="form.role">
+        <option disabled value="">Select</option>
+        <option>Admin</option>
+        <option>User</option>
+      </select>
+    </div>
+
+    <button @click="submitForm">sign up</button>
+  </div>
+
+  <script>
+    new Vue({
+      el: '#app',
+      data: {
+        form: {
+          name: '',
+          email: '',
+          password: '',
+          role: ''
+        }
+      },
+      methods: {
+        submitForm() {
+          console.log("Form submitted:", this.form);
+          alert(`Welcome, ${this.form.name || 'User'}!`);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
