@@ -3,164 +3,796 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CyberComply - Login Page</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.prod.min.js"></script>
+    <title>CyberComply - Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Arial', sans-serif;
         }
 
         body {
-            background-color: #0c1420;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #101726;
             color: #ffffff;
-            min-height: 100vh;
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            overflow-x: hidden;
         }
 
-        .header {
-            padding: 20px;
+        #app {
+            position: relative;
+            min-height: 100vh;
+        }
+
+        /* Top Header */
+        .top-header {
+            background-color: #1a2845;
+            padding: 15px 30px;
             display: flex;
-            justify-content: flex-end;
             align-items: center;
+            position: relative;
+            z-index: 100;
         }
 
         .menu-icon {
             cursor: pointer;
-            font-weight: bold;
             font-size: 24px;
+            color: #8b9dc3;
+            transition: color 0.3s;
         }
 
-        .login-btn {
-            background: transparent;
-            border: none;
+        .menu-icon:hover {
             color: #ffffff;
-            cursor: pointer;
-            font-size: 16px;
-            letter-spacing: 1px;
-            font-weight: 500;
-            padding: 8px 16px;
-            transition: all 0.3s ease;
         }
 
-        .login-btn:hover {
-            color: #e0e0e0;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 50px 20px;
-            text-align: center;
-            position: relative;
-            z-index: 2;
-        }
-
-        .welcome-text {
-            font-size: 24px;
-            margin-bottom: 30px;
-            letter-spacing: 2px;
-        }
-
-        .brand-name {
-            font-size: 72px;
-            font-weight: bold;
-            letter-spacing: 4px;
-            margin-bottom: 100px;
-        }
-
-        .account-text {
-            font-size: 18px;
-            margin-bottom: 40px;
-        }
-
-        .signup-btn {
-            background-color: #ffffff;
-            color: #0c1420;
-            border: none;
-            padding: 15px 60px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .signup-btn:hover {
-            background-color: #e0e0e0;
-        }
-
-        .wave-left {
+        .user-profile {
             position: absolute;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #2a3f5f;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .user-profile:hover {
+            transform: scale(1.05);
+            border-color: #4a8fe7;
+        }
+
+        .user-profile svg {
+            width: 30px;
+            height: 30px;
+            fill: #1a2845;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 80px;
+            width: 280px;
+            height: calc(100vh - 80px);
+            background-color: #0d1420;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            z-index: 90;
+            overflow-y: auto;
+            padding: 20px 0;
+            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-section {
+            margin-bottom: 30px;
+        }
+
+        .sidebar-header {
+            padding: 10px 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #6b7a99;
+            letter-spacing: 1.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-header svg {
+            width: 14px;
+            height: 14px;
+            fill: #6b7a99;
+        }
+
+        .sidebar-item {
+            padding: 12px 20px;
+            color: #c5d0e6;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            font-size: 14px;
+        }
+
+        .sidebar-item:hover {
+            background-color: #1a2845;
+            border-left-color: #4a8fe7;
+            color: #ffffff;
+        }
+
+        .no-results {
+            padding: 12px 20px;
+            color: #6b7a99;
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        /* Main Content */
+        .main-content {
+            transition: margin-left 0.3s ease-in-out;
+            padding: 60px 80px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-content.shifted {
+            margin-left: 280px;
+        }
+
+        /* Logo */
+        .logo {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .logo h1 {
+            font-size: 72px;
+            font-weight: 700;
+            letter-spacing: 8px;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Upload Section */
+        .upload-container {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .upload-area {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2a4a7c 100%);
+            border: 2px dashed #4a8fe7;
+            border-radius: 20px;
+            padding: 60px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            border-color: #6ba3ff;
+            background: linear-gradient(135deg, #2a4a7c 0%, #1e3a5f 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(74, 143, 231, 0.2);
+        }
+
+        .upload-area.dragover {
+            border-color: #6ba3ff;
+            background-color: #2a4a7c;
+        }
+
+        .upload-icon {
+            margin-bottom: 20px;
+        }
+
+        .upload-icon svg {
+            width: 60px;
+            height: 60px;
+            fill: #8b9dc3;
+        }
+
+        .upload-text {
+            font-size: 20px;
+            color: #c5d0e6;
+            letter-spacing: 3px;
+            font-weight: 300;
+        }
+
+        .upload-menu-icon {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            cursor: pointer;
+            font-size: 24px;
+            color: #8b9dc3;
+            transition: color 0.3s;
+            z-index: 10;
+        }
+
+        .upload-menu-icon:hover {
+            color: #ffffff;
+        }
+
+        /* Company/Department Menu */
+        .company-menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-10%, -50%);  /* Center it over the upload box */
+            width: 300px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            z-index: 20;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease-in-out;  /* Only transition opacity, not position */
+        }
+
+        .company-menu.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .company-menu h3 {
+            color: #1a2845;
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .company-menu input,
+        .company-menu select {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 2px solid #dce4f0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Segoe UI', sans-serif;
+            color: #1a2845;
+            transition: border-color 0.3s;
+        }
+
+        .company-menu input:focus,
+        .company-menu select:focus {
+            outline: none;
+            border-color: #4a8fe7;
+        }
+
+        .company-menu select {
+            cursor: pointer;
+            background-color: #ffffff;
+        }
+
+        /* Selected Info Display */
+        .selected-info {
+            max-width: 800px;
+            margin: 0 auto 30px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s;
+        }
+
+        .selected-info.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .info-badge {
+            background-color: #1e3a5f;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border-left: 4px solid #4a8fe7;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-badge span.label {
+            color: #8b9dc3;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .info-badge span.value {
+            color: #ffffff;
+            font-size: 14px;
+        }
+
+        /* File Upload Status */
+        .upload-status {
+            max-width: 800px;
+            margin: 20px auto;
+        }
+
+        .file-item {
+            background-color: #1a2845;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            background-color: #2a4a7c;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-icon svg {
+            width: 20px;
+            height: 20px;
+            fill: #4a8fe7;
+        }
+
+        .file-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .file-name {
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .file-size {
+            color: #8b9dc3;
+            font-size: 12px;
+        }
+
+        .file-status {
+            color: #4a8fe7;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .file-status.success {
+            color: #4caf50;
+        }
+
+        .file-status.error {
+            color: #f44336;
+        }
+
+        /* Loading Animation */
+        .loading-bar {
+            width: 100%;
+            height: 3px;
+            background-color: #2a4a7c;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .loading-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #4a8fe7, #6ba3ff);
+            animation: loading 1.5s ease-in-out infinite;
+            border-radius: 2px;
+        }
+
+        @keyframes loading {
+            0% {
+                width: 0%;
+            }
+            50% {
+                width: 70%;
+            }
+            100% {
+                width: 100%;
+            }
+        }
+
+        /* Help Button */
+        .help-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background-color: #4a8fe7;
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 12px rgba(74, 143, 231, 0.4);
+            transition: all 0.3s;
+            z-index: 100;
+        }
+
+        .help-button:hover {
+            background-color: #6ba3ff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(74, 143, 231, 0.6);
+        }
+
+        /* Wavy Background */
+        .wavy-background {
+            position: fixed;
             bottom: 0;
             left: 0;
             width: 50%;
-            z-index: 1;
-            opacity: 1;
+            z-index: 0;
+            opacity: 0.3;
+            pointer-events: none;
         }
 
-        .wave-right {
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            width: 40%;
-            z-index: 1;
-            opacity: 1;
+        .wavy-background img {
+            width: 100%;
+            height: auto;
+            display: block;
         }
 
-        @media (max-width: 768px) {
-            .brand-name {
-                font-size: 48px;
-                margin-bottom: 60px;
-            }
+        /* Hidden File Input */
+        input[type="file"] {
+            display: none;
+        }
 
-            .wave-left {
-                width: 60%;
-            }
+        /* Error Message */
+        .error-message {
+            max-width: 800px;
+            margin: 10px auto;
+            padding: 12px 20px;
+            background-color: rgba(244, 67, 54, 0.1);
+            border-left: 4px solid #f44336;
+            border-radius: 8px;
+            color: #ff6b6b;
+            font-size: 14px;
+            animation: slideIn 0.3s ease-out;
+        }
 
-            .wave-right {
-                width: 50%;
-            }
+        /* Scrollbar Styling */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: #0d1420;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #2a4a7c;
+            border-radius: 3px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: #4a8fe7;
         }
     </style>
 </head>
 <body>
     <div id="app">
-        <div class="header">
-            <!-- Removed the menu-icon with "ooo" -->
-            <div></div>
-            <button class="login-btn" @click="login">LOGIN</button>
+        <!-- Top Header -->
+        <div class="top-header">
+            <div class="menu-icon" @click="toggleSidebar">●●●</div>
+            <div class="user-profile" @click="showProfile">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+            </div>
         </div>
 
-        <div class="container">
-            <div class="welcome-text">WELCOME TO</div>
-            <div class="brand-name">CYBERCOMPLY</div>
+        <!-- Sidebar -->
+        <div class="sidebar" :class="{ open: sidebarOpen }">
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                    </svg>
+                    LAST 7 DAYS
+                </div>
+                <div v-if="last7Days.length === 0" class="no-results">
+                    No results to display
+                </div>
+                <div v-else>
+                    <div 
+                        v-for="report in last7Days" 
+                        :key="report"
+                        class="sidebar-item"
+                        @click="openReport(report)"
+                    >
+                        {{ report }}
+                    </div>
+                </div>
+            </div>
 
-            <div class="account-text">DON'T HAVE AN ACCOUNT?</div>
-            <button class="signup-btn" @click="signUp">Sign Up</button>
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                    </svg>
+                    LAST 30 DAYS
+                </div>
+                <div v-if="last30Days.length === 0" class="no-results">
+                    No results to display
+                </div>
+                <div v-else>
+                    <div 
+                        v-for="report in last30Days" 
+                        :key="report"
+                        class="sidebar-item"
+                        @click="openReport(report)"
+                    >
+                        {{ report }}
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- Wave designs -->
-        <img src="img1.png" alt="Wave design left" class="wave-left">
-        <img src="img2.png" alt="Wave design right" class="wave-right">
+        <!-- Main Content -->
+        <div class="main-content" :class="{ shifted: sidebarOpen }">
+            <!-- Logo -->
+            <div class="logo">
+                <h1>CYBERCOMPLY</h1>
+            </div>
+
+            <!-- Selected Company/Department Info -->
+            <div class="selected-info" :class="{ show: companyName || selectedDepartment }">
+                <div class="info-badge" v-if="companyName">
+                    <span class="label">COMPANY:</span>
+                    <span class="value">{{ companyName }}</span>
+                </div>
+                <div class="info-badge" v-if="selectedDepartment">
+                    <span class="label">DEPARTMENT:</span>
+                    <span class="value">{{ selectedDepartment }}</span>
+                </div>
+            </div>
+
+            <!-- Upload Container -->
+            <div class="upload-container">
+                <!-- Upload Area -->
+                <div 
+                    class="upload-area"
+                    :class="{ dragover: isDragging }"
+                    @click="triggerFileInput"
+                    @dragover.prevent="handleDragOver"
+                    @dragleave.prevent="handleDragLeave"
+                    @drop.prevent="handleDrop"
+                >
+                    <div class="upload-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/>
+                        </svg>
+                    </div>
+                    <div class="upload-text">DROP YOUR FILES HERE</div>
+                    
+                    <!-- Three-dot menu icon -->
+                    <div class="upload-menu-icon" @click.stop="toggleCompanyMenu">
+                        ●●●
+                    </div>
+
+                    <!-- Company/Department Selection Menu -->
+                    <div class="company-menu" :class="{ open: companyMenuOpen }">
+                        <h3>Select Company</h3>
+                        <input 
+                            type="text" 
+                            v-model="companyName" 
+                            placeholder="Enter company name"
+                            @click.stop
+                        >
+                        
+                        <h3>Select Department</h3>
+                        <select v-model="selectedDepartment" @click.stop @change="closeCompanyMenu">
+                            <option value="">-- Select Department --</option>
+                            <option value="HR & Admin">HR & Admin</option>
+                            <option value="Finance">Finance</option>
+                            <option value="IT">IT</option>
+                            <option value="Operations">Operations</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Hidden File Input -->
+                <input 
+                    type="file" 
+                    ref="fileInput" 
+                    multiple 
+                    accept=".pdf,.docx,.txt"
+                    @change="handleFileSelect"
+                >
+
+                <!-- Error Messages -->
+                <div v-if="errorMessage" class="error-message">
+                    {{ errorMessage }}
+                </div>
+
+                <!-- Upload Status -->
+                <div class="upload-status" v-if="uploadedFiles.length > 0">
+                    <div 
+                        v-for="(file, index) in uploadedFiles" 
+                        :key="index"
+                        class="file-item"
+                    >
+                        <div class="file-info">
+                            <div class="file-icon">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+                                </svg>
+                            </div>
+                            <div class="file-details">
+                                <div class="file-name">{{ file.name }}</div>
+                                <div class="file-size">{{ formatFileSize(file.size) }}</div>
+                                <div v-if="file.uploading" class="loading-bar">
+                                    <div class="loading-progress"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="file-status" :class="{ success: file.uploaded, error: file.error }">
+                            <span v-if="file.uploading">Uploading...</span>
+                            <span v-else-if="file.uploaded">✓ Uploaded</span>
+                            <span v-else-if="file.error">✗ Error</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Button -->
+        <div class="help-button" @click="showHelp">
+            HELP?
+        </div>
+
+        <!-- Wavy Background -->
+        <div class="wavy-background">
+            <img src="img3.png" alt="Wavy Design">
+        </div>
     </div>
 
     <script>
         const { createApp } = Vue;
 
         createApp({
+            data() {
+                return {
+                    sidebarOpen: false,
+                    companyMenuOpen: false,
+                    companyName: '',
+                    selectedDepartment: '',
+                    isDragging: false,
+                    uploadedFiles: [],
+                    errorMessage: '',
+                    last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
+                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report']
+                }
+            },
             methods: {
-                signUp() {
-                    // Redirect to signup page
-                    window.location.href = 'signup.html';
+                toggleSidebar() {
+                    this.sidebarOpen = !this.sidebarOpen;
                 },
-                login() {
-                    console.log('Login button clicked!');
-                    alert('Login functionality would be implemented here');
+                toggleCompanyMenu() {
+                    this.companyMenuOpen = !this.companyMenuOpen;
+                },
+                closeCompanyMenu() {
+                    setTimeout(() => {
+                        this.companyMenuOpen = false;
+                    }, 200);
+                },
+                showProfile() {
+                    alert('User Profile page will be implemented soon!');
+                },
+                showHelp() {
+                    alert('FAQ and troubleshooting resources page will be implemented soon!');
+                },
+                openReport(reportName) {
+                    alert(`Opening report: ${reportName}\n\nReport viewing interface will be implemented soon!`);
+                },
+                triggerFileInput() {
+                    this.$refs.fileInput.click();
+                },
+                handleDragOver(e) {
+                    this.isDragging = true;
+                },
+                handleDragLeave(e) {
+                    this.isDragging = false;
+                },
+                handleDrop(e) {
+                    this.isDragging = false;
+                    const files = Array.from(e.dataTransfer.files);
+                    this.processFiles(files);
+                },
+                handleFileSelect(e) {
+                    const files = Array.from(e.target.files);
+                    this.processFiles(files);
+                    // Reset file input
+                    e.target.value = '';
+                },
+                processFiles(files) {
+                    this.errorMessage = '';
+
+                    // Check total file count
+                    const totalFiles = this.uploadedFiles.length + files.length;
+                    if (totalFiles > 10) {
+                        this.errorMessage = `Maximum 10 files allowed. You're trying to upload ${totalFiles} files.`;
+                        return;
+                    }
+
+                    // Validate each file
+                    for (let file of files) {
+                        // Check file size (50MB = 50 * 1024 * 1024 bytes)
+                        if (file.size > 50 * 1024 * 1024) {
+                            this.errorMessage = `File "${file.name}" exceeds 50MB limit.`;
+                            continue;
+                        }
+
+                        // Check file type
+                        const validExtensions = ['.pdf', '.docx', '.txt'];
+                        const fileName = file.name.toLowerCase();
+                        const isValid = validExtensions.some(ext => fileName.endsWith(ext));
+                        
+                        if (!isValid) {
+                            this.errorMessage = `File "${file.name}" is not supported. Only PDF, DOCX, and TXT files are allowed.`;
+                            continue;
+                        }
+
+                        // Add file to upload list
+                        const fileObj = {
+                            name: file.name,
+                            size: file.size,
+                            uploading: true,
+                            uploaded: false,
+                            error: false
+                        };
+                        
+                        this.uploadedFiles.push(fileObj);
+
+                        // Simulate upload (since backend is not implemented)
+                        this.simulateUpload(fileObj);
+                    }
+                },
+                simulateUpload(fileObj) {
+                    // Simulate upload delay (1.5 seconds)
+                    setTimeout(() => {
+                        fileObj.uploading = false;
+                        fileObj.uploaded = true;
+                    }, 1500);
+                },
+                formatFileSize(bytes) {
+                    if (bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
                 }
             }
         }).mount('#app');
