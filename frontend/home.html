@@ -13,7 +13,7 @@
         }
 
         body {
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Arial', sans-serif;
             background-color: #101726;
             color: #ffffff;
             overflow-x: hidden;
@@ -73,11 +73,11 @@
 
         /* Sidebar */
         .sidebar {
-            position: fixed;
+            position: absolute;
             left: 0;
-            top: 80px;
+            top: 60px;
             width: 280px;
-            height: calc(100vh - 80px);
+            height: calc(100vh - 60px);
             background-color: #0d1420;
             transform: translateX(-100%);
             transition: transform 0.3s ease-in-out;
@@ -154,8 +154,8 @@
 
         .logo h1 {
             font-size: 72px;
-            font-weight: 700;
-            letter-spacing: 8px;
+            font-weight: bold;
+            letter-spacing: 4px;
             color: #ffffff;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
@@ -452,9 +452,9 @@
             position: fixed;
             bottom: 0;
             left: 0;
-            width: 50%;
+            width: 55%;
             z-index: 0;
-            opacity: 0.3;
+            opacity: 0.7;
             pointer-events: none;
         }
 
@@ -498,6 +498,17 @@
 
         .sidebar::-webkit-scrollbar-thumb:hover {
             background: #4a8fe7;
+        }
+
+        @media screen and (max-width: 1200px) {
+            .sidebar {
+                position: fixed;
+                box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+            }
+            
+            .main-content.shifted {
+                margin-left: 0;  /* Don't push content on smaller screens */
+            }
         }
     </style>
 </head>
@@ -670,7 +681,7 @@
 
         <!-- Help Button -->
         <div class="help-button" @click="showHelp">
-            HELP?
+            Need Any Help?
         </div>
 
         <!-- Wavy Background -->

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberComply - Document Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #101726;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        #app {
+            position: relative;
+            min-height: 100vh;
+        }
+
+        /* Top Header */
+        .top-header {
+            background-color: #1a2845;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            position: relative;
+            z-index: 100;
+        }
+
+        .menu-icon {
+            cursor: pointer;
+            font-size: 24px;
+            color: #8b9dc3;
+            transition: color 0.3s;
+        }
+
+        .menu-icon:hover {
+            color: #ffffff;
+        }
+
+        .back-arrow {
+            position: absolute;
+            left: 30px;
+            top: 80px;
+            cursor: pointer;
+            font-size: 32px;
+            color: #8b9dc3;
+            transition: all 0.3s;
+            font-weight: 300;
+            z-index: 95;
+        }
+
+        .back-arrow.shifted {
+            left: 310px;
+        }
+
+        .back-arrow:hover {
+            color: #ffffff;
+        }
+
+        .user-profile {
+            position: absolute;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #2a3f5f;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .user-profile:hover {
+            transform: scale(1.05);
+            border-color: #4a8fe7;
+        }
+
+        .user-profile svg {
+            width: 30px;
+            height: 30px;
+            fill: #1a2845;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: absolute;
+            left: 0;
+            top: 60px;
+            width: 280px;
+            height: calc(100vh - 60px);
+            background-color: #0d1420;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            z-index: 90;
+            overflow-y: auto;
+            padding: 20px 0;
+            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-section {
+            margin-bottom: 30px;
+        }
+
+        .sidebar-header {
+            padding: 10px 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #6b7a99;
+            letter-spacing: 1.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-header svg {
+            width: 14px;
+            height: 14px;
+            fill: #6b7a99;
+        }
+
+        .sidebar-item {
+            padding: 12px 20px;
+            color: #c5d0e6;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            font-size: 14px;
+        }
+
+        .sidebar-item:hover {
+            background-color: #1a2845;
+            border-left-color: #4a8fe7;
+            color: #ffffff;
+        }
+
+        .no-results {
+            padding: 12px 20px;
+            color: #6b7a99;
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        /* Main Content */
+        .main-content {
+            transition: margin-left 0.3s ease-in-out;
+            padding: 60px 80px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-content.shifted {
+            margin-left: 280px;
+        }
+
+        /* Document Title Section */
+        .document-title-section {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .document-icon {
+            margin-bottom: 20px;
+        }
+
+        .document-icon svg {
+            width: 80px;
+            height: 80px;
+            fill: #c5d0e6;
+        }
+
+        .document-title {
+            font-size: 28px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            color: #ffffff;
+        }
+
+        /* Content Container */
+        .content-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* Compliance Score Section */
+        .compliance-section {
+            margin-bottom: 50px;
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+
+        .section-header {
+            background-color: #ffffff;
+            color: #1a2845;
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s;
+            flex-shrink: 0;
+        }
+
+        .section-header:hover {
+            background-color: #4a8fe7;
+            color: #ffffff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 143, 231, 0.4);
+        }
+
+        .compliance-details {
+            padding-left: 0;
+            flex: 1;
+        }
+
+        .compliance-item {
+            color: #ffffff;
+            font-size: 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+
+        .compliance-item::before {
+            content: "•";
+            margin-right: 15px;
+            font-size: 20px;
+        }
+
+        /* Recommendations Section */
+        .recommendations-section {
+            margin-bottom: 50px;
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+
+        .recommendations-list {
+            padding-left: 0;
+            flex: 1;
+        }
+
+        .recommendation-item {
+            color: #ffffff;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .recommendation-item::before {
+            content: "•";
+            margin-right: 15px;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 300px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .action-button {
+            background-color: #ffffff;
+            color: #1a2845;
+            padding: 15px 40px;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            flex: 1;
+        }
+
+        .action-button:hover {
+            background-color: #4a8fe7;
+            color: #ffffff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(74, 143, 231, 0.4);
+        }
+
+        /* Wavy Background */
+        .wavy-background {
+            position: absolute;
+            top: 55px;
+            right: 0;
+            width: 45%;
+            z-index: 0;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .wavy-background img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Scrollbar Styling */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: #0d1420;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #2a4a7c;
+            border-radius: 3px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: #4a8fe7;
+        }
+
+        @media screen and (max-width: 1200px) {
+            .sidebar {
+                position: fixed;
+                box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+            }
+            
+            .main-content.shifted {
+                margin-left: 0;
+            }
+        }
+
+        @media screen and (max-width: 768px) {
+            .main-content {
+                padding: 40px 30px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .back-arrow {
+                left: 20px;
+                top: 75px;
+                font-size: 28px;
+            }
+
+            .back-arrow.shifted {
+                left: 300px;
+            }
+
+            .compliance-section,
+            .recommendations-section {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .section-header {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Top Header -->
+        <div class="top-header">
+            <div class="menu-icon" @click="toggleSidebar">●●●</div>
+            <div class="user-profile" @click="showProfile">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Back Arrow -->
+        <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←</div>
+
+        <!-- Sidebar -->
+        <div class="sidebar" :class="{ open: sidebarOpen }">
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                    </svg>
+                    LAST 7 DAYS
+                </div>
+                <div v-if="last7Days.length === 0" class="no-results">
+                    No results to display
+                </div>
+                <div v-else>
+                    <div 
+                        v-for="report in last7Days" 
+                        :key="report"
+                        class="sidebar-item"
+                        @click="openReport(report)"
+                    >
+                        {{ report }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                    </svg>
+                    LAST 30 DAYS
+                </div>
+                <div v-if="last30Days.length === 0" class="no-results">
+                    No results to display
+                </div>
+                <div v-else>
+                    <div 
+                        v-for="report in last30Days" 
+                        :key="report"
+                        class="sidebar-item"
+                        @click="openReport(report)"
+                    >
+                        {{ report }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content" :class="{ shifted: sidebarOpen }">
+            <!-- Document Title -->
+            <div class="document-title-section">
+                <div class="document-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+                    </svg>
+                </div>
+                <div class="document-title">Document Analysis</div>
+            </div>
+
+            <!-- Content Container -->
+            <div class="content-container">
+                <!-- Compliance Score Section -->
+                <div class="compliance-section">
+                    <button class="section-header" @click="viewComplianceScore">Compliance Score</button>
+                    <div class="compliance-details">
+                        <div class="compliance-item">50%</div>
+                        <div class="compliance-item">Compliance Level : Medium</div>
+                    </div>
+                </div>
+
+                <!-- Recommendations Section -->
+                <div class="recommendations-section">
+                    <button class="section-header" @click="viewRecommendations">Recommendations</button>
+                    <div class="recommendations-list">
+                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</div>
+                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</div>
+                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit.wertyuiopasdfghjklasdfghjkl</div>
+                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit.......more</div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button class="action-button" @click="compareReport">Compare</button>
+                    <button class="action-button" @click="generateReports">Generate Reports</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wavy Background -->
+        <div class="wavy-background">
+            <img src="img4.png" alt="Wavy Design">
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    sidebarOpen: false,
+                    last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
+                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report']
+                }
+            },
+            methods: {
+                toggleSidebar() {
+                    this.sidebarOpen = !this.sidebarOpen;
+                },
+                showProfile() {
+                    alert('User Profile page will be implemented soon!');
+                },
+                goBack() {
+                    window.location.href = 'home.html';
+                },
+                openReport(reportName) {
+                    alert(`Opening report: ${reportName}\n\nReport viewing interface will be implemented soon!`);
+                },
+                viewComplianceScore() {
+                    alert('Compliance Score details page will be implemented soon!');
+                },
+                viewRecommendations() {
+                    alert('Recommendations details page will be implemented soon!');
+                },
+                compareReport() {
+                    alert('Compare functionality will be implemented soon!');
+                },
+                generateReports() {
+                    alert('Generate Reports functionality will be implemented soon!');
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
