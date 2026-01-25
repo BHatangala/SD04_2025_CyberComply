@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberComply - Administrative Access</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #101726;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        #app {
+            position: relative;
+            min-height: 100vh;
+        }
+
+        /* Top Header */
+        .top-header {
+            background-color: #1a2845;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            position: relative;
+            z-index: 100;
+        }
+
+        .menu-icon {
+            cursor: pointer;
+            font-size: 24px;
+            color: #8b9dc3;
+            transition: color 0.3s;
+        }
+
+        .menu-icon:hover {
+            color: #ffffff;
+        }
+
+        .user-profile {
+            position: absolute;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #2a3f5f;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .user-profile:hover {
+            transform: scale(1.05);
+            border-color: #4a8fe7;
+        }
+
+        .user-profile svg {
+            width: 30px;
+            height: 30px;
+            fill: #1a2845;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: absolute;
+            left: 0;
+            top: 60px;
+            width: 280px;
+            height: calc(100vh - 60px);
+            background-color: #0d1420;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            z-index: 90;
+            overflow-y: auto;
+            padding: 20px 0;
+            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-section {
+            margin-bottom: 30px;
+        }
+
+        .sidebar-header {
+            padding: 10px 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #6b7a99;
+            letter-spacing: 1.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-header svg {
+            width: 14px;
+            height: 14px;
+            fill: #6b7a99;
+        }
+
+        .sidebar-item {
+            padding: 12px 20px;
+            color: #c5d0e6;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            font-size: 14px;
+        }
+
+        .sidebar-item:hover {
+            background-color: #1a2845;
+            border-left-color: #4a8fe7;
+            color: #ffffff;
+        }
+
+        .no-results {
+            padding: 12px 20px;
+            color: #6b7a99;
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        /* Main Content */
+        .main-content {
+            transition: margin-left 0.3s ease-in-out;
+            padding: 60px 80px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-content.shifted {
+            margin-left: 280px;
+        }
+
+        /* Admin Access Section */
+        .admin-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .admin-title {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .admin-description {
+            font-size: 18px;
+            color: #c5d0e6;
+            margin-bottom: 30px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .admin-form {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .admin-form label {
+            display: block;
+            font-size: 14px;
+            color: #8b9dc3;
+            margin-bottom: 10px;
+        }
+
+        .admin-form input {
+            width: 100%;
+            padding: 12px;
+            background-color: #1e3a5f;
+            border: none;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .admin-form button {
+            width: 100%;
+            padding: 12px;
+            background-color: #ffffff;
+            color: #1a2845;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .admin-form button:hover {
+            background-color: #f0f0f0;
+            transform: translateY(-2px);
+        }
+
+        /* Wavy Background */
+        .wavy-background {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 55%;
+            z-index: 0;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .wavy-background img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Scrollbar Styling */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: #0d1420;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #2a4a7c;
+            border-radius: 3px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: #4a8fe7;
+        }
+
+        @media screen and (max-width: 1200px) {
+            .sidebar {
+                position: fixed;
+                box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+            }
+            
+            .main-content.shifted {
+                margin-left: 0;  /* Don't push content on smaller screens */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Top Header -->
+        <div class="top-header">
+            <div class="menu-icon" @click="toggleSidebar">●●●</div>
+            <div class="user-profile" @click="showProfile">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar" :class="{ open: sidebarOpen }">
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                    </svg>
+                    LAST 7 DAYS
+                </div>
+                <div v-if="last7Days.length === 0" class="no-results">
+                    No results to display
+                </div>
+                <div v-else>
+                    <div 
+                        v-for="report in last7Days" 
+                        :key="report"
+                        class="sidebar-item"
+                        @click="openReport(report)"
+                    >
+                        {{ report }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-header">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                    </svg>
+                    LAST 30 DAYS
+                </div>
+                <div v-if="last30Days.length === 0" class="no-results">
+                    No results to display
+                </div>
+                <div v-else>
+                    <div 
+                        v-for="report in last30Days" 
+                        :key="report"
+                        class="sidebar-item"
+                        @click="openReport(report)"
+                    >
+                        {{ report }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content" :class="{ shifted: sidebarOpen }">
+            <!-- Admin Access Container -->
+            <div class="admin-container">
+                <h1 class="admin-title">ADMINISTRATIVE ACCESS</h1>
+                <p class="admin-description">
+                    Administrative access grants users full privileges, enabling unrestricted access to all services and features provided by the tool.
+                </p>
+                <p class="admin-description">
+                    Enter organizational email address below for verification.
+                </p>
+                <div class="admin-form">
+                    <label>EMAIL</label>
+                    <input type="email" v-model="orgEmail" placeholder="Enter email">
+                    <button @click="sendVerification">SEND</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Curly Line Background -->
+        <div class="curly-line-background">
+            <img src="img5.png" alt="Curly Line Design">
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    sidebarOpen: false,
+                    orgEmail: 'hello@reallygreatsite.com',
+                    last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
+                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report']
+                }
+            },
+            methods: {
+                toggleSidebar() {
+                    this.sidebarOpen = !this.sidebarOpen;
+                },
+                showProfile() {
+                    alert('Navigating to profile page...');
+                    window.location.href = 'profile.html';
+                },
+                openReport(reportName) {
+                    alert(`Opening report: ${reportName}\n\nReport viewing interface will be implemented soon!`);
+                },
+                sendVerification() {
+                    if (this.orgEmail) {
+                        alert(`Verification email sent to: ${this.orgEmail}`);
+                        // Implement send logic here
+                    } else {
+                        alert('Please enter a valid email.');
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
