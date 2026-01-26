@@ -43,8 +43,7 @@
             position: fixed;
             bottom: 0;
             right: 0;
-            width: 100%;
-            height: 100%;
+            width: 85%;
             z-index: 0;
             pointer-events: none;
         }
@@ -155,6 +154,7 @@
                         message.type = 'success';
                         message.text = 'Login Success! Redirecting...';
                         setTimeout(() => {
+                            window.location.href = 'home.html';
                         }, 1500);
 
                     } catch (e) {
