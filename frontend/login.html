@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Page</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #101726;
+        }
+
+        .custom-input {
+            background-color: #0F3456;
+            border: 1px solid #2563EB;
+            color: #E2E8F0;
+            transition: all 0.3s ease;
+        }
+
+        .custom-input:focus {
+            outline: none;
+            border-color: #60A5FA;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        }
+
+        .custom-btn {
+            background-color: #BEE3F8;
+            color: #000;
+            font-weight: 600;
+            transition: opacity 0.3s ease;
+        }
+
+        .custom-btn:hover {
+            opacity: 0.9;
+        }
+
+        .right-wave {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body class="h-screen w-full flex flex-col text-white overflow-hidden relative">
+
+    <div id="app" class="h-full w-full flex flex-col relative z-10">
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex items-center justify-center px-4">
+
+            <div class="w-full max-w-md text-center space-y-8">
+                <div class="space-y-2">
+                    <h1 class="text-5xl font-medium tracking-tight">Login</h1>
+                    <p class="text-gray-400 text-sm tracking-wide">Sign in to continue</p>
+                </div>
+
+                <form @submit.prevent="handleLogin" class="space-y-6 text-left w-3/4 mx-auto" novalidate>
+
+                    <!-- 3. Error/Success Message Box -->
+                    <transition name="fade">
+                        <div v-if="message.text" :class="[
+                            'text-sm p-3 rounded text-center shadow-lg border',
+                            message.type === 'error' ? 'bg-gray-200 text-red-600 border-red-400' : 'bg-green-600 text-white border-green-400'
+                        ]">
+                            {{ message.text }}
+                        </div>
+                    </transition>
+
+                    <!-- Email Field -->
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Email</label>
+                        <input v-model="form.email" type="email" placeholder="hello@reallygreatsite.com"
+                            class="custom-input w-full p-3 text-sm placeholder-gray-400" required>
+                    </div>
+
+                    <!-- Password Field -->
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Password</label>
+                        <input v-model="form.password" type="password" placeholder="******"
+                            class="custom-input w-full p-3 text-sm placeholder-gray-400" required>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="pt-4 space-y-6 text-center">
+                        <button type="submit" class="custom-btn w-full py-3 uppercase tracking-wider text-sm shadow-lg">
+                            log in
+                        </button>
+
+                        <div>
+                            <a href="forgot_password.html"
+                                class="text-sm text-white font-medium hover:text-blue-300 transition-colors tracking-wide">
+                                Forgot Password?
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Decorative Waves -->
+    <img src="img2.png" alt="Decorative Wave Right" class="right-wave">
+
+    <script>
+        const { createApp, reactive, ref } = Vue;
+
+        createApp({
+            setup() {
+                const form = reactive({
+                    email: '',
+                    password: ''
+                });
+
+                const message = reactive({
+                    text: '',
+                    type: ''
+                });
+
+                const handleLogin = async () => {
+                    message.text = '';
+
+                    // Manual Email Validation
+                    if (!form.email || !form.email.includes('@')) {
+                        message.type = 'error';
+                        message.text = "Please include an '@' in the email address.";
+                        return;
+                    }
+
+                    const btn = document.activeElement;
+                    const originalText = btn.innerText;
+                    btn.innerText = "LOADING...";
+                    btn.disabled = true;
+
+                    console.log("Logging in with:", form.email);
+
+                    try {
+                        // API CALL SIMULATION
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        if (form.email === 'error@test.com') {
+                            throw new Error("Invalid credentials provided.");
+                        }
+                        // Success scenario
+                        console.log("Login Success");
+                        message.type = 'success';
+                        message.text = 'Login Success! Redirecting...';
+                        setTimeout(() => {
+                        }, 1500);
+
+                    } catch (e) {
+                        // Set Error Message state
+                        message.type = 'error';
+                        message.text = e.message || "An error occurred during login.";
+                    } finally {
+                        btn.innerText = originalText;
+                        btn.disabled = false;
+                    }
+                };
+
+                return { form, message, handleLogin };
+            }
+        }).mount('#app');
+    </script>
+</body>
+
+</html>
