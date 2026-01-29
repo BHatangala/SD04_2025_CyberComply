@@ -501,7 +501,7 @@ createApp({
       }
     },
     openReport(reportName) {
-      alert(`Opening report: ${reportName}\n\nReport viewing interface will be implemented soon!`);//change this
+      window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
     }
   }
 }).mount('#app');

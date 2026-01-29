@@ -852,7 +852,7 @@
                     alert('FAQ and troubleshooting resources page will be implemented soon!');
                 },
                 openReport(reportName) {
-                    alert(`Opening report: ${reportName}\n\nReport viewing interface will be implemented soon!`);
+                    window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
                 triggerFileInput() {
                     this.$refs.fileInput.click();

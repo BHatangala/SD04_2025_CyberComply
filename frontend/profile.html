@@ -389,7 +389,7 @@
                     // Already on profile page, perhaps refresh or do nothing
                 },
                 openReport(reportName) {
-                    alert(`Opening report: ${reportName}\n\nReport viewing interface will be implemented soon!`);
+                    window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
                 logout() {
                     alert('Logging out...');
