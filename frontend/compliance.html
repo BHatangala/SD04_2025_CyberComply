@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberComply - Compliance Score</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <!-- Google Fonts removed to match other files -->
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #101726;
+            --sidebar-bg: #0d1420;
+            --text-white: #ffffff;
+            --text-muted: #8b9dc3;
+            /* Matched from home.html */
+            --accent-blue: #1a2845;
+            /* Matched from top-header */
+            --highlight-blue: #2a3f5f;
+            --separator: #1C3A5A;
+            --font-main: 'Arial', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-dark);
+            color: var(--text-white);
+            overflow-x: hidden;
+            background-image: linear-gradient(to bottom right, #051323, #020b16);
+            min-height: 100vh;
+        }
+
+        #app {
+            position: relative;
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 280px 1fr 60px;
+            /* Sidebar, Main, Action Bar */
+        }
+
+        /* Responsive grid change */
+        @media screen and (max-width: 1200px) {
+            #app {
+                display: block;
+            }
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            background-color: var(--sidebar-bg);
+            /* Using the blue from image */
+            border-right: 1px solid var(--separator);
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
+            transform: translateX(0);
+            transition: transform 0.3s ease-in-out;
+            z-index: 90;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Mobile sidebar hidden by default handling done via Vue/Classes */
+        .sidebar.closed {
+            /* For desktop collapsible if needed, or mobile */
+        }
+
+        @media screen and (max-width: 1200px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 60px;
+                /* Below header */
+                height: calc(100vh - 60px);
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        .sidebar-header-icons {
+            display: flex;
+            padding: 20px;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .icon-btn:hover {
+            color: var(--text-white);
+        }
+
+        .search-btn {
+            font-size: 1.8rem;
+        }
+
+        .add-btn {
+            font-size: 2rem;
+        }
+
+        .sidebar-section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            letter-spacing: 1.5px;
+            color: var(--text-white);
+            text-transform: uppercase;
+            padding: 10px 20px;
+            font-weight: 600;
+        }
+
+        .sidebar-item {
+            padding: 12px 20px;
+            font-size: 0.9rem;
+            color: var(--text-white);
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.2s;
+            letter-spacing: 1px;
+        }
+
+        .sidebar-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .no-results {
+            padding: 12px 20px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-style: italic;
+        }
+
+        /* --- MAIN CONTENT --- */
+        .main-content {
+            padding: 20px 40px;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Mobile Header (Hidden on Desktop usually, but here we might need it for menu) */
+        .mobile-header {
+            display: none;
+            background-color: var(--accent-blue);
+            padding: 15px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        @media screen and (max-width: 1200px) {
+            .mobile-header {
+                display: flex;
+            }
+        }
+
+        .window-controls {
+            color: var(--text-muted);
+            font-size: 1rem;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+        }
+
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .nav-icons {
+            display: flex;
+            gap: 20px;
+        }
+
+        .nav-icons i {
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .nav-icons i:hover {
+            color: white;
+        }
+
+        .user-avatar i {
+            font-size: 3rem;
+            color: white;
+        }
+
+        .page-title {
+            font-size: 2.5rem;
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 60px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .info-section {
+            margin-bottom: 40px;
+            padding-left: 20px;
+        }
+
+        .section-header-text {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        .bullet-list {
+            list-style: none;
+            padding-left: 10px;
+        }
+
+        .bullet-list li {
+            font-size: 1.1rem;
+            margin-bottom: 12px;
+            color: #e0e6ed;
+            letter-spacing: 1.5px;
+            display: flex;
+            align-items: center;
+        }
+
+        .bullet-list li::before {
+            content: "•";
+            margin-right: 15px;
+            font-size: 1.5rem;
+            line-height: 1rem;
+        }
+
+        /* --- ACTION BAR (RIGHT) --- */
+        .action-bar {
+            background-color: transparent;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding-top: 100px;
+        }
+
+        @media screen and (max-width: 1200px) {
+            .action-bar {
+                display: none;
+                /* Hide for mobile based on typical dashboard behaviour, or move it */
+            }
+        }
+
+        .action-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-color: #0c2b4d;
+            padding: 10px 5px;
+            border-radius: 4px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #8daac7;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 5px;
+            transition: transform 0.2s;
+        }
+
+        .close-btn:hover {
+            color: white;
+            transform: scale(1.1);
+        }
+
+
+        /* Wavy Background */
+        .wavy-background {
+            position: fixed;
+            bottom: -100px;
+            left: 0;
+            width: 50%;
+            height: 500px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .wavy-background img {
+            width: 100%;
+            height: auto;
+            opacity: 0.4;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <!-- Mobile Header -->
+        <div class="mobile-header">
+            <div class="menu-icon" @click="toggleSidebar" style="font-size: 24px; cursor: pointer;">☰</div>
+            <div style="font-weight: bold; font-size: 1.2rem;">CyberComply</div>
+            <div class="user-profile-mobile">
+                <i class="fa-regular fa-circle-user" style="font-size: 1.5rem;"></i>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar" :class="{ open: sidebarOpen }">
+            <div class="sidebar-header-icons">
+                <button class="icon-btn search-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
+                <button class="icon-btn add-btn"><i class="fa-solid fa-plus"></i></button>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-title">LAST 7 DAYS</div>
+                <div v-if="last7Days.length === 0" class="no-results">No results</div>
+                <div v-else>
+                    <div v-for="report in last7Days" :key="report" class="sidebar-item" @click="openReport(report)">
+                        {{ report }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-title">LAST 30 DAYS</div>
+                <div v-if="last30Days.length === 0" class="no-results">No results</div>
+                <div v-else>
+                    <div v-for="report in last30Days" :key="report" class="sidebar-item" @click="openReport(report)">
+                        {{ report }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Window Controls / Top Nav -->
+            <div class="top-nav">
+                <div>
+                    <div class="window-controls">ooo</div>
+                    <div class="nav-icons">
+                        <i class="fa-solid fa-arrow-left" @click="goBack"></i>
+                        <i class="fa-solid fa-house" @click="goHome"></i>
+                    </div>
+                </div>
+                <div class="user-avatar">
+                    <i class="fa-regular fa-circle-user"></i>
+                </div>
+            </div>
+
+            <!-- Title -->
+            <h1 class="page-title">COMPLIANCE SCORE</h1>
+
+            <!-- Content Area -->
+            <div class="info-section">
+                <h2 class="section-header-text">Gap Identification</h2>
+                <ul class="bullet-list">
+                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
+                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
+                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
+                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
+                </ul>
+            </div>
+
+            <div class="info-section">
+                <h2 class="section-header-text">Risk Assessment</h2>
+                <ul class="bullet-list">
+                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
+                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
+                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
+                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Action Bar -->
+        <aside class="action-bar">
+            <div class="action-list">
+                <button class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+                <button class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+                <button class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+                <button class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </aside>
+
+        <!-- Wavy Background -->
+        <div class="wavy-background">
+            <!-- Using existing image asset if available or inline SVG for simplicity as per user req for "codes" -->
+            <!-- The root script.js used an SVG. I will use the SVG here for better fidelity to the "image" request if img asset not perfect -->
+            <svg viewBox="0 0 1440 320" preserveAspectRatio="none"
+                style="width: 100%; height: 100%; filter: blur(40px); transform: rotate(5deg);">
+                <path fill="#536d88" fill-opacity="0.5"
+                    d="M0,224L48,213.3C96,203,192,181,288,181.3C384,181,480,203,576,224C672,245,768,267,864,250.7C960,235,1056,181,1152,165.3C1248,149,1344,171,1392,181.3L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z">
+                </path>
+                <path fill="#2c455e" fill-opacity="0.8"
+                    d="M0,160L48,176C96,192,192,224,288,229.3C384,235,480,213,576,192C672,171,768,149,864,160C960,171,1056,213,1152,213.3C1248,213,1344,171,1392,149.3L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z">
+                </path>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    sidebarOpen: false,
+                    last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
+                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report']
+                }
+            },
+            methods: {
+                toggleSidebar() {
+                    this.sidebarOpen = !this.sidebarOpen;
+                },
+                openReport(reportName) {
+                    alert(`Opening report: ${reportName}`);
+                },
+                goBack() {
+                    // Navigate back
+                    window.history.back();
+                },
+                goHome() {
+                    window.location.href = 'home.html';
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+
+</html>

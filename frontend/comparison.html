@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberComply - Comparison Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #101726;
+            --sidebar-bg: #0d1420;
+            --text-white: #ffffff;
+            --text-muted: #8b9dc3;
+            --accent-blue: #1a2845;
+            --highlight-blue: #2a3f5f;
+            --separator: #1C3A5A;
+            --font-main: 'Arial', sans-serif;
+            --btn-white: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-dark);
+            color: var(--text-white);
+            overflow-x: hidden;
+            background-image: linear-gradient(to bottom right, #051323, #020b16);
+            min-height: 100vh;
+        }
+
+        #app {
+            position: relative;
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+
+        }
+
+
+        @media screen and (max-width: 1200px) {
+            #app {
+                display: block;
+            }
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--separator);
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
+            transform: translateX(0);
+            transition: transform 0.3s ease-in-out;
+            z-index: 90;
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media screen and (max-width: 1200px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 60px;
+                height: calc(100vh - 60px);
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        .sidebar-header-icons {
+            display: flex;
+            padding: 20px;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .icon-btn:hover {
+            color: var(--text-white);
+        }
+
+        .search-btn {
+            font-size: 1.8rem;
+        }
+
+        .add-btn {
+            font-size: 2rem;
+        }
+
+        .sidebar-section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            letter-spacing: 1.5px;
+            color: var(--text-white);
+            text-transform: uppercase;
+            padding: 10px 20px;
+            font-weight: 600;
+        }
+
+        .sidebar-item {
+            padding: 12px 20px;
+            font-size: 0.9rem;
+            color: var(--text-white);
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.2s;
+            letter-spacing: 1px;
+        }
+
+        .sidebar-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .no-results {
+            padding: 12px 20px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-style: italic;
+        }
+
+        /* --- MAIN CONTENT --- */
+        .main-content {
+            padding: 20px 40px;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            background-color: var(--accent-blue);
+            padding: 15px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        @media screen and (max-width: 1200px) {
+            .mobile-header {
+                display: flex;
+            }
+        }
+
+        .window-controls {
+            color: var(--text-muted);
+            font-size: 1rem;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+        }
+
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .nav-icons {
+            display: flex;
+            gap: 20px;
+        }
+
+        .nav-icons i {
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .nav-icons i:hover {
+            color: white;
+        }
+
+        .user-avatar i {
+            font-size: 3rem;
+            color: white;
+        }
+
+        .page-title {
+            font-size: 2.5rem;
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Comparison specific styles */
+        .comparison-container {
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .company-header {
+            font-weight: 700;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            letter-spacing: 1.5px;
+        }
+
+        .metrics-grid {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .metric-box {
+            background-color: white;
+            color: var(--bg-dark);
+            padding: 15px 30px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            min-width: 250px;
+            border-radius: 2px;
+            /* Sharp edges as per image */
+        }
+
+        .metric-stats {
+            color: white;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+        }
+
+        .metric-stats div {
+            margin-bottom: 5px;
+        }
+
+        .recommendations-title {
+            margin-top: 40px;
+            margin-bottom: 20px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            font-size: 1.1rem;
+        }
+
+        .rec-list {
+            list-style: none;
+            padding-left: 10px;
+        }
+
+        .rec-list>li {
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+
+        .rec-list>li::before {
+            content: "•";
+            margin-right: 15px;
+            font-size: 1.5rem;
+            vertical-align: middle;
+        }
+
+        .rec-sublist {
+            list-style: none;
+            padding-left: 40px;
+            margin-top: 10px;
+        }
+
+        .rec-sublist li {
+            margin-bottom: 15px;
+            color: #d0dbe5;
+            font-size: 1rem;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .rec-sublist li::before {
+            content: "▪";
+            /* Square bullet */
+            margin-right: 15px;
+            font-size: 1.2rem;
+            line-height: 1.2rem;
+        }
+
+
+        /* Wavy Background */
+        .wavy-background {
+            position: fixed;
+            bottom: -50px;
+            left: 0;
+            width: 40%;
+            height: 60%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .wavy-background svg {
+            /* Mirror the wave to look like left side wave */
+            transform: scaleX(-1) rotate(10deg);
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <!-- Mobile Header -->
+        <div class="mobile-header">
+            <div class="menu-icon" @click="toggleSidebar" style="font-size: 24px; cursor: pointer;">☰</div>
+            <div style="font-weight: bold; font-size: 1.2rem;">CyberComply</div>
+            <div class="user-profile-mobile">
+                <i class="fa-regular fa-circle-user" style="font-size: 1.5rem;"></i>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar" :class="{ open: sidebarOpen }">
+            <div class="sidebar-header-icons">
+                <button class="icon-btn search-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
+                <button class="icon-btn add-btn"><i class="fa-solid fa-plus"></i></button>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-title">LAST 7 DAYS</div>
+                <div v-if="last7Days.length === 0" class="no-results">No results</div>
+                <div v-else>
+                    <div v-for="report in last7Days" :key="report" class="sidebar-item" @click="openReport(report)">
+                        {{ report }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-title">LAST 30 DAYS</div>
+                <div v-if="last30Days.length === 0" class="no-results">No results</div>
+                <div v-else>
+                    <div v-for="report in last30Days" :key="report" class="sidebar-item" @click="openReport(report)">
+                        {{ report }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="top-nav">
+                <div>
+                    <div class="window-controls">ooo</div>
+                    <div class="nav-icons">
+                        <i class="fa-solid fa-arrow-left" @click="goBack"></i>
+                        <i class="fa-solid fa-house" @click="goHome"></i>
+                    </div>
+                </div>
+                <div class="user-avatar">
+                    <i class="fa-regular fa-circle-user"></i>
+                </div>
+            </div>
+
+            <h1 class="page-title">COMPARISON DASHBOARD</h1>
+
+            <div class="comparison-container">
+                <div class="company-header">ABC Company</div>
+
+                <div class="metrics-grid">
+                    <div class="metric-box">
+                        Security <br> Department
+                    </div>
+
+                    <div class="metric-stats">
+                        <div>Score : 80%</div>
+                        <div>Risk Level : Low</div>
+                    </div>
+
+                    <div class="metric-box" style="cursor: pointer;" @click="showGraph">
+                        Graphical View
+                    </div>
+                </div>
+
+                <h3 class="recommendations-title">CYBERCOMPLY Recommendations :</h3>
+
+                <ul class="rec-list">
+                    <li>
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit
+                        <ul class="rec-sublist">
+                            <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
+                        </ul>
+                    </li>
+                    <li>
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit
+                        <ul class="rec-sublist">
+                            <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
+                        </ul>
+                    </li>
+                    <li>
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit
+                        <ul class="rec-sublist">
+                            <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Wavy Background -->
+        <div class="wavy-background">
+            <svg viewBox="0 0 1440 320" preserveAspectRatio="none"
+                style="width: 100%; height: 100%; filter: blur(30px); opacity: 0.6">
+                <!-- Different path for variety, or reused -->
+                <path fill="#163C65" fill-opacity="1"
+                    d="M0,192L60,170.7C120,149,240,107,360,112C480,117,600,171,720,197.3C840,224,960,224,1080,208C1200,192,1320,160,1380,144L1440,128L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z">
+                </path>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    sidebarOpen: false,
+                    last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
+                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report']
+                }
+            },
+            methods: {
+                toggleSidebar() {
+                    this.sidebarOpen = !this.sidebarOpen;
+                },
+                openReport(reportName) {
+                    alert(`Opening report: ${reportName}`);
+                },
+                goBack() {
+                    window.history.back();
+                },
+                goHome() {
+                    window.location.href = 'home.html';
+                },
+                showGraph() {
+                    alert('Graphical view coming soon!');
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+
+</html>
