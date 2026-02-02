@@ -5,15 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CyberComply - User Support</title>
 
-    <!-- =========================================================
-         VUE 3 (CDN)
-         ========================================================= -->
+    <!-- Vue 3 (CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
 
     <style>
-      /* =========================================================
-         GLOBAL RESET AND BASE THEME
-         ========================================================= */
+      /* Global Reset And Base Theme */
       * {
         margin: 0;
         padding: 0;
@@ -33,9 +29,7 @@
         min-height: 100vh;
       }
 
-      /* =========================================================
-         BACKGROUND DESIGN LAYER
-         ========================================================= */
+      /* Background Design Layer */
       .bg-design {
         position: fixed;
         inset: 0;
@@ -48,9 +42,7 @@
         opacity: 0.85;
       }
 
-      /* =========================================================
-         TOP HEADER
-         ========================================================= */
+      /* Top Header */
       .top-header {
         background-color: #1a2845;
         padding: 15px 30px;
@@ -98,9 +90,7 @@
         fill: #1a2845;
       }
 
-      /* =========================================================
-         BACK NAVIGATION
-         ========================================================= */
+      /* Back Navigation */
       .back-arrow {
         position: absolute;
         left: 30px;
@@ -121,9 +111,7 @@
         color: #ffffff;
       }
 
-      /* =========================================================
-         SIDEBAR NAVIGATION
-         ========================================================= */
+      /* Sidebar Navigation */
       .sidebar {
         position: absolute;
         left: 0;
@@ -252,9 +240,7 @@
         font-style: italic;
       }
 
-      /* =========================================================
-         SCROLLBAR STYLING (SIDEBAR)
-         ========================================================= */
+      /* Scrollbar Styling (Sidebar) */
       .sidebar::-webkit-scrollbar {
         width: 6px;
       }
@@ -272,14 +258,7 @@
         background: #4a8fe7;
       }
 
-      /* =========================================================
-         RESPONSIVE BEHAVIOUR
-         (REMOVED: mobile/tablet support)
-         ========================================================= */
-
-      /* =========================================================
-         MAIN CONTENT WRAPPER
-         ========================================================= */
+      /* Main Content Wrapper */
       .support-content {
         position: relative;
         z-index: 1;
@@ -311,9 +290,7 @@
         max-width: 980px;
       }
 
-      /* =========================================================
-         SUPPORT SLIDER / CARDS
-         ========================================================= */
+      /* Support Slider / Cards */
       .support-slider {
         position: relative;
         border-radius: 18px;
@@ -428,9 +405,7 @@
         transform: translateY(-1px);
       }
 
-      /* =========================================================
-         SLIDE BACKGROUND THEMES
-         ========================================================= */
+      /* Slide Background Themes */
       .bg-about {
         background-color: #113961;
       }
@@ -443,9 +418,7 @@
         background-color: #2f4e6c;
       }
 
-      /* =========================================================
-         TRANSITIONS
-         ========================================================= */
+      /* Transitions */
       .fade-enter-active,
       .fade-leave-active {
         transition: opacity 220ms ease, transform 220ms ease;
@@ -467,9 +440,7 @@
     <div id="app">
       <div class="bg-design"></div>
 
-      <!-- =========================================================
-           TOP BAR
-           ========================================================= -->
+      <!-- Top Bar -->
       <div class="top-header">
         <div class="menu-icon" @click="toggleSidebar">●●●</div>
 
@@ -482,14 +453,10 @@
         </div>
       </div>
 
-      <!-- =========================================================
-           BACK NAVIGATION
-           ========================================================= -->
+      <!-- Back Navigation -->
       <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="onBack">←</div>
 
-      <!-- =========================================================
-           SIDEBAR
-           ========================================================= -->
+      <!-- Sidebar -->
       <div class="sidebar" :class="{ open: sidebarOpen }">
         <div class="sidebar-icon-bar">
           <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
@@ -566,9 +533,7 @@
         </div>
       </div>
 
-      <!-- =========================================================
-           MAIN USER SUPPORT AREA
-           ========================================================= -->
+      <!-- Main User Support Area -->
       <div class="support-content" :class="{ shifted: sidebarOpen }">
         <h1 class="page-title">USER SUPPORT</h1>
 
@@ -625,9 +590,7 @@
       </div>
     </div>
 
-    <!-- =========================================================
-         VUE APP SCRIPT
-         ========================================================= -->
+    <!-- Vue App Script -->
     <script>
       const { createApp } = Vue;
 

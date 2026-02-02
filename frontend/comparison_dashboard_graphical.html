@@ -5,15 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CyberComply - Comparison Dashboard Graphical</title>
 
-    <!-- =========================================================
-         VUE 3 (CDN)
-         ========================================================= -->
+    <!-- Vue 3 (CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
 
     <style>
-      /* =========================================================
-         GLOBAL RESET AND BASE THEME
-         ========================================================= */
+      /* Global Reset and Base Theme */
       * {
         margin: 0;
         padding: 0;
@@ -32,9 +28,7 @@
         min-height: 100vh;
       }
 
-      /* =========================================================
-         BACKGROUND DESIGN LAYER
-         ========================================================= */
+      /* Background Design Layer */
       .bg-design {
         position: fixed;
         inset: 0;
@@ -47,9 +41,7 @@
         opacity: 0.85;
       }
 
-      /* =========================================================
-         TOP HEADER
-         ========================================================= */
+      /* Top Header */
       .top-header {
         background-color: #1a2845;
         padding: 15px 30px;
@@ -70,9 +62,7 @@
         color: #ffffff;
       }
 
-      /* =========================================================
-         BACK NAVIGATION
-         ========================================================= */
+      /* Back Navigation */
       .back-arrow {
         position: absolute;
         left: 30px;
@@ -120,9 +110,7 @@
         fill: #1a2845;
       }
 
-      /* =========================================================
-         SIDEBAR NAVIGATION
-         ========================================================= */
+      /* Sidebar Navigation */
       .sidebar {
         position: absolute;
         left: 0;
@@ -251,9 +239,7 @@
         font-style: italic;
       }
 
-      /* =========================================================
-         SCROLLBAR STYLING (SIDEBAR)
-         ========================================================= */
+      /* Scrollbar Styling (Sidebar) */
       .sidebar::-webkit-scrollbar {
         width: 6px;
       }
@@ -268,9 +254,7 @@
         background: #4a8fe7;
       }
 
-      /* =========================================================
-         MAIN CONTENT WRAPPER
-         ========================================================= */
+      /* Main Content Wrapper */
       .main-content {
         transition: margin-left 0.3s ease-in-out;
         padding: 30px 60px;
@@ -283,9 +267,7 @@
         margin-left: 280px;
       }
 
-      /* =========================================================
-         DASHBOARD TITLES
-         ========================================================= */
+      /* Dashboard Titles */
       .dashboard-titles {
         text-align: center;
         margin-top: 28px;
@@ -313,9 +295,7 @@
         opacity: 0.95;
       }
 
-      /* =========================================================
-         CONTROL BAR
-         ========================================================= */
+      /* Control Bar */
       .controls-wrap {
         margin: 22px auto 0;
         max-width: 1100px;
@@ -375,9 +355,7 @@
         transform: translateY(-1px);
       }
 
-      /* =========================================================
-         DASHBOARD LAYOUT
-         ========================================================= */
+      /* Dashboard Layout */
       .dashboard-shell {
         margin: 18px auto 0;
         max-width: 1100px;
@@ -422,9 +400,7 @@
         text-transform: uppercase;
       }
 
-      /* =========================================================
-         LEGEND
-         ========================================================= */
+      /* Legend */
       .legend {
         display: flex;
         flex-wrap: wrap;
@@ -461,9 +437,7 @@
         font-weight: 700;
       }
 
-      /* =========================================================
-         PIE CHART AND TOOLTIP
-         ========================================================= */
+      /* Pie Chart and Tooltip */
       .chart-wrap {
         position: relative;
         width: 100%;
@@ -584,9 +558,7 @@
         line-height: 1.4;
       }
 
-      /* =========================================================
-         RANKING TABLE
-         ========================================================= */
+      /* Ranking Table */
       .table {
         width: 100%;
         border-collapse: collapse;
@@ -648,9 +620,7 @@
         border-color: #4a8fe7;
       }
 
-      /* =========================================================
-         DRILL-DOWN MODAL
-         ========================================================= */
+      /* Drill-Down Model */
       .modal-backdrop {
         position: fixed;
         inset: 0;
@@ -770,9 +740,6 @@
         margin: 6px 0;
       }
 
-      /* =========================================================
-         ✅ ADDED: SAME RESPONSIVE SIDEBAR LOGIC AS DOCUMENT PAGE
-         ========================================================= */
       @media (max-width: 1200px) {
         .sidebar {
           position: fixed;
@@ -790,7 +757,7 @@
     <div id="app">
       <div class="bg-design"></div>
 
-      <!-- TOP BAR -->
+      <!-- Top Bar -->
       <div class="top-header">
         <div class="menu-icon" @click="toggleSidebar">●●●</div>
 
@@ -803,10 +770,10 @@
         </div>
       </div>
 
-      <!-- BACK NAVIGATION -->
+      <!-- Back Navigation -->
       <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="onBack">←</div>
 
-      <!-- SIDEBAR -->
+      <!-- Sidebar -->
       <div class="sidebar" :class="{ open: sidebarOpen }">
         <div class="sidebar-icon-bar">
           <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
@@ -834,7 +801,7 @@
           />
         </div>
 
-        <!-- LAST 7 DAYS -->
+        <!-- Last 7 Days -->
         <div class="sidebar-section">
           <div class="sidebar-header">
             <svg viewBox="0 0 24 24">
@@ -860,7 +827,7 @@
           </div>
         </div>
 
-        <!-- LAST 30 DAYS -->
+        <!-- Last 30 Days -->
         <div class="sidebar-section">
           <div class="sidebar-header">
             <svg viewBox="0 0 24 24">
@@ -887,7 +854,7 @@
         </div>
       </div>
 
-      <!-- MAIN DASHBOARD AREA -->
+      <!-- Main Dashboard Area -->
       <div class="main-content" :class="{ shifted: sidebarOpen }">
         <div class="dashboard-titles">
           <div class="dashboard-title-main">COMPARISON DASHBOARD</div>
@@ -898,7 +865,7 @@
           </div>
         </div>
 
-        <!-- DASHBOARD CONTROLS -->
+        <!-- Dashboard Controls -->
         <div class="controls-wrap">
           <div class="controls-row">
             <div class="control-group">
@@ -929,7 +896,7 @@
         </div>
 
         <div class="dashboard-shell">
-          <!-- CHART CARD -->
+          <!-- Chart Card -->
           <div class="card">
             <div class="card-title">
               <h3>Department Comparison</h3>
@@ -1003,7 +970,7 @@
             </div>
           </div>
 
-          <!-- RANKING TABLE CARD -->
+          <!-- Ranking Table Card -->
           <div class="card">
             <div class="card-title">
               <h3>Ranking & Quick Insights</h3>
@@ -1055,7 +1022,7 @@
         </div>
       </div>
 
-      <!-- DRILL-DOWN MODAL -->
+      <!-- Drill-Down Model -->
       <div v-if="detailOpen && selectedDept" class="modal-backdrop" @click.self="closeDetail">
         <div class="modal">
           <div class="modal-head">
@@ -1106,7 +1073,7 @@
       </div>
     </div>
 
-    <!-- VUE APP SCRIPT -->
+    <!-- Vue App Script -->
     <script>
       const { createApp } = Vue;
 
