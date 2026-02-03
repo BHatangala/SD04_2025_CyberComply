@@ -6,22 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Comparison Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
-
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root {
-            --bg-dark: #101726;
-            --sidebar-bg: #0d1420;
-            --text-white: #ffffff;
-            --text-muted: #8b9dc3;
-            --accent-blue: #1a2845;
-            --highlight-blue: #2a3f5f;
-            --separator: #1C3A5A;
-            --font-main: 'Arial', sans-serif;
-            --btn-white: #ffffff;
-        }
-
         * {
             margin: 0;
             padding: 0;
@@ -29,152 +15,206 @@
         }
 
         body {
-            font-family: var(--font-main);
-            background-color: var(--bg-dark);
-            color: var(--text-white);
+            font-family: 'Arial', sans-serif;
+            background-color: #101726;
+            color: #ffffff;
             overflow-x: hidden;
-            background-image: linear-gradient(to bottom right, #051323, #020b16);
             min-height: 100vh;
         }
 
         #app {
             position: relative;
             min-height: 100vh;
-            display: grid;
-            grid-template-columns: 280px 1fr;
+        }
 
+        /* --- TOP HEADER --- */
+        .top-header {
+            background-color: #1a2845;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            position: relative;
+            z-index: 100;
+        }
+
+        .menu-icon {
+            cursor: pointer;
+            font-size: 24px;
+            color: #8b9dc3;
+            transition: color 0.3s;
+        }
+
+        .menu-icon:hover {
+            color: #ffffff;
         }
 
 
-        @media screen and (max-width: 1200px) {
-            #app {
-                display: block;
-            }
+        .user-profile {
+            position: absolute;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #2a3f5f;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .user-profile:hover {
+            transform: scale(1.05);
+            border-color: #4a8fe7;
+        }
+
+        .user-profile svg {
+            width: 30px;
+            height: 30px;
+            fill: #1a2845;
         }
 
         /* --- SIDEBAR --- */
         .sidebar {
-            background-color: var(--sidebar-bg);
-            border-right: 1px solid var(--separator);
-            height: 100vh;
-            position: sticky;
-            top: 0;
-            overflow-y: auto;
-            transform: translateX(0);
+            position: absolute;
+            left: 0;
+            top: 60px;
+            width: 280px;
+            height: calc(100vh - 60px);
+            background-color: #0d1420;
+            transform: translateX(-100%);
             transition: transform 0.3s ease-in-out;
             z-index: 90;
-            display: flex;
-            flex-direction: column;
+            overflow-y: auto;
+            padding: 20px 0;
+            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
         }
 
-        @media screen and (max-width: 1200px) {
-            .sidebar {
-                position: fixed;
-                left: 0;
-                top: 60px;
-                height: calc(100vh - 60px);
-                transform: translateX(-100%);
-            }
-
-            .sidebar.open {
-                transform: translateX(0);
-            }
+        .sidebar.open {
+            transform: translateX(0);
         }
 
-        .sidebar-header-icons {
+        .sidebar-icon-bar {
             display: flex;
-            padding: 20px;
-            gap: 15px;
+            justify-content: space-between;
             align-items: center;
+            padding: 0px 10px 15px 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #1a2845;
         }
 
-        .icon-btn {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            font-size: 1.5rem;
+        .sidebar-icon {
+            width: 45px;
+            height: 45px;
+            background-color: #1a2845;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            transition: color 0.3s;
+            transition: all 0.3s;
         }
 
-        .icon-btn:hover {
-            color: var(--text-white);
+        .sidebar-icon:hover {
+            background-color: #2a4a7c;
+            transform: scale(1.05);
         }
 
-        .search-btn {
-            font-size: 1.8rem;
+        .sidebar-icon svg {
+            width: 22px;
+            height: 22px;
+            fill: #8b9dc3;
+            transition: fill 0.3s;
         }
 
-        .add-btn {
-            font-size: 2rem;
+        .sidebar-icon:hover svg {
+            fill: #ffffff;
+        }
+
+        /* Search Input */
+        .search-container {
+            padding: 0 20px 20px;
+            display: none;
+        }
+
+        .search-container.active {
+            display: block;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 15px;
+            background-color: #1a2845;
+            border: 2px solid #2a4a7c;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #4a8fe7;
         }
 
         .sidebar-section {
-            margin-bottom: 20px;
+            margin-bottom: 30px;
         }
 
-        .section-title {
-            font-size: 0.75rem;
-            letter-spacing: 1.5px;
-            color: var(--text-white);
-            text-transform: uppercase;
+        .sidebar-header {
             padding: 10px 20px;
+            font-size: 11px;
             font-weight: 600;
+            color: #6b7a99;
+            letter-spacing: 1.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-header svg {
+            width: 14px;
+            height: 14px;
+            fill: #6b7a99;
         }
 
         .sidebar-item {
             padding: 12px 20px;
-            font-size: 0.9rem;
-            color: var(--text-white);
+            color: #c5d0e6;
             cursor: pointer;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            transition: background 0.2s;
-            letter-spacing: 1px;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            font-size: 14px;
         }
 
         .sidebar-item:hover {
-            background-color: rgba(255, 255, 255, 0.05);
+            background-color: #1a2845;
+            border-left-color: #4a8fe7;
+            color: #ffffff;
         }
 
         .no-results {
             padding: 12px 20px;
-            color: var(--text-muted);
-            font-size: 0.8rem;
+            color: #6b7a99;
+            font-size: 12px;
             font-style: italic;
         }
 
         /* --- MAIN CONTENT --- */
         .main-content {
-            padding: 20px 40px;
+            transition: margin-left 0.3s ease-in-out;
+            padding: 40px 60px;
             position: relative;
             z-index: 1;
-            display: flex;
-            flex-direction: column;
         }
 
-        /* Mobile Header */
-        .mobile-header {
-            display: none;
-            background-color: var(--accent-blue);
-            padding: 15px;
-            align-items: center;
-            justify-content: space-between;
+        .main-content.shifted {
+            margin-left: 280px;
         }
 
-        @media screen and (max-width: 1200px) {
-            .mobile-header {
-                display: flex;
-            }
-        }
-
-        .window-controls {
-            color: var(--text-muted);
-            font-size: 1rem;
-            letter-spacing: 2px;
-            margin-bottom: 20px;
-        }
-
-        .top-nav {
+        /* Page Specific Styles */
+        .top-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -183,85 +223,96 @@
 
         .nav-icons {
             display: flex;
-            gap: 20px;
+            gap: 25px;
         }
 
-        .nav-icons i {
-            color: var(--text-muted);
-            font-size: 1.5rem;
+        .nav-icon {
+            font-size: 28px;
+            color: #8b9dc3;
             cursor: pointer;
+            transition: color 0.3s, transform 0.2s;
         }
 
-        .nav-icons i:hover {
-            color: white;
+        .nav-icon:hover {
+            color: #ffffff;
+            transform: scale(1.1);
         }
 
-        .user-avatar i {
-            font-size: 3rem;
-            color: white;
-        }
+
 
         .page-title {
-            font-size: 2.5rem;
-            font-weight: 500;
             text-align: center;
-            margin-bottom: 30px;
+            font-size: 3rem;
+            font-weight: 400;
             letter-spacing: 2px;
+            margin-bottom: 50px;
             text-transform: uppercase;
         }
 
-        /* Comparison specific styles */
-        .comparison-container {
+        /* Comparison Dashboard Content */
+        .dashboard-container {
             max-width: 900px;
             margin: 0 auto;
-            width: 100%;
         }
 
-        .company-header {
-            font-weight: 700;
-            margin-bottom: 20px;
+        .company-name {
             font-size: 1.2rem;
-            letter-spacing: 1.5px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            text-transform: uppercase;
         }
 
-        .metrics-grid {
+        .metrics-row {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 40px;
-            flex-wrap: wrap;
+            justify-content: space-between;
+            margin-bottom: 50px;
             gap: 20px;
+            flex-wrap: wrap;
         }
 
         .metric-box {
             background-color: white;
-            color: var(--bg-dark);
-            padding: 15px 30px;
+            color: black;
+            padding: 15px 20px;
+            width: 200px;
+            /* Fixed width for boxy look */
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             text-align: center;
-            font-weight: 700;
-            font-size: 1.2rem;
-            min-width: 250px;
-            border-radius: 2px;
-            /* Sharp edges as per image */
+            font-weight: 800;
+            font-size: 1rem;
+            text-transform: capitalize;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            line-height: 1.2;
         }
 
         .metric-stats {
-            color: white;
-            font-size: 1.1rem;
+            text-align: left;
+            font-size: 1.2rem;
             letter-spacing: 1px;
+            font-weight: 400;
         }
 
         .metric-stats div {
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
 
-        .recommendations-title {
+        .recommendations-section {
             margin-top: 40px;
+            padding-left: 20px;
+            /* Indent slightly as per image */
+        }
+
+        .rec-title {
+            font-size: 1.2rem;
+            font-weight: 800;
+            letter-spacing: 2px;
             margin-bottom: 20px;
-            font-weight: 700;
-            letter-spacing: 1.5px;
             text-transform: uppercase;
-            font-size: 1.1rem;
         }
 
         .rec-list {
@@ -270,100 +321,138 @@
         }
 
         .rec-list>li {
-            margin-bottom: 20px;
             font-size: 1.1rem;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
         }
 
         .rec-list>li::before {
             content: "•";
             margin-right: 15px;
             font-size: 1.5rem;
-            vertical-align: middle;
+            line-height: 1rem;
         }
 
-        .rec-sublist {
+        .sub-rec-list {
             list-style: none;
             padding-left: 40px;
             margin-top: 10px;
         }
 
-        .rec-sublist li {
-            margin-bottom: 15px;
-            color: #d0dbe5;
+        .sub-rec-list li {
             font-size: 1rem;
+            color: #dbe4ee;
             display: flex;
-            align-items: flex-start;
+            align-items: center;
         }
 
-        .rec-sublist li::before {
-            content: "▪";
+        .sub-rec-list li::before {
+            content: "■";
             /* Square bullet */
+            font-size: 0.6rem;
             margin-right: 15px;
-            font-size: 1.2rem;
-            line-height: 1.2rem;
         }
 
-
-        /* Wavy Background */
+        /* --- WAVY BACKGROUND --- */
         .wavy-background {
             position: fixed;
-            bottom: -50px;
+            bottom: 0;
             left: 0;
-            width: 40%;
-            height: 60%;
+            /* Absolute corner */
+            width: 55%;
             z-index: 0;
             pointer-events: none;
         }
 
-        .wavy-background svg {
-            /* Mirror the wave to look like left side wave */
-            transform: scaleX(-1) rotate(10deg);
+        .wavy-background img {
+            width: 100%;
+            height: auto;
+            display: block;
         }
 
+        /* Scrollbar */
         ::-webkit-scrollbar {
             width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
         }
 
         ::-webkit-scrollbar-thumb {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 3px;
         }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
     </style>
 </head>
 
 <body>
     <div id="app">
-        <!-- Mobile Header -->
-        <div class="mobile-header">
-            <div class="menu-icon" @click="toggleSidebar" style="font-size: 24px; cursor: pointer;">☰</div>
-            <div style="font-weight: bold; font-size: 1.2rem;">CyberComply</div>
-            <div class="user-profile-mobile">
-                <i class="fa-regular fa-circle-user" style="font-size: 1.5rem;"></i>
+        <!-- Top Header -->
+        <div class="top-header">
+            <div class="menu-icon" @click="toggleSidebar">●●●</div>
+            <div class="user-profile" @click="showProfile">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
             </div>
         </div>
 
         <!-- Sidebar -->
         <div class="sidebar" :class="{ open: sidebarOpen }">
-            <div class="sidebar-header-icons">
-                <button class="icon-btn search-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
-                <button class="icon-btn add-btn"><i class="fa-solid fa-plus"></i></button>
+            <div class="sidebar-icon-bar">
+                <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                    </svg>
+                </div>
+                <div class="sidebar-icon" @click="goToHome" title="Start new analysis">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="search-container" :class="{ active: searchActive }">
+                <input type="text" class="search-input" v-model="searchQuery" placeholder="Search documents..."
+                    @input="filterReports">
             </div>
 
             <div class="sidebar-section">
-                <div class="section-title">LAST 7 DAYS</div>
-                <div v-if="last7Days.length === 0" class="no-results">No results</div>
+                <div class="sidebar-header">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
+                    </svg>
+                    LAST 7 DAYS
+                </div>
+                <div v-if="filteredLast7Days.length === 0" class="no-results">No results</div>
                 <div v-else>
-                    <div v-for="report in last7Days" :key="report" class="sidebar-item" @click="openReport(report)">
+                    <div v-for="report in filteredLast7Days" :key="report" class="sidebar-item"
+                        @click="openReport(report)">
                         {{ report }}
                     </div>
                 </div>
             </div>
 
             <div class="sidebar-section">
-                <div class="section-title">LAST 30 DAYS</div>
-                <div v-if="last30Days.length === 0" class="no-results">No results</div>
+                <div class="sidebar-header">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z" />
+                    </svg>
+                    LAST 30 DAYS
+                </div>
+                <div v-if="filteredLast30Days.length === 0" class="no-results">No results</div>
                 <div v-else>
-                    <div v-for="report in last30Days" :key="report" class="sidebar-item" @click="openReport(report)">
+                    <div v-for="report in filteredLast30Days" :key="report" class="sidebar-item"
+                        @click="openReport(report)">
                         {{ report }}
                     </div>
                 </div>
@@ -371,26 +460,23 @@
         </div>
 
         <!-- Main Content -->
-        <div class="main-content">
-            <div class="top-nav">
-                <div>
-                    <div class="window-controls">ooo</div>
-                    <div class="nav-icons">
-                        <i class="fa-solid fa-arrow-left" @click="goBack"></i>
-                        <i class="fa-solid fa-house" @click="goHome"></i>
-                    </div>
+        <div class="main-content" :class="{ shifted: sidebarOpen }">
+            <!-- Top Bar with Nav and Profile -->
+            <div class="top-bar">
+                <div class="nav-icons">
+                    <i class="fa-solid fa-arrow-left nav-icon" @click="goBack" title="Back"></i>
+                    <i class="fa-solid fa-house nav-icon" @click="goToHome" title="Home"></i>
                 </div>
-                <div class="user-avatar">
-                    <i class="fa-regular fa-circle-user"></i>
-                </div>
+
             </div>
 
             <h1 class="page-title">COMPARISON DASHBOARD</h1>
 
-            <div class="comparison-container">
-                <div class="company-header">ABC Company</div>
+            <!-- Dashboard Content -->
+            <div class="dashboard-container">
+                <div class="company-name">ABC Company</div>
 
-                <div class="metrics-grid">
+                <div class="metrics-row">
                     <div class="metric-box">
                         Security <br> Department
                     </div>
@@ -400,45 +486,40 @@
                         <div>Risk Level : Low</div>
                     </div>
 
-                    <div class="metric-box" style="cursor: pointer;" @click="showGraph">
+                    <div class="metric-box" style="cursor: pointer;" @click="showGraphic">
                         Graphical View
                     </div>
                 </div>
 
-                <h3 class="recommendations-title">CYBERCOMPLY Recommendations :</h3>
-
-                <ul class="rec-list">
-                    <li>
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit
-                        <ul class="rec-sublist">
-                            <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
-                        </ul>
-                    </li>
-                    <li>
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit
-                        <ul class="rec-sublist">
-                            <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
-                        </ul>
-                    </li>
-                    <li>
-                        Lorem ipsum dolor sit amet, consectetur adipiscing elit
-                        <ul class="rec-sublist">
-                            <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
-                        </ul>
-                    </li>
-                </ul>
+                <div class="recommendations-section">
+                    <h2 class="rec-title">CYBERCOMPLY Recommendations :</h2>
+                    <ul class="rec-list">
+                        <li>
+                            Lorem ipsum dolor sit amet, consectetur adipiscing elit
+                            <ul class="sub-rec-list">
+                                <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
+                            </ul>
+                        </li>
+                        <li>
+                            Lorem ipsum dolor sit amet, consectetur adipiscing elit
+                            <ul class="sub-rec-list">
+                                <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
+                            </ul>
+                        </li>
+                        <li>
+                            Lorem ipsum dolor sit amet, consectetur adipiscing elit
+                            <ul class="sub-rec-list">
+                                <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
 
         <!-- Wavy Background -->
         <div class="wavy-background">
-            <svg viewBox="0 0 1440 320" preserveAspectRatio="none"
-                style="width: 100%; height: 100%; filter: blur(30px); opacity: 0.6">
-                <!-- Different path for variety, or reused -->
-                <path fill="#163C65" fill-opacity="1"
-                    d="M0,192L60,170.7C120,149,240,107,360,112C480,117,600,171,720,197.3C840,224,960,224,1080,208C1200,192,1320,160,1380,144L1440,128L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z">
-                </path>
-            </svg>
+            <img src="img4.png" alt="Wavy Design">
         </div>
     </div>
 
@@ -448,14 +529,42 @@
         createApp({
             data() {
                 return {
-                    sidebarOpen: false,
+                    sidebarOpen: true,
+                    searchActive: false,
+                    searchQuery: '',
                     last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
-                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report']
+                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
+                    filteredLast7Days: [],
+                    filteredLast30Days: []
                 }
+            },
+            mounted() {
+                this.filteredLast7Days = [...this.last7Days];
+                this.filteredLast30Days = [...this.last30Days];
             },
             methods: {
                 toggleSidebar() {
                     this.sidebarOpen = !this.sidebarOpen;
+                },
+                toggleSearch() {
+                    this.searchActive = !this.searchActive;
+                    if (!this.searchActive) {
+                        this.searchQuery = '';
+                        this.filterReports();
+                    }
+                },
+                filterReports() {
+                    const query = this.searchQuery.toLowerCase();
+                    if (!query) {
+                        this.filteredLast7Days = [...this.last7Days];
+                        this.filteredLast30Days = [...this.last30Days];
+                    } else {
+                        this.filteredLast7Days = this.last7Days.filter(report => report.toLowerCase().includes(query));
+                        this.filteredLast30Days = this.last30Days.filter(report => report.toLowerCase().includes(query));
+                    }
+                },
+                showProfile() {
+                    alert('Profile clicked');
                 },
                 openReport(reportName) {
                     alert(`Opening report: ${reportName}`);
@@ -463,11 +572,11 @@
                 goBack() {
                     window.history.back();
                 },
-                goHome() {
+                goToHome() {
                     window.location.href = 'home.html';
                 },
-                showGraph() {
-                    alert('Graphical view coming soon!');
+                showGraphic() {
+                    alert('Graphical View Coming Soon');
                 }
             }
         }).mount('#app');
