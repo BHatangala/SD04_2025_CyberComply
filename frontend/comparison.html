@@ -458,7 +458,7 @@
                     this.sidebarOpen = !this.sidebarOpen;
                 },
                 openReport(reportName) {
-                    alert(`Opening report: ${reportName}`);
+                    window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
                 goBack() {
                     window.history.back();

@@ -1280,7 +1280,7 @@
           },
 
           openReport(reportName) {
-            alert(`Opening report: ${reportName}\n\nReport viewing interface will be implemented soon!`);
+            window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
           },
 
           hoverDeptById(id) {
