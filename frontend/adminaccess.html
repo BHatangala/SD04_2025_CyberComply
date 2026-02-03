@@ -424,7 +424,11 @@
                 </p>
                 <div class="admin-form">
                     <label>EMAIL</label>
-                    <input type="email" v-model="orgEmail" placeholder="Enter email">
+                    <input 
+                        type="email" 
+                        v-model="orgEmail" 
+                        placeholder="hello@cybercomply.com"
+                    />
                     <button @click="sendVerification">SEND</button>
                 </div>
             </div>
@@ -443,7 +447,7 @@
             data() {
                 return {
                     sidebarOpen: false,
-                    orgEmail: 'hello@reallygreatsite.com',
+                    orgEmail: '',
                     last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
                     last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
                     searchActive: false,
