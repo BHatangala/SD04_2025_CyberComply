@@ -20,6 +20,7 @@
       height: 100vh;
     }
     .container {
+      z-index: 2;
       max-width: 400px;
       width: 100%;
       padding: 20px;
@@ -67,12 +68,21 @@
       font-size: 14px;
       margin-bottom: 20px;
     }
+    .wave-right {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 65%;
+      z-index: 1;
+      opacity: 1;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
   <div id="app" class="container">
     <h1>Create New Account</h1>
-    <div class="link-text">Already Registered? <a href="#" style="color: #a2b8c8;">Log in here.</a></div>
+    <div class="link-text">Already Registered? <a href="login.html" style="color: #a2b8c8;">Log in here.</a></div>
     
     <div class="form-group">
       <label for="name">NAME</label>
@@ -100,6 +110,8 @@
     </div>
 
     <button @click="submitForm">Sign Up</button>
+
+    <img src="img2.png" alt="Wave design right" class="wave-right">
   </div>
 
   <script>
