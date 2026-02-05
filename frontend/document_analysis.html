@@ -57,6 +57,27 @@
             z-index: 95;
         }
 
+        .back-arrow::after {
+            content: "Back to Previous Page";
+            position: absolute;
+            left: 0px;
+            top: 150%;
+            transform: translateY(-50%);
+            background: #1a2845;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .back-arrow:hover::after {
+            opacity: 1;
+        }
+
         .back-arrow.shifted {
             left: 310px;
         }

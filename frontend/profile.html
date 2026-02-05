@@ -58,7 +58,7 @@
         }
 
         .back-arrow::after {
-            content: "Back to Home";
+            content: "Back to Previous Page";
             position: absolute;
             left: 40px;
             top: 50%;
@@ -574,7 +574,7 @@
                     }
                 },
                 goToHome() {
-                    window.location.href = 'home.html';   // or index.html / dashboard.html — adjust name
+                    window.history.back();
                 },
                 filterReports() {
                     const query = this.searchQuery.toLowerCase();
