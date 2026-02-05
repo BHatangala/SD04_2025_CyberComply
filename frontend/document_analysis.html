@@ -57,6 +57,27 @@
             z-index: 95;
         }
 
+        .back-arrow::after {
+            content: "Back to Previous Page";
+            position: absolute;
+            left: 0px;
+            top: 150%;
+            transform: translateY(-50%);
+            background: #1a2845;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .back-arrow:hover::after {
+            opacity: 1;
+        }
+
         .back-arrow.shifted {
             left: 310px;
         }
@@ -374,7 +395,7 @@
             position: absolute;
             top: 55px;
             right: 0;
-            width: 45%;
+            width: 75%;
             z-index: 0;
             opacity: 0.7;
             pointer-events: none;
@@ -639,16 +660,16 @@
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
                 viewComplianceScore() {
-                    alert('Compliance Score details page will be implemented soon!');
+                    window.location.href = 'compliance.html';
                 },
                 viewRecommendations() {
                     window.location.href = 'recommendations.html';
                 },
                 compareReport() {
-                    alert('Compare functionality will be implemented soon!');
+                    window.location.href = 'comparison.html';
                 },
                 generateReports() {
-                    alert('Generate Reports functionality will be implemented soon!');
+                    window.location.href = 'report_viewing.html';
                 }
             }
         }).mount('#app');

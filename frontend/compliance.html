@@ -48,6 +48,89 @@
             color: #ffffff;
         }
 
+        /* Back Arrow */
+        .back-arrow {
+            position: absolute;
+            left: 30px;
+            top: 80px;
+            cursor: pointer;
+            font-size: 32px;
+            color: #8b9dc3;
+            transition: all 0.3s;
+            font-weight: 300;
+            z-index: 95;
+        }
+
+        .back-arrow::after {
+            content: "Back to Previous Page";
+            position: absolute;
+            left: 0px;
+            top: 150%;
+            transform: translateY(-50%);
+            background: #1a2845;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .back-arrow:hover::after {
+            opacity: 1;
+        }
+
+        .back-arrow.shifted {
+            left: 310px;
+        }
+
+        .back-arrow:hover {
+            color: #ffffff;
+        }
+
+        /* Home Button */
+        .home-button {
+            position: absolute;
+            left: 100px;
+            top: 85px;
+            cursor: pointer;
+            font-size: 28px;
+            color: #8b9dc3;
+            transition: all 0.3s;
+            z-index: 95;
+        }
+
+        .home-button::after {
+            content: "Back to Home Page";
+            position: absolute;
+            left: 10px;
+            top: 150%;
+            transform: translateY(-50%);
+            background: #1a2845;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .home-button:hover::after {
+            opacity: 1;
+        }
+
+        .home-button.shifted {
+            left: 360px;
+        }
+
+        .home-button:hover {
+            color: #ffffff;
+        }
+
         .user-profile {
             position: absolute;
             right: 30px;
@@ -215,24 +298,6 @@
         }
 
         /* Page Specific Styles */
-        .top-nav {
-            display: flex;
-            gap: 25px;
-            margin-bottom: 40px;
-        }
-
-        .nav-icon {
-            font-size: 28px;
-            color: #8b9dc3;
-            cursor: pointer;
-            transition: color 0.3s, transform 0.2s;
-        }
-
-        .nav-icon:hover {
-            color: #ffffff;
-            transform: scale(1.1);
-        }
-
         .page-title {
             text-align: center;
             font-size: 3rem;
@@ -370,6 +435,16 @@
             </div>
         </div>
 
+        <!-- Back Arrow -->
+        <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←</div>
+
+        <!-- Home Button -->
+        <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goToHome">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="#8b9dc3">
+                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+            </svg>
+        </div>
+
         <!-- Sidebar -->
         <div class="sidebar" :class="{ open: sidebarOpen }">
             <div class="sidebar-icon-bar">
@@ -430,16 +505,6 @@
 
         <!-- Main Content -->
         <div class="main-content" :class="{ shifted: sidebarOpen }">
-            <!-- Navigation Icons -->
-            <div class="top-nav">
-                <i class="fa-solid fa-magnifying-glass nav-icon" v-if="false"></i>
-                <!-- Placeholder for search if needed -->
-                <!-- Back Arrow -->
-                <i class="fa-solid fa-arrow-left nav-icon" @click="goBack" title="Back"></i>
-                <!-- Home Icon -->
-                <i class="fa-solid fa-house nav-icon" @click="goToHome" title="Home"></i>
-            </div>
-
             <h1 class="page-title">COMPLIANCE SCORE</h1>
 
             <div class="info-section">
@@ -518,10 +583,10 @@
                     }
                 },
                 showProfile() {
-                    alert('Profile clicked');
+                    window.location.href = 'profile.html';
                 },
                 openReport(reportName) {
-                    alert(`Opening report: ${reportName}`);
+                    window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
                 goBack() {
                     window.history.back();
