@@ -1,9 +1,11 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Dashboard</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <style>
         * {
@@ -636,7 +638,7 @@
                         class="sidebar-item"
                         @click="openReport(report)"
                     >
-                        {{ report }}
+                        [[ report ]]
                     </div>
                 </div>
             </div>
@@ -658,7 +660,7 @@
                         class="sidebar-item"
                         @click="openReport(report)"
                     >
-                        {{ report }}
+                        [[ report ]]
                     </div>
                 </div>
             </div>
@@ -675,11 +677,11 @@
             <div class="selected-info" :class="{ show: companyName || selectedDepartment }">
                 <div class="info-badge" v-if="companyName">
                     <span class="label">COMPANY:</span>
-                    <span class="value">{{ companyName }}</span>
+                    <span class="value">[[ companyName ]]</span>
                 </div>
                 <div class="info-badge" v-if="selectedDepartment">
                     <span class="label">DEPARTMENT:</span>
-                    <span class="value">{{ selectedDepartment }}</span>
+                    <span class="value">[[ selectedDepartment ]]</span>
                 </div>
             </div>
 
@@ -738,7 +740,7 @@
 
                 <!-- Error Messages -->
                 <div v-if="errorMessage" class="error-message">
-                    {{ errorMessage }}
+                    [[ errorMessage ]]
                 </div>
 
                 <!-- Upload Status -->
@@ -755,8 +757,8 @@
                                 </svg>
                             </div>
                             <div class="file-details">
-                                <div class="file-name">{{ file.name }}</div>
-                                <div class="file-size">{{ formatFileSize(file.size) }}</div>
+                                <div class="file-name">[[ file.name ]]</div>
+                                <div class="file-size">[[ formatFileSize(file.size) ]]</div>
                                 <div v-if="file.uploading" class="loading-bar">
                                     <div class="loading-progress"></div>
                                 </div>
@@ -779,7 +781,7 @@
 
         <!-- Wavy Background -->
         <div class="wavy-background">
-            <img src="img3.png" alt="Wavy Design">
+            <img src="{% static 'img3.png' %}" alt="Wavy Design">
         </div>
     </div>
 
@@ -787,6 +789,7 @@
         const { createApp } = Vue;
 
         createApp({
+            delimiters: ['[[', ']]'],
             data() {
                 return {
                     sidebarOpen: false,
@@ -801,7 +804,8 @@
                     last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
                     last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
                     filteredLast7Days: [],
-                    filteredLast30Days: []
+                    filteredLast30Days: [],
+                    apiEndpoint: "{% url 'analyze_compliance' %}"  // Django URL
                 }
             },
             mounted() {
@@ -908,22 +912,64 @@
                             size: file.size,
                             uploading: true,
                             uploaded: false,
-                            error: false
+                            error: false,
+                            file: file  // Store actual file object
                         };
                         
                         this.uploadedFiles.push(fileObj);
 
-                        // Simulate upload (since backend is not implemented)
-                        this.simulateUpload(fileObj);
+                        // CHANGED: Actually upload to Django backend
+                        this.uploadToDjango(fileObj);
                     }
                 },
-                simulateUpload(fileObj) {
+                uploadToDjango(fileObj) {
+                    const formData = new FormData();
+                    formData.append('document', fileObj.file);
+                    formData.append('company_name', this.companyName || '');
+                    formData.append('department', this.selectedDepartment || '');
+
+                    // Get CSRF token
+                    const csrfToken = document.querySelector('[name=csrf-token]').content;
+
+                    // Make API call to Django
+                    fetch(this.apiEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken,
+                        },
+                        body: formData
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Upload successful:', data);
+                        fileObj.uploading = false;
+                        fileObj.uploaded = true;
+                        
+                        // Store analysis results
+                        fileObj.analysisResults = data;
+                        
+                        // Optionally redirect to results page
+                        // window.location.href = `/analysis-results/${data.document_id}`;
+                    })
+                    .catch(error => {
+                        console.error('Upload error:', error);
+                        fileObj.uploading = false;
+                        fileObj.error = true;
+                        this.errorMessage = `Failed to upload "${fileObj.name}": ${error.message}`;
+                    });
+                },
+                /*simulateUpload(fileObj) {
                     // Simulate upload delay (1.5 seconds)
                     setTimeout(() => {
                         fileObj.uploading = false;
                         fileObj.uploaded = true;
                     }, 1500);
-                },
+                },*/
                 formatFileSize(bytes) {
                     if (bytes === 0) return '0 Bytes';
                     const k = 1024;
