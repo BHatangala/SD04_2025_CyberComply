@@ -759,13 +759,14 @@
                             <div class="file-details">
                                 <div class="file-name">[[ file.name ]]</div>
                                 <div class="file-size">[[ formatFileSize(file.size) ]]</div>
-                                <div v-if="file.uploading" class="loading-bar">
+                                <div v-if="file.uploading || file.analyzing" class="loading-bar">
                                     <div class="loading-progress"></div>
                                 </div>
                             </div>
                         </div>
                         <div class="file-status" :class="{ success: file.uploaded, error: file.error }">
                             <span v-if="file.uploading">Uploading...</span>
+                            <span v-else-if="file.analyzing" style="color: #f0a500;">⚙ AI Analyzing... (this may take a few minutes)</span>
                             <span v-else-if="file.uploaded">✓ Uploaded</span>
                             <span v-else-if="file.error">✗ Error</span>
                         </div>
@@ -912,6 +913,7 @@
                             size: file.size,
                             uploading: true,
                             uploaded: false,
+                            analyzing: false,
                             error: false,
                             file: file  // Store actual file object
                         };
@@ -931,6 +933,9 @@
                     // Get CSRF token
                     const csrfToken = document.querySelector('[name=csrf-token]').content;
 
+                    fileObj.uploading = true;
+                    fileObj.analyzing = false;
+
                     // Make API call to Django
                     fetch(this.apiEndpoint, {
                         method: 'POST',
@@ -940,6 +945,9 @@
                         body: formData
                     })
                     .then(response => {
+                        fileObj.uploading = false;
+                        fileObj.uploaded = true;
+                        fileObj.analyzing = true;
                         if (!response.ok) {
                             throw new Error(`HTTP error! status: ${response.status}`);
                         }
@@ -947,7 +955,7 @@
                     })
                     .then(data => {
                         console.log('Upload successful:', data);
-                        fileObj.uploading = false;
+                        fileObj.analyzing = false;
                         fileObj.uploaded = true;
                         
                         // Store analysis results
@@ -959,6 +967,7 @@
                     .catch(error => {
                         console.error('Upload error:', error);
                         fileObj.uploading = false;
+                        fileObj.analyzing = false;
                         fileObj.error = true;
                         this.errorMessage = `Failed to upload "${fileObj.name}": ${error.message}`;
                     });

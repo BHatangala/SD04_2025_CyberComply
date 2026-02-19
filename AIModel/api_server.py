@@ -22,7 +22,7 @@ def health_check():
     return jsonify({
         "status": "healthy", 
         "model": "DeepSeek-R1-Distill-7B",
-        "device": "NVIDIA GeForce MX230"
+        "device": "Hugging Face Inference API" 
     })
 
 @app.route('/api/analyze', methods=['POST'])

@@ -1,71 +1,90 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-import torch
 import os
+import time
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class DeepSeekLoader:
-    def __init__(self, model_name="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"):
-        hf_token = os.getenv("HF_TOKEN")
-        cache_dir = os.getenv("HF_HOME")
-        offload_path = "E:/AIModel/offload"
+    def __init__(self):
+        self.api_key = os.getenv("OPENROUTER_API_KEY")
+        if not self.api_key:
+            raise ValueError("OPENROUTER_API_KEY not found in .env file.")
 
-        if not os.path.exists(offload_path):
-            os.makedirs(offload_path, exist_ok=True)
-            
-        self.device = "cpu"
-        
-        # 1. Simplified 4-bit Config for CPU stability
-        self.bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_use_double_quant=True,
-            # This is critical for preventing the Meta-Tensor error on some systems
-            llm_int8_enable_fp32_cpu_offload=True 
-        )
+        self.api_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:5000", # Required for OpenRouter rankings
+            "X-Title": "CyberComply AI App",
+        }
+        # R1 Distill Qwen 32B: free, less congested than full R1, 
+        # outperforms o1-mini, ideal for legal compliance reasoning
+        self.model = "deepseek/deepseek-r1-distill-qwen-32b"
+        print(f"DeepSeek R1 Distill Qwen 32B configured via OpenRouter (free).")
 
-        print(f"Loading tokenizer...")
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            token=hf_token,
-            cache_dir=cache_dir
-        )
-        
-        print("Loading model via Manual CPU Mapping (Bypassing Meta-Tensor logic)...")
-        
-        # 2. Force Load to CPU
-        # We replace device_map="auto" with a hardcoded CPU mapping to avoid the .item() crash
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            token=hf_token,
-            quantization_config=self.bnb_config,
-            device_map={"": "cpu"}, 
-            torch_dtype=torch.float16,
-            cache_dir=cache_dir,
-            offload_folder=offload_path,
-            low_cpu_mem_usage=True,
-            trust_remote_code=True
-        )
-        
-        print("Model loaded successfully!")
+    def generate_response(self, prompt: str, max_length: int = 1024, temperature: float = 0.6, retries: int = 3) -> str:
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "max_tokens": max_length,
+            "temperature": temperature
+        }
 
-    def generate_response(self, prompt, max_length=1024, temperature=0.1):
-        # Everything stays on CPU
-        print("AI is thinking... (Generating tokens on CPU)") # Log to terminal
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-        
-        with torch.inference_mode():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=max_length,
-                temperature=temperature,
-                do_sample=True if temperature > 0 else False,
-                pad_token_id=self.tokenizer.eos_token_id
-            )
-        print("Generation complete!")
-        return self.tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
+        for attempt in range(1, retries + 1):
+            try:
+                print(f"[DEBUG] Attempt {attempt}/{retries} — Sending request to OpenRouter...")
+                print(f"[DEBUG] Prompt length: {len(prompt)} characters")
+
+                response = requests.post(
+                    self.api_url,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=120
+                )
+
+                print(f"[DEBUG] Response status: {response.status_code}")
+
+                # Handle rate limiting with exponential backoff
+                if response.status_code == 429:
+                    wait_time = 2 ** attempt  # 2s, 4s, 8s
+                    print(f"[DEBUG] Rate limited (429). Waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+                    continue
+
+                print(f"[DEBUG] Raw response preview: {response.text[:300]}")
+                response.raise_for_status()
+                result = response.json()
+
+                if isinstance(result, dict) and "choices" in result:
+                    content = result["choices"][0]["message"]["content"]
+                    print(f"[DEBUG] Success — Response length: {len(content)} chars")
+                    print(f"[DEBUG] Response content: {content[:300]}")
+                    return content
+
+                if isinstance(result, dict) and "error" in result:
+                    print(f"[DEBUG] OpenRouter error: {result['error']}")
+                    return ""
+
+                return str(result)
+
+            except requests.exceptions.Timeout:
+                print(f"[DEBUG] Attempt {attempt} timed out after 120s.")
+                if attempt < retries:
+                    print(f"[DEBUG] Retrying in 5 seconds...")
+                    time.sleep(5)
+                else:
+                    raise
+
+            except requests.exceptions.RequestException as e:
+                # Don't retry on non-429 HTTP errors
+                print(f"[DEBUG] Request failed: {e}")
+                raise
+
+        raise RuntimeError("All retry attempts exhausted.")
+
 
 _model_instance = None
 
