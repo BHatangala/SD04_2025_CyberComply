@@ -48,3 +48,14 @@ Thumbs.db
 *.mov
 *.wmv
 
+# Ignore the virtual environment folder
+venv/
+.venv/
+env/
+
+# Ignore Python's automatic cache files
+__pycache__/
+*.pyc
+
+# Ignore local environment variables (keys/secrets)
+.env
