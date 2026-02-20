@@ -43,7 +43,8 @@
             position: fixed;
             bottom: 0;
             right: 0;
-            width: 85%;
+            width: 100%;
+            height: 100%;
             z-index: 0;
             pointer-events: none;
         }
@@ -58,7 +59,7 @@
         <div class="flex-1 flex items-center justify-center px-4">
 
             <div class="w-full max-w-md text-center space-y-8">
-                <div class="space-y-6">
+                <div class="space-y-2">
                     <h1 class="text-5xl font-medium tracking-tight">Login</h1>
                     <p class="text-gray-400 text-sm tracking-wide">Sign in to continue</p>
                 </div>
@@ -129,9 +130,17 @@
                     message.text = '';
 
                     // Manual Email Validation
-                    if (!form.email || !form.email.includes('@')) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!form.email || !emailRegex.test(form.email)) {
                         message.type = 'error';
-                        message.text = "Please include an '@' in the email address.";
+                        message.text = "Please enter a valid email address.";
+                        return;
+                    }
+
+                    // Password Validation
+                    if (!form.password) {
+                        message.type = 'error';
+                        message.text = "Please enter your password.";
                         return;
                     }
 
@@ -154,7 +163,6 @@
                         message.type = 'success';
                         message.text = 'Login Success! Redirecting...';
                         setTimeout(() => {
-                            window.location.href = 'home.html';
                         }, 1500);
 
                     } catch (e) {
