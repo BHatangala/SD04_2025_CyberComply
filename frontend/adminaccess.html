@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Administrative Access</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="otp_component.js"></script>
     <style>
         * {
             margin: 0;
@@ -315,6 +316,118 @@
             background: #4a8fe7;
         }
 
+        .back-arrow {
+            position: absolute;
+            left: 30px;
+            top: 80px;
+            cursor: pointer;
+            font-size: 32px;
+            color: #8b9dc3;
+            transition: all 0.3s;
+            font-weight: 300;
+            z-index: 95;
+        }
+
+        .back-arrow::after {
+            content: "Back to Profile";
+            position: absolute;
+            left: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #1a2845;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .back-arrow:hover::after {
+            opacity: 1;
+        }
+
+        .back-arrow.shifted {
+            left: 310px;
+        }
+
+        .back-arrow:hover {
+            color: #ffffff;
+        }
+
+        .message-banner {
+            margin: 20px auto;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            max-width: 400px;
+        }
+
+        .message-banner.success {
+            background: #166534;
+            border: 1px solid #4ade80;
+            color: white;
+        }
+
+        .message-banner.error {
+            background: #fee2e2;
+            border: 1px solid #f87171;
+            color: #b91c1c;
+        }
+
+        .success-title {
+            color: #ffffff;
+        }
+
+        .success-text {
+            color: #c5d0e6;
+        }
+
+        /* FULL SCREEN DARK BACKGROUND */
+        .otp-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            backdrop-filter: blur(4px);
+        }
+
+        /* CENTERED OTP BOX */
+        .otp-modal {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2a4a7c 100%);
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+        }
+
+        /* BACK BUTTON */
+        .back-btn {
+            margin-top: 20px;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+        }
+
+        .otp-modal h3 {
+            margin-bottom: 24px;
+            font-size: 22px;
+            color: #ffffff;
+        }
+
+        .otp-modal p {
+            color: #c5d0e6;
+            margin-bottom: 28px;
+            font-size: 15px;
+        }
+
         @media screen and (max-width: 1200px) {
             .sidebar {
                 position: fixed;
@@ -338,6 +451,9 @@
                 </svg>
             </div>
         </div>
+
+        <!-- Back Arrow -->
+        <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goToProfile">←</div>
 
         <!-- Sidebar -->
         <div class="sidebar" :class="{ open: sidebarOpen }">
@@ -434,6 +550,49 @@
             </div>
         </div>
 
+        <!-- OTP + SUCCESS MODAL -->
+        <div v-if="step === 'otp' || step === 'success'" class="otp-overlay">
+
+            <div class="otp-modal">
+
+                <!-- OTP VIEW -->
+                <div v-if="step === 'otp'">
+
+                    <h2>Enter the OTP sent to {{ orgEmail }}</h2>
+
+                    <transition name="fade">
+                        <div v-if="message.text"
+                            class="message-banner"
+                            :class="message.type">
+                            {{ message.text }}
+                        </div>
+                    </transition>
+
+                    <otp-verification 
+                        :email="orgEmail" 
+                        @verified="handleOtpVerified">
+                    </otp-verification>
+
+                </div>
+
+
+                <!-- SUCCESS VIEW (INSIDE SAME MODAL) -->
+                <div v-if="step === 'success'" class="success-step">
+
+                    <h2 class="success-title">Admin Access Granted</h2>
+
+                    <p class="success-text">
+                        <br>
+                        Redirecting to profile page...
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
         <!-- Curly Line Background -->
         <div class="wavy-background">
             <img src="img5.png" alt="Curly Line Design">
@@ -443,11 +602,14 @@
     <script>
         const { createApp } = Vue;
 
-        createApp({
+        const app = createApp({
             data() {
                 return {
                     sidebarOpen: false,
                     orgEmail: '',
+                    step: 'form',              // 'form' | 'otp' | 'success'
+                    message: { text: '', type: '' },
+                    loading: false,
                     last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
                     last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
                     searchActive: false,
@@ -472,12 +634,35 @@
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
                 sendVerification() {
-                    if (this.orgEmail) {
-                        alert(`Verification email sent to: ${this.orgEmail}`);
-                        // Implement send logic here
-                    } else {
-                        alert('Please enter a valid email.');
+                    if (!this.orgEmail) {
+                        this.message = { text: 'Please enter a valid email.', type: 'error' };
+                        return;
                     }
+
+                    // simulate sending email
+                    this.step = 'otp';
+                    this.message = { text: 'OTP sent successfully.', type: 'success' };
+                },
+                handleOtpVerified() {
+                    // save email for profile page
+                    sessionStorage.setItem('userRole', 'Admin');
+                    sessionStorage.setItem('userEmail', this.orgEmail);
+
+                    // show green success message
+                    this.message = {
+                        text: 'Administrative access granted successfully.',
+                        type: 'success'
+                    };
+
+                    this.step = 'success';
+
+                    // redirect after message
+                    setTimeout(() => {
+                        window.location.href = 'profile.html';
+                    }, 2200);
+                },
+                goToProfile() {
+                    window.location.href = 'profile.html';
                 },
                 toggleSearch() {
                     this.searchActive = !this.searchActive;
@@ -504,7 +689,9 @@
                     }
                 }
             }
-        }).mount('#app');
+        });
+        registerOtpComponent(app);
+        app.mount('#app');
     </script>
 </body>
 </html>
