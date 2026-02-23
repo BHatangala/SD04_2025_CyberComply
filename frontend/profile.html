@@ -593,22 +593,46 @@
                 </div>
                 <div class="profile-actions">
                     <button class="action-button" @click="grantAdminAccess">GRANT ADMIN ACCESS</button>
-                    <button class="action-button delete" @click="showDeleteOtp">DELETE ACCOUNT</button>
+                    <button class="action-button delete" @click="deleteAccount">DELETE ACCOUNT</button>
                 </div>
             </div>
         </div>
 
-        <!-- OTP Overlay for Delete Account -->
-        <div v-if="showOtpModal" class="otp-overlay">
+        <!-- DELETE ACCOUNT OTP + SUCCESS MODAL -->
+        <div v-if="step === 'otp' || step === 'success'" class="otp-overlay">
+
             <div class="otp-modal">
-                <h3>Verify Your Identity</h3>
-                <p>Enter the OTP sent to your email to confirm account deletion.</p>
-                <otp-verification 
-                    :email="email" 
-                    @verified="handleDeleteConfirmed"
-                ></otp-verification>
-                <button class="otp-modal-close" @click="showOtpModal = false">Cancel</button>
+
+                <!-- OTP VIEW -->
+                <div v-if="step === 'otp'">
+
+                    <h2>Verify Account Deletion</h2>
+                    <p><br>An OTP has been sent to your registered email.</p>
+
+                    <transition name="fade">
+                        <div v-if="message.text"
+                            class="message-banner"
+                            :class="message.type">
+                            {{ message.text }}
+                        </div>
+                    </transition>
+
+                    <otp-verification 
+                        :email="userEmail"
+                        @verified="handleDeleteVerified">
+                    </otp-verification>
+
+                </div>
+
+                <!-- SUCCESS VIEW -->
+                <div v-if="step === 'success'" class="success-step">
+
+                    <h3 class="success-title">Account Deleted Successfully</h3>
+
+                </div>
+
             </div>
+
         </div>
 
         <!-- Curly Line Background -->
@@ -623,11 +647,14 @@
         const app = createApp({
         data() {
             return {
+                step: 'profile', // profile | otp | success
+                message: { text: '', type: '' },
                 sidebarOpen: false,
                 userName: 'James S',
                 fullName: 'James Smith',
-                email: 'James@gmail.com',
-                role: 'User',
+                userEmail: sessionStorage.getItem('userEmail') || '',
+                email: sessionStorage.getItem('userEmail') || 'James@gmail.com',
+                role: sessionStorage.getItem('userRole') || 'General',
                 passwordMasked: 'Pa***********',
                 searchActive: false,
                 searchQuery: '',
@@ -643,6 +670,8 @@
                 // Initialize filtered lists
                 this.filteredLast7Days = [...this.last7Days];
                 this.filteredLast30Days = [...this.last30Days];
+
+                this.assignRoleFromEmail();
             },
             methods: {
                 toggleSidebar() {
@@ -660,16 +689,23 @@
                     // Implement admin access logic here
                     window.location.href = 'adminaccess.html';
                 },
-                showDeleteOtp() {
-                    if (confirm('This will permanently delete your account. Proceed?')) {
-                        this.showOtpModal = true;
-                    }
+                deleteAccount() {
+                    this.step = 'otp';
+                    this.message = {
+                        text: '',
+                        type: 'success'
+                    };
                 },
-                handleDeleteConfirmed() {
-                    // OTP verified → simulate delete + redirect
-                    alert('Account successfully deleted.');
-                    this.showOtpModal = false;
-                    window.location.href = 'welcome.html';
+                handleDeleteVerified() {
+
+                    // simulate account deletion
+                    localStorage.clear();
+
+                    this.step = 'success';
+
+                    setTimeout(() => {
+                        window.location.href = 'welcome.html';
+                    }, 2200);
                 },
                 toggleSearch() {
                     this.searchActive = !this.searchActive;
@@ -693,6 +729,19 @@
                         this.filteredLast30Days = this.last30Days.filter(report => 
                             report.toLowerCase().includes(query)
                         );
+                    }
+                },
+                assignRoleFromEmail() {
+                    const storedRole = sessionStorage.getItem('userRole');
+                    const storedEmail = sessionStorage.getItem('userEmail');
+
+                    // Example rule — change to your real logic later
+                    if (storedRole) {
+                        this.role = storedRole;
+                    }
+
+                    if (storedEmail) {
+                        this.email = storedEmail;
                     }
                 }
             }
