@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Profile</title>
+    <!-- Vue.js 3 CDN -->
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <!-- Custom OTP Component -->
     <script src="otp_component.js"></script>
     <style>
         * {
@@ -25,7 +27,7 @@
             min-height: 100vh;
         }
 
-        /* Top Header */
+        /* === HEADER === */
         .top-header {
             background-color: #1a2845;
             padding: 15px 30px;
@@ -46,6 +48,7 @@
             color: #ffffff;
         }
 
+        /* Back navigation arrow */
         .back-arrow {
             position: absolute;
             left: 30px;
@@ -58,6 +61,7 @@
             z-index: 95;
         }
 
+        /* Tooltip for back arrow */
         .back-arrow::after {
             content: "Back to Previous Page";
             position: absolute;
@@ -87,6 +91,7 @@
             color: #ffffff;
         }
 
+        /* User profile avatar in header */
         .user-profile {
             position: absolute;
             right: 30px;
@@ -113,7 +118,7 @@
             fill: #1a2845;
         }
 
-        /* Sidebar */
+        /* === SIDEBAR STYLES === */
         .sidebar {
             position: absolute;
             left: 0;
@@ -169,6 +174,7 @@
             color: #ffffff;
         }
 
+        /* Icon bar in sidebar */
         .sidebar-icon-bar {
             display: flex;
             justify-content: space-between;
@@ -206,7 +212,7 @@
             fill: #ffffff;
         }
 
-        /* Search Input */
+        /* Search Input Container */
         .search-container {
             padding: 0 20px 20px;
             display: none;
@@ -243,7 +249,7 @@
             font-style: italic;
         }
 
-        /* Main Content */
+        /* === MAIN CONTENT AREA === */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
             padding: 80px 80px 60px;
@@ -255,6 +261,7 @@
             margin-left: 280px;
         }
 
+        /* Profile avatar */
         .profile-avatar {
             text-align: center;
             margin-bottom: 28px;
@@ -267,7 +274,7 @@
             filter: drop-shadow(0 4px 12px rgba(74, 143, 231, 0.4));
         }
 
-        /* Profile Section */
+        /* Profile Details Section */
         .profile-container {
             max-width: 800px;
             margin: 0 auto;
@@ -294,6 +301,7 @@
             color: #ffffff;
         }
 
+        /* Profile action buttons */
         .profile-actions {
             display: flex;
             justify-content: space-between;
@@ -346,7 +354,7 @@
             background-color: #f0f0f0;
         }
 
-        /* Wavy Background */
+        /* === BACKGROUND ELEMENTS === */
         .wavy-background {
             position: fixed;
             bottom: 0;
@@ -363,7 +371,7 @@
             display: block;
         }
 
-        /* Scrollbar Styling */
+        /* === Scrollbar Styling === */
         .sidebar::-webkit-scrollbar {
             width: 6px;
         }
@@ -381,6 +389,7 @@
             background: #4a8fe7;
         }
 
+        /* 2FA checkbox */
         .twofa-checkbox {
             display: flex;
             align-items: center;
@@ -423,6 +432,7 @@
             user-select: none;
         }
 
+        /* === MODAL STYLES === */
         .otp-overlay {
             position: fixed;
             inset: 0;
@@ -456,6 +466,7 @@
             font-size: 15px;
         }
 
+        /* === RESPONSIVE DESIGN === */
         @media screen and (max-width: 1200px) {
             .sidebar {
                 position: fixed;
@@ -470,18 +481,18 @@
 </head>
 <body>
     <div id="app">
-        <!-- Top Header -->
+        <!-- Top Header Section -->
         <div class="top-header">
             <div class="menu-icon" @click="toggleSidebar">●●●</div>
             <button class="logout-button" @click="logout">LOGOUT</button>
         </div>
 
-        <!-- Back Arrow -->
+        <!-- Back Arrow Navigation -->
         <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goToHome">←</div>
 
-        <!-- Sidebar -->
+        <!-- Sidebar Navigation -->
         <div class="sidebar" :class="{ open: sidebarOpen }">
-            <!-- Icon Bar (Search and Plus) -->
+            <!-- Icon Bar (with Search and Plus) -->
             <div class="sidebar-icon-bar">
                 <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
                     <svg viewBox="0 0 24 24">
@@ -495,7 +506,7 @@
                 </div>
             </div>
 
-            <!-- Search Input (Hidden by default) -->
+            <!-- Search Input Field (Hidden by default) -->
             <div class="search-container" :class="{ active: searchActive }">
                 <input 
                     type="text" 
@@ -506,6 +517,7 @@
                 >
             </div>
 
+            <!-- Last 7 Days Reports Section -->
             <div class="sidebar-section">
                 <div class="sidebar-header">
                     <svg viewBox="0 0 24 24">
@@ -528,6 +540,7 @@
                 </div>
             </div>
 
+            <!-- Last 30 Days Reports Section -->
             <div class="sidebar-section">
                 <div class="sidebar-header">
                     <svg viewBox="0 0 24 24">
@@ -551,7 +564,7 @@
             </div>
         </div>
 
-        <!-- Main Content -->
+        <!-- Main Content - User Profile -->
         <div class="main-content" :class="{ shifted: sidebarOpen }">
             <!-- Profile Avatar -->
             <div class="profile-avatar">
@@ -560,7 +573,7 @@
                 </svg>
             </div>
 
-            <!-- Profile Container -->
+            <!-- Profile Information Container -->
             <div class="profile-container">
                 <div class="profile-field">
                     <label>User Name</label>
@@ -582,7 +595,8 @@
                     <label>Password</label>
                     <span>: {{ passwordMasked }}</span>
                 </div>
-                <!-- 2FA Checkbox -->
+
+                <!-- 2FA Authentication Toggle Checkbox -->
                 <div class="twofa-checkbox">
                     <input 
                         type="checkbox" 
@@ -591,6 +605,8 @@
                     >
                     <label for="enable-2fa">Enable two-factor authentication</label>
                 </div>
+
+                <!-- Profile Action Buttons -->
                 <div class="profile-actions">
                     <button class="action-button" @click="grantAdminAccess">GRANT ADMIN ACCESS</button>
                     <button class="action-button delete" @click="deleteAccount">DELETE ACCOUNT</button>
@@ -598,12 +614,12 @@
             </div>
         </div>
 
-        <!-- DELETE ACCOUNT OTP + SUCCESS MODAL -->
+        <!-- Delete Account OTP + Success Modal -->
         <div v-if="step === 'otp' || step === 'success'" class="otp-overlay">
 
             <div class="otp-modal">
 
-                <!-- OTP VIEW -->
+                <!-- OTP Verification View -->
                 <div v-if="step === 'otp'">
 
                     <h2>Verify Account Deletion</h2>
@@ -624,7 +640,7 @@
 
                 </div>
 
-                <!-- SUCCESS VIEW -->
+                <!-- Success Confirmation View -->
                 <div v-if="step === 'success'" class="success-step">
 
                     <h3 class="success-title">Account Deleted Successfully</h3>
@@ -635,7 +651,7 @@
 
         </div>
 
-        <!-- Curly Line Background -->
+        <!-- Webpage Background Element -->
         <div class="wavy-background">
             <img src="img5.png" alt="Curly Line Design">
         </div>
@@ -644,51 +660,73 @@
     <script>
         const { createApp } = Vue;
 
+        /*
+        CyberComply Profile Page Section
+        Manages user profile display, and account settings
+        */
         const app = createApp({
         data() {
             return {
+                // UI State
                 step: 'profile', // profile | otp | success
-                message: { text: '', type: '' },
-                sidebarOpen: false,
+                message: { text: '', type: '' }, // Notification messages
+                sidebarOpen: false, // Sidebar visibility state
+                
+                // User Data
                 userName: 'James S',
                 fullName: 'James Smith',
                 userEmail: sessionStorage.getItem('userEmail') || '',
                 email: sessionStorage.getItem('userEmail') || 'James@gmail.com',
                 role: sessionStorage.getItem('userRole') || 'General User',
                 passwordMasked: 'Pa***********',
-                searchActive: false,
-                searchQuery: '',
+                
+                searchActive: false, // Search input visibility
+                searchQuery: '', // Current search query
+                
+                // Document Lists
                 last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
                 last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
+                
+                // Filtered Document Lists
                 filteredLast7Days: [],
                 filteredLast30Days: [],
-                enableTwoFactor: false,
-                showOtpModal: false
+
+                enableTwoFactor: false, // 2FA preference
+                showOtpModal: false // Modal State
             }
         },
-            mounted() {
+
+        /*
+        Lifecycle hook - component mounted
+        */
+        mounted() {
                 // Initialize filtered lists
                 this.filteredLast7Days = [...this.last7Days];
                 this.filteredLast30Days = [...this.last30Days];
 
+                // Assigns User Role
                 this.assignRoleFromEmail();
             },
             methods: {
+                // Toggles sidebar open/close state
                 toggleSidebar() {
                     this.sidebarOpen = !this.sidebarOpen;
                 },
+                // Navigates to report viewing page
                 openReport(reportName) {
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
+                // Handles user logout
                 logout() {
                     alert('Logging out...');
-                    // Implement logout logic here
                     window.location.href = 'welcome.html';
                 },
+                // Navigates to admin access granting page
                 grantAdminAccess() {
-                    // Implement admin access logic here
                     window.location.href = 'adminaccess.html';
                 },
+                // Initiation of account deletion process
+                // Shows OTP verification modal
                 deleteAccount() {
                     this.step = 'otp';
                     this.message = {
@@ -696,6 +734,7 @@
                         type: 'success'
                     };
                 },
+                // Handles successful OTP verification for account deletion
                 handleDeleteVerified() {
 
                     // simulate account deletion
@@ -707,6 +746,8 @@
                         window.location.href = 'welcome.html';
                     }, 2200);
                 },
+                // Toggles search input visibility
+                // Resets search query when hiding
                 toggleSearch() {
                     this.searchActive = !this.searchActive;
                     if (!this.searchActive) {
@@ -714,9 +755,11 @@
                         this.filterReports();
                     }
                 },
+                // Navigates back to previous page
                 goToHome() {
                     window.history.back();
                 },
+                // Filters report lists based on search query
                 filterReports() {
                     const query = this.searchQuery.toLowerCase();
                     if (query === '') {
@@ -731,6 +774,7 @@
                         );
                     }
                 },
+                // Assigns user role
                 assignRoleFromEmail() {
                     const storedRole = sessionStorage.getItem('userRole');
                     const storedEmail = sessionStorage.getItem('userEmail');
