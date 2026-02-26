@@ -281,7 +281,7 @@
 
     /* Main Content */
     .report-viewer {
-        margin-left: auto; /* leave space for sidebar when open */
+        margin-left: auto; 
         margin-right: auto;
         padding: 30px 30px;
         min-height: calc(100vh - 60px);
@@ -687,7 +687,9 @@ mounted() {
     },
     getReportUrl(reportName) {
         /* This function returns the URL of the PDF for embedding
-        // For now, use placeholder PDFs. You can map names to real files
+        //This function is intentionally disabled because report PDFs are not yet
+        // served by the backend. Once backend storage and access control are implemented,
+        // uncomment and use this function to return actual report URLs.
         const reportMap = {
             "Curtin Report": "pdfs/curtin_report.pdf",
             "IFS Report": "pdfs/ifs_report.pdf",
