@@ -60,7 +60,7 @@ class UserProfile(models.Model):
         related_name="users"
     )
 
-    full_name = models.CharField(max_length=150, null=True, blank=True)
+    full_name = models.CharField(max_length=150)
 
     role = models.CharField(max_length=25, choices=Role.choices, default=Role.GENERAL)
 
