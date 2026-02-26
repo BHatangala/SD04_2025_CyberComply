@@ -539,6 +539,14 @@
                     Enter organizational email address below for verification.
                 </p>
                 <div class="admin-form">
+                    <transition name="fade">
+                        <div v-if="message.text"
+                            class="message-banner"
+                            :class="message.type">
+                            {{ message.text }}
+                        </div>
+                    </transition>
+
                     <label>EMAIL</label>
                     <input 
                         type="email" 
@@ -634,14 +642,27 @@
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
                 sendVerification() {
-                    if (!this.orgEmail) {
-                        this.message = { text: 'Please enter a valid email.', type: 'error' };
+                    // Clear previous message
+                    this.message = { text: '', type: '' };
+
+                    // Same email regex used in login page
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+                    // Check empty or invalid format
+                    if (!this.orgEmail || !emailRegex.test(this.orgEmail)) {
+                        this.message = {
+                            text: 'Please enter a valid email address.',
+                            type: 'error'
+                        };
                         return;
                     }
 
-                    // simulate sending email
+                    // simulate sending OTP
                     this.step = 'otp';
-                    this.message = { text: 'OTP sent successfully.', type: 'success' };
+                    this.message = {
+                        text: `OTP sent to ${this.orgEmail}`,
+                        type: 'success'
+                    };
                 },
                 handleOtpVerified() {
                     // save email for profile page
