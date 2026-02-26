@@ -94,7 +94,7 @@ class OtpVerification(models.Model):
         ADMIN_REQUEST_VERIFY = "ADMIN_REQUEST_VERIFY", "ADMIN_REQUEST_VERIFY"
 
     otp_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="otps")
+    user = models.ForeignKey(UserProfile, on_delete=models.PROTECT, related_name="otps")
 
     otp_hash = models.CharField(max_length=255)
     purpose = models.CharField(max_length=30, choices=Purpose.choices)
@@ -119,7 +119,7 @@ class LoginHistory(models.Model):
         FAILED = "FAILED", "FAILED"
 
     login_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="login_history")
+    user = models.ForeignKey(UserProfile, on_delete=models.PROTECT, related_name="login_history")
 
     attempt_time = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=10, choices=Status.choices)
