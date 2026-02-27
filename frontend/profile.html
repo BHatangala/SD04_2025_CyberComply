@@ -305,7 +305,7 @@
         .profile-actions {
             display: flex;
             justify-content: space-between;
-            gap: 20px;
+            gap: 100px;
             margin-top: 40px;
         }
 
@@ -576,10 +576,6 @@
             <!-- Profile Information Container -->
             <div class="profile-container">
                 <div class="profile-field">
-                    <label>User Name</label>
-                    <span>: {{ userName }}</span>
-                </div>
-                <div class="profile-field">
                     <label>Name</label>
                     <span>: {{ fullName }}</span>
                 </div>
@@ -588,12 +584,12 @@
                     <span>: {{ email }}</span>
                 </div>
                 <div class="profile-field">
-                    <label>Role</label>
-                    <span>: {{ role }}</span>
-                </div>
-                <div class="profile-field">
                     <label>Password</label>
                     <span>: {{ passwordMasked }}</span>
+                </div>
+                <div class="profile-field">
+                    <label>Role</label>
+                    <span>: {{ role }}</span>
                 </div>
 
                 <!-- 2FA Authentication Toggle Checkbox -->
