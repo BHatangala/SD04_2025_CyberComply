@@ -24,7 +24,7 @@
             min-height: 100vh;
         }
 
-        /* Top Header */
+        /* ── Top Header ── */
         .top-header {
             background-color: #1a2845;
             padding: 15px 30px;
@@ -71,7 +71,7 @@
             fill: #1a2845;
         }
 
-        /* Sidebar */
+        /* ── Sidebar ── */
         .sidebar {
             position: absolute;
             left: 0;
@@ -91,12 +91,11 @@
             transform: translateX(0);
         }
 
-        /* Sidebar Icon Bar */
         .sidebar-icon-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0px 10px 15px 10px; 
+            padding: 0px 10px 15px 10px;
             margin-bottom: 20px;
             border-bottom: 2px solid #1a2845;
         }
@@ -129,7 +128,6 @@
             fill: #ffffff;
         }
 
-        /* Search Input */
         .search-container {
             padding: 0 20px 20px;
             display: none;
@@ -202,7 +200,7 @@
             font-style: italic;
         }
 
-        /* Main Content */
+        /* ── Main Content ── */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
             padding: 60px 80px;
@@ -214,10 +212,10 @@
             margin-left: 280px;
         }
 
-        /* Logo */
+        /* ── Logo ── */
         .logo {
             text-align: center;
-            margin-bottom: 60px;
+            margin-bottom: 36px;
         }
 
         .logo h1 {
@@ -228,7 +226,52 @@
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
 
-        /* Upload Section */
+        /* ── Organisation Name Field (admin-only — always shown for now)
+               TODO: Wrap v-if="isAdmin" once auth/database is implemented ── */
+        .org-row {
+            max-width: 800px;
+            margin: 0 auto 28px;
+            display: flex;
+            align-items: stretch;
+        }
+
+        .org-label {
+            background: #1e3a5f;
+            padding: 12px 18px;
+            border-radius: 10px 0 0 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #4a8fe7;
+            letter-spacing: 2px;
+            border: 1.5px solid #2a4a7c;
+            border-right: none;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+        }
+
+        .org-input {
+            flex: 1;
+            padding: 12px 16px;
+            background: #151f35;
+            border: 1.5px solid #2a4a7c;
+            border-radius: 0 10px 10px 0;
+            color: #ffffff;
+            font-size: 14px;
+            font-family: 'Arial', sans-serif;
+            transition: border-color 0.3s;
+        }
+
+        .org-input::placeholder {
+            color: #4a5a7a;
+        }
+
+        .org-input:focus {
+            outline: none;
+            border-color: #4a8fe7;
+        }
+
+        /* ── Upload Container ── */
         .upload-container {
             max-width: 800px;
             margin: 0 auto;
@@ -239,7 +282,7 @@
             background: linear-gradient(135deg, #1e3a5f 0%, #2a4a7c 100%);
             border: 2px dashed #4a8fe7;
             border-radius: 20px;
-            padding: 60px 40px;
+            padding: 48px 40px 40px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s;
@@ -259,130 +302,100 @@
             background-color: #2a4a7c;
         }
 
-        .upload-icon {
-            margin-bottom: 20px;
-        }
-
-        .upload-icon svg {
-            width: 60px;
-            height: 60px;
-            fill: #8b9dc3;
-        }
-
         .upload-text {
             font-size: 20px;
             color: #c5d0e6;
             letter-spacing: 3px;
             font-weight: 300;
+            margin-bottom: 0;
         }
 
-        .upload-menu-icon {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            cursor: pointer;
-            font-size: 24px;
-            color: #8b9dc3;
-            transition: color 0.3s;
-            z-index: 10;
-        }
-
-        .upload-menu-icon:hover {
-            color: #ffffff;
-        }
-
-        /* Company/Department Menu */
-        .company-menu {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-10%, -50%);  /* Center it over the upload box */
-            width: 300px;
-            background-color: #ffffff;
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-            z-index: 20;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease-in-out;  /* Only transition opacity, not position */
-        }
-
-        .company-menu.open {
-            opacity: 1;
-            pointer-events: all;
-        }
-
-        .company-menu h3 {
-            color: #1a2845;
-            font-size: 16px;
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
-
-        .company-menu input,
-        .company-menu select {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 15px;
-            border: 2px solid #dce4f0;
-            border-radius: 8px;
-            font-size: 14px;
-            font-family: 'Segoe UI', sans-serif;
-            color: #1a2845;
-            transition: border-color 0.3s;
-        }
-
-        .company-menu input:focus,
-        .company-menu select:focus {
-            outline: none;
-            border-color: #4a8fe7;
-        }
-
-        .company-menu select {
-            cursor: pointer;
-            background-color: #ffffff;
-        }
-
-        /* Selected Info Display */
-        .selected-info {
-            max-width: 800px;
-            margin: 0 auto 30px;
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            opacity: 0;
-            transform: translateY(-10px);
-            transition: all 0.3s;
-        }
-
-        .selected-info.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .info-badge {
-            background-color: #1e3a5f;
-            padding: 10px 20px;
-            border-radius: 8px;
-            border-left: 4px solid #4a8fe7;
+        /* divider */
+        .upload-divider {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 14px;
+            margin: 22px 40px;
         }
 
-        .info-badge span.label {
+        .upload-divider-line {
+            flex: 1;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .upload-divider-text {
+            font-size: 11px;
+            color: #4a5a7a;
+            letter-spacing: 2px;
+            white-space: nowrap;
+        }
+
+        /* Source icons row */
+        .upload-sources {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 36px;
+        }
+
+        .source-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 9px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .source-btn:hover {
+            transform: translateY(-4px);
+        }
+
+        .source-icon {
+            width: 58px;
+            height: 58px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1.5px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .source-btn:hover .source-icon {
+            background: rgba(74, 143, 231, 0.18);
+            border-color: #4a8fe7;
+            box-shadow: 0 4px 14px rgba(74, 143, 231, 0.2);
+        }
+
+        .source-icon svg {
+            width: 30px;
+            height: 30px;
+        }
+
+        .source-label {
+            font-size: 10px;
             color: #8b9dc3;
-            font-size: 12px;
-            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
         }
 
-        .info-badge span.value {
-            color: #ffffff;
+        /* ── Error Message ── */
+        .error-message {
+            max-width: 800px;
+            margin: 10px auto;
+            padding: 12px 20px;
+            background-color: rgba(244, 67, 54, 0.1);
+            border-left: 4px solid #f44336;
+            border-radius: 8px;
+            color: #ff6b6b;
             font-size: 14px;
+            animation: slideIn 0.3s ease-out;
         }
 
-        /* File Upload Status */
+        /* ── File List ── */
         .upload-status {
             max-width: 800px;
             margin: 20px auto;
@@ -390,30 +403,58 @@
 
         .file-item {
             background-color: #1a2845;
-            padding: 15px 20px;
-            border-radius: 10px;
+            padding: 14px 18px;
+            border-radius: 12px;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 14px;
+            position: relative;
             animation: slideIn 0.3s ease-out;
         }
 
         @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateX(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
+            from { opacity: 0; transform: translateX(-20px); }
+            to   { opacity: 1; transform: translateX(0); }
         }
 
-        .file-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
+        /* ── Remove × button ── */
+        .file-remove {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            font-size: 15px;
+            font-weight: 400;
+            color: #4a5a7a;
+            cursor: pointer;
+            line-height: 1;
+            transition: color 0.2s;
+            user-select: none;
+        }
+
+        .file-remove:hover {
+            color: #8b9dc3;
+        }
+
+        .file-remove::after {
+            content: "Remove file";
+            position: absolute;
+            left: calc(100% + 10px);  /* appears to the right of the × */
+            top: 50%;
+            transform: translateY(-50%);  /* vertically centred with the × */
+            background: #24365c;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .file-remove:hover::after {
+            opacity: 1;
         }
 
         .file-icon {
@@ -424,6 +465,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
 
         .file-icon svg {
@@ -435,41 +477,35 @@
         .file-details {
             display: flex;
             flex-direction: column;
+            flex: 1;
+            min-width: 0;
         }
 
         .file-name {
             color: #ffffff;
             font-size: 14px;
             font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            /* leave space for the × at top-right */
+            padding-right: 20px;
         }
 
         .file-size {
             color: #8b9dc3;
             font-size: 12px;
+            margin-top: 2px;
         }
 
-        .file-status {
-            color: #4a8fe7;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .file-status.success {
-            color: #4caf50;
-        }
-
-        .file-status.error {
-            color: #f44336;
-        }
-
-        /* Loading Animation */
+        /* Loading bar (uploading state) */
         .loading-bar {
             width: 100%;
             height: 3px;
             background-color: #2a4a7c;
             border-radius: 2px;
             overflow: hidden;
-            margin-top: 8px;
+            margin-top: 6px;
         }
 
         .loading-progress {
@@ -480,18 +516,198 @@
         }
 
         @keyframes loading {
-            0% {
-                width: 0%;
-            }
-            50% {
-                width: 70%;
-            }
-            100% {
-                width: 100%;
-            }
+            0%   { width: 0%; }
+            50%  { width: 70%; }
+            100% { width: 100%; }
         }
 
-        /* Help Button */
+        /* ── Department Pill (admin-only)
+               TODO: Wrap with v-if="isAdmin" once auth/database is ready ── */
+        .dept-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            white-space: nowrap;
+            flex-shrink: 0;
+            position: relative;
+            background: rgba(74, 143, 231, 0.12);
+            border: 1px solid rgba(74, 143, 231, 0.3);
+            color: #4a8fe7;
+        }
+
+        .dept-pill.unassigned {
+            background: transparent;
+            border: 1px dashed rgba(255, 255, 255, 0.18);
+            color: #4a5a7a;
+        }
+
+        .dept-pill:hover {
+            background: rgba(74, 143, 231, 0.22);
+            border-color: #4a8fe7;
+            color: #7db8ff;
+        }
+
+        .dept-pill.unassigned:hover {
+            border-color: #4a8fe7;
+            color: #4a8fe7;
+        }
+
+        .dept-pill svg {
+            width: 12px;
+            height: 12px;
+            fill: currentColor;
+            flex-shrink: 0;
+        }
+
+        .dept-chevron {
+            transition: transform 0.2s;
+        }
+
+        /* Department dropdown */
+        .dept-dropdown {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            background: #1e2d4a;
+            border: 1px solid #2a4a7c;
+            border-radius: 10px;
+            min-width: 160px;
+            z-index: 50;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            animation: dropIn 0.15s ease-out;
+        }
+
+        @keyframes dropIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .dept-option {
+            padding: 10px 16px;
+            font-size: 13px;
+            color: #c5d0e6;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .dept-option:hover {
+            background: #2a4a7c;
+            color: #ffffff;
+        }
+
+        .dept-option.selected {
+            color: #4a8fe7;
+            font-weight: 600;
+        }
+
+        /* ── Status Badge ── */
+        .file-status-badge {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            padding: 4px 11px;
+            border-radius: 20px;
+            flex-shrink: 0;
+        }
+
+        .status-uploading {
+            background: rgba(74, 143, 231, 0.12);
+            color: #4a8fe7;
+        }
+
+        .status-uploaded {
+            background: rgba(139, 157, 195, 0.15);
+            color: #8b9dc3;
+        }
+
+        .status-analysing {
+            background: rgba(255, 193, 7, 0.13);
+            color: #ffc107;
+        }
+
+        .status-analysed {
+            background: rgba(76, 175, 80, 0.15);
+            color: #4caf50;
+        }
+
+        /* ── Integration Alert Modal ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+
+        .modal-box {
+            background: #1a2845;
+            border: 1px solid #2a4a7c;
+            border-radius: 18px;
+            padding: 40px 36px;
+            width: 360px;
+            text-align: center;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+            animation: popIn 0.2s ease;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.92); opacity: 0; }
+            to   { transform: scale(1);    opacity: 1; }
+        }
+
+        .modal-icon {
+            font-size: 42px;
+            margin-bottom: 16px;
+        }
+
+        .modal-box h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .modal-box p {
+            font-size: 13px;
+            color: #8b9dc3;
+            line-height: 1.7;
+            margin-bottom: 24px;
+        }
+
+        .modal-close-btn {
+            display: inline-block;
+            background: #4a8fe7;
+            color: #ffffff;
+            padding: 10px 28px;
+            border-radius: 22px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.2s;
+        }
+
+        .modal-close-btn:hover {
+            background: #6ba3ff;
+            transform: translateY(-1px);
+        }
+
+        /* ── Help Button ── */
         .help-button {
             position: fixed;
             bottom: 30px;
@@ -515,7 +731,7 @@
             box-shadow: 0 6px 16px rgba(74, 143, 231, 0.6);
         }
 
-        /* Wavy Background */
+        /* ── Wavy Background ── */
         .wavy-background {
             position: fixed;
             bottom: 0;
@@ -532,407 +748,487 @@
             display: block;
         }
 
-        /* Hidden File Input */
         input[type="file"] {
             display: none;
         }
 
-        /* Error Message */
-        .error-message {
-            max-width: 800px;
-            margin: 10px auto;
-            padding: 12px 20px;
-            background-color: rgba(244, 67, 54, 0.1);
-            border-left: 4px solid #f44336;
-            border-radius: 8px;
-            color: #ff6b6b;
-            font-size: 14px;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        /* Scrollbar Styling */
-        .sidebar::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .sidebar::-webkit-scrollbar-track {
-            background: #0d1420;
-        }
-
-        .sidebar::-webkit-scrollbar-thumb {
-            background: #2a4a7c;
-            border-radius: 3px;
-        }
-
-        .sidebar::-webkit-scrollbar-thumb:hover {
-            background: #4a8fe7;
-        }
+        /* ── Scrollbar ── */
+        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar::-webkit-scrollbar-track { background: #0d1420; }
+        .sidebar::-webkit-scrollbar-thumb { background: #2a4a7c; border-radius: 3px; }
+        .sidebar::-webkit-scrollbar-thumb:hover { background: #4a8fe7; }
 
         @media screen and (max-width: 1200px) {
             .sidebar {
                 position: fixed;
                 box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
             }
-            
             .main-content.shifted {
-                margin-left: 0;  /* Don't push content on smaller screens */
+                margin-left: 0;
             }
         }
     </style>
 </head>
 <body>
-    <div id="app">
-        <!-- Top Header -->
-        <div class="top-header">
-            <div class="menu-icon" @click="toggleSidebar">●●●</div>
-            <div class="user-profile" @click="showProfile">
+<div id="app">
+
+    <!-- ── Top Header ── -->
+    <div class="top-header">
+        <div class="menu-icon" @click="toggleSidebar">●●●</div>
+        <div class="user-profile" @click="showProfile">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- ── Sidebar ── -->
+    <div class="sidebar" :class="{ open: sidebarOpen }">
+        <div class="sidebar-icon-bar">
+            <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
                 <svg viewBox="0 0 24 24">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                </svg>
+            </div>
+            <div class="sidebar-icon" @click="goToHome" title="Start new analysis">
+                <svg viewBox="0 0 24 24">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                 </svg>
             </div>
         </div>
 
-        <!-- Sidebar -->
-        <div class="sidebar" :class="{ open: sidebarOpen }">
-            <!-- Icon Bar (Search and Plus) -->
-            <div class="sidebar-icon-bar">
-                <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                    </svg>
-                </div>
-                <div class="sidebar-icon" @click="goToHome" title="Start new analysis">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                    </svg>
-                </div>
-            </div>
+        <div class="search-container" :class="{ active: searchActive }">
+            <input
+                type="text"
+                class="search-input"
+                v-model="searchQuery"
+                placeholder="Search documents..."
+                @input="filterReports"
+            >
+        </div>
 
-            <!-- Search Input (Hidden by default) -->
-            <div class="search-container" :class="{ active: searchActive }">
-                <input 
-                    type="text" 
-                    class="search-input" 
-                    v-model="searchQuery" 
-                    placeholder="Search documents..."
-                    @input="filterReports"
-                >
+        <div class="sidebar-section">
+            <div class="sidebar-header">
+                <svg viewBox="0 0 24 24">
+                    <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                </svg>
+                LAST 7 DAYS
             </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                    </svg>
-                    LAST 7 DAYS
-                </div>
-                <div v-if="filteredLast7Days.length === 0" class="no-results">
-                    No results to display
-                </div>
-                <div v-else>
-                    <div 
-                        v-for="report in filteredLast7Days" 
-                        :key="report"
-                        class="sidebar-item"
-                        @click="openReport(report)"
-                    >
-                        {{ report }}
-                    </div>
-                </div>
-            </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-                    </svg>
-                    LAST 30 DAYS
-                </div>
-                <div v-if="filteredLast30Days.length === 0" class="no-results">
-                    No results to display
-                </div>
-                <div v-else>
-                    <div 
-                        v-for="report in filteredLast30Days" 
-                        :key="report"
-                        class="sidebar-item"
-                        @click="openReport(report)"
-                    >
-                        {{ report }}
-                    </div>
-                </div>
+            <div v-if="filteredLast7Days.length === 0" class="no-results">No results to display</div>
+            <div v-else>
+                <div
+                    v-for="report in filteredLast7Days"
+                    :key="report"
+                    class="sidebar-item"
+                    @click="openReport(report)"
+                >{{ report }}</div>
             </div>
         </div>
 
-        <!-- Main Content -->
-        <div class="main-content" :class="{ shifted: sidebarOpen }">
-            <!-- Logo -->
-            <div class="logo">
-                <h1>CYBERCOMPLY</h1>
+        <div class="sidebar-section">
+            <div class="sidebar-header">
+                <svg viewBox="0 0 24 24">
+                    <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+                </svg>
+                LAST 30 DAYS
             </div>
-
-            <!-- Selected Company/Department Info -->
-            <div class="selected-info" :class="{ show: companyName || selectedDepartment }">
-                <div class="info-badge" v-if="companyName">
-                    <span class="label">COMPANY:</span>
-                    <span class="value">{{ companyName }}</span>
-                </div>
-                <div class="info-badge" v-if="selectedDepartment">
-                    <span class="label">DEPARTMENT:</span>
-                    <span class="value">{{ selectedDepartment }}</span>
-                </div>
+            <div v-if="filteredLast30Days.length === 0" class="no-results">No results to display</div>
+            <div v-else>
+                <div
+                    v-for="report in filteredLast30Days"
+                    :key="report"
+                    class="sidebar-item"
+                    @click="openReport(report)"
+                >{{ report }}</div>
             </div>
-
-            <!-- Upload Container -->
-            <div class="upload-container">
-                <!-- Upload Area -->
-                <div 
-                    class="upload-area"
-                    :class="{ dragover: isDragging }"
-                    @click="triggerFileInput"
-                    @dragover.prevent="handleDragOver"
-                    @dragleave.prevent="handleDragLeave"
-                    @drop.prevent="handleDrop"
-                >
-                    <div class="upload-icon">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/>
-                        </svg>
-                    </div>
-                    <div class="upload-text">DROP YOUR FILES HERE</div>
-                    
-                    <!-- Three-dot menu icon -->
-                    <div class="upload-menu-icon" @click.stop="toggleCompanyMenu">
-                        ●●●
-                    </div>
-
-                    <!-- Company/Department Selection Menu -->
-                    <div class="company-menu" :class="{ open: companyMenuOpen }">
-                        <h3>Select Company</h3>
-                        <input 
-                            type="text" 
-                            v-model="companyName" 
-                            placeholder="Enter company name"
-                            @click.stop
-                        >
-                        
-                        <h3>Select Department</h3>
-                        <select v-model="selectedDepartment" @click.stop @change="closeCompanyMenu">
-                            <option value="">-- Select Department --</option>
-                            <option value="HR & Admin">HR & Admin</option>
-                            <option value="Finance">Finance</option>
-                            <option value="IT">IT</option>
-                            <option value="Operations">Operations</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Hidden File Input -->
-                <input 
-                    type="file" 
-                    ref="fileInput" 
-                    multiple 
-                    accept=".pdf,.docx,.txt"
-                    @change="handleFileSelect"
-                >
-
-                <!-- Error Messages -->
-                <div v-if="errorMessage" class="error-message">
-                    {{ errorMessage }}
-                </div>
-
-                <!-- Upload Status -->
-                <div class="upload-status" v-if="uploadedFiles.length > 0">
-                    <div 
-                        v-for="(file, index) in uploadedFiles" 
-                        :key="index"
-                        class="file-item"
-                    >
-                        <div class="file-info">
-                            <div class="file-icon">
-                                <svg viewBox="0 0 24 24">
-                                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
-                                </svg>
-                            </div>
-                            <div class="file-details">
-                                <div class="file-name">{{ file.name }}</div>
-                                <div class="file-size">{{ formatFileSize(file.size) }}</div>
-                                <div v-if="file.uploading" class="loading-bar">
-                                    <div class="loading-progress"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="file-status" :class="{ success: file.uploaded, error: file.error }">
-                            <span v-if="file.uploading">Uploading...</span>
-                            <span v-else-if="file.uploaded">✓ Uploaded</span>
-                            <span v-else-if="file.error">✗ Error</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Help Button -->
-        <div class="help-button" @click="showHelp">
-            Need Any Help?
-        </div>
-
-        <!-- Wavy Background -->
-        <div class="wavy-background">
-            <img src="img3.png" alt="Wavy Design">
         </div>
     </div>
 
-    <script>
-        const { createApp } = Vue;
+    <!-- ── Main Content ── -->
+    <div class="main-content" :class="{ shifted: sidebarOpen }" @click="closeAllDropdowns">
 
-        createApp({
-            data() {
-                return {
-                    sidebarOpen: false,
-                    companyMenuOpen: false,
-                    companyName: '',
-                    selectedDepartment: '',
-                    isDragging: false,
-                    uploadedFiles: [],
-                    errorMessage: '',
-                    searchActive: false,
-                    searchQuery: '',
-                    last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
-                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
-                    filteredLast7Days: [],
-                    filteredLast30Days: []
+        <!-- Logo -->
+        <div class="logo">
+            <h1>CYBERCOMPLY</h1>
+        </div>
+
+        <!--
+            Organisation Name — ADMIN ONLY
+            TODO: Add v-if="isAdmin" once database/auth is integrated.
+                  isAdmin should be derived from the authenticated user's role.
+        -->
+        <div class="org-row">
+            <div class="org-label">ORGANISATION</div>
+            <input
+                class="org-input"
+                type="text"
+                v-model="companyName"
+                placeholder="Enter organisation name…"
+            >
+        </div>
+
+        <!-- Upload Container -->
+        <div class="upload-container">
+            <div
+                class="upload-area"
+                :class="{ dragover: isDragging }"
+                @dragover.prevent="handleDragOver"
+                @dragleave.prevent="handleDragLeave"
+                @drop.prevent="handleDrop"
+            >
+                <div class="upload-text">DROP YOUR FILES HERE</div>
+
+                <div class="upload-divider">
+                    <div class="upload-divider-line"></div>
+                    <div class="upload-divider-text">OR UPLOAD FROM</div>
+                    <div class="upload-divider-line"></div>
+                </div>
+
+                <div class="upload-sources">
+
+                    <!-- Google Drive -->
+                    <div class="source-btn" @click.stop="showIntegrationModal('Google Drive')">
+                        <div class="source-icon">
+                            <!-- Google Drive SVG logo -->
+                            <svg viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                                <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                                <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+                                <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+                                <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                                <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                                <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+                            </svg>
+                        </div>
+                        <div class="source-label">GOOGLE DRIVE</div>
+                    </div>
+
+                    <!-- Microsoft OneDrive -->
+                    <div class="source-btn" @click.stop="showIntegrationModal('Microsoft OneDrive')">
+                        <div class="source-icon">
+                            <!-- Official OneDrive cloud-shape SVG -->
+                            <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                                <path fill="#0364B8" d="M28.087 16.502l-.665-.386A11.047 11.047 0 0 0 21.8 14.5C15.592 14.5 10.5 19.444 10.5 25.524c0 .18.007.36.018.538l.039.66-.588.276A7.44 7.44 0 0 0 6.5 33.5c0 4.136 3.364 7.5 7.5 7.5h26c3.866 0 7-3.134 7-7 0-3.445-2.494-6.37-5.876-6.916l-.553-.088-.164-.535a11.01 11.01 0 0 0-2.32-4.459z"/>
+                                <path fill="#0078D4" d="M29.888 17.371A13.443 13.443 0 0 0 21.8 14.5a13.42 13.42 0 0 0-10.5 5.058A11.01 11.01 0 0 1 21.5 17.5c2.967 0 5.693 1.124 7.752 2.966l.636.576z"/>
+                                <path fill="#1490DF" d="M47 34c0-3.445-2.494-6.37-5.876-6.916A11.01 11.01 0 0 0 38.5 20.5a11.042 11.042 0 0 0-8.612-3l-.722.055.636.576A13.441 13.441 0 0 1 34.5 28.5c0 .18-.007.36-.018.538l-.039.66.588.276A7.44 7.44 0 0 1 38.5 37c0 .695-.097 1.367-.272 2H40c3.866 0 7-3.134 7-7z"/>
+                                <path fill="#28A8E8" d="M10.557 26.062A7.44 7.44 0 0 0 6.5 33.5c0 4.136 3.364 7.5 7.5 7.5h26a7.01 7.01 0 0 0 4.228-1.5H14c-4.136 0-7.5-3.364-7.5-7.5 0-2.098.863-3.994 2.258-5.358l-1.07-.058-.131-.522z"/>
+                            </svg>
+                        </div>
+                        <div class="source-label">ONE DRIVE</div>
+                    </div>
+
+                    <!-- My Device -->
+                    <div class="source-btn" @click.stop="triggerFileInput">
+                        <div class="source-icon">
+                            <svg viewBox="0 0 24 24" fill="#8b9dc3">
+                                <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/>
+                            </svg>
+                        </div>
+                        <div class="source-label">MY DEVICE</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Hidden File Input -->
+            <input
+                type="file"
+                ref="fileInput"
+                multiple
+                accept=".pdf,.docx,.txt"
+                @change="handleFileSelect"
+            >
+
+            <!-- Error Messages -->
+            <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+
+            <!-- ── File List ── -->
+            <div class="upload-status" v-if="uploadedFiles.length > 0">
+                <div
+                    v-for="(file, index) in uploadedFiles"
+                    :key="index"
+                    class="file-item"
+                >
+                    <!-- Remove button -->
+                    <div class="file-remove" @click="removeFile(index)">×</div>
+
+                    <!-- File type icon -->
+                    <div class="file-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+                        </svg>
+                    </div>
+
+                    <!-- File name + size + loading bar -->
+                    <div class="file-details">
+                        <div class="file-name">{{ file.name }}</div>
+                        <div class="file-size">{{ formatFileSize(file.size) }}</div>
+                        <div v-if="file.status === 'uploading'" class="loading-bar">
+                            <div class="loading-progress"></div>
+                        </div>
+                    </div>
+
+                    <!--
+                        Department Pill — ADMIN ONLY
+                        TODO: Wrap with v-if="isAdmin" once database/auth is integrated.
+                              isAdmin should be derived from the authenticated user's role.
+                    -->
+                    <div
+                        class="dept-pill"
+                        :class="{ unassigned: !file.department }"
+                        @click.stop="toggleDeptDropdown(index)"
+                    >
+                        <!-- assigned icon -->
+                        <svg v-if="file.department" viewBox="0 0 24 24">
+                            <path d="M12 2l-5.5 9h11L12 2zm0 3.84L14.6 9h-5.2L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5S15.01 22 17.5 22s4.5-2.01 4.5-4.5S19.99 13 17.5 13zm0 7c-1.38 0-2.5-1.12-2.5-2.5S16.12 15 17.5 15s2.5 1.12 2.5 2.5S18.88 20 17.5 20zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z"/>
+                        </svg>
+                        <!-- unassigned icon -->
+                        <svg v-else viewBox="0 0 24 24">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                        </svg>
+
+                        <span>{{ file.department || 'Assign Dept' }}</span>
+
+                        <svg class="dept-chevron" viewBox="0 0 24 24" style="transform: rotate(90deg);">
+                            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/>
+                        </svg>
+
+                        <!-- Department Dropdown -->
+                        <div class="dept-dropdown" v-if="file.deptOpen" @click.stop>
+                            <div
+                                v-for="dept in departments"
+                                :key="dept"
+                                class="dept-option"
+                                :class="{ selected: file.department === dept }"
+                                @click.stop="assignDepartment(index, dept)"
+                            >{{ dept }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Status Badge -->
+                    <div
+                        class="file-status-badge"
+                        :class="{
+                            'status-uploading':  file.status === 'uploading',
+                            'status-uploaded':   file.status === 'uploaded',
+                            'status-analysing':  file.status === 'analysing',
+                            'status-analysed':   file.status === 'analysed'
+                        }"
+                    >
+                        <span v-if="file.status === 'uploading'">UPLOADING…</span>
+                        <span v-else-if="file.status === 'uploaded'">UPLOADED</span>
+                        <span v-else-if="file.status === 'analysing'">ANALYSING…</span>
+                        <span v-else-if="file.status === 'analysed'">✓ ANALYSED</span>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Integration Alert Modal ── -->
+    <div class="modal-overlay" v-if="modalVisible" @click.self="closeModal">
+        <div class="modal-box">
+            <div class="modal-icon">🔗</div>
+            <h3>Implementation In Progress</h3>
+            <p>
+                <strong>{{ modalServiceName }}</strong> integration is currently being developed.<br>
+                Please use <strong>My Device</strong> to upload files for now.
+            </p>
+            <div class="modal-close-btn" @click="closeModal">Got It</div>
+        </div>
+    </div>
+
+    <!-- Help Button -->
+    <div class="help-button" @click="showHelp">Need Any Help?</div>
+
+    <!-- Wavy Background -->
+    <div class="wavy-background">
+        <img src="img3.png" alt="Wavy Design">
+    </div>
+
+</div>
+
+<script>
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                // ── Sidebar ──
+                sidebarOpen: false,
+                searchActive: false,
+                searchQuery: '',
+                last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
+                last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
+                filteredLast7Days: [],
+                filteredLast30Days: [],
+
+                // ── Admin fields ──
+                // TODO: replace with isAdmin flag from auth/database once implemented
+                companyName: '',
+
+                // ── Upload ──
+                isDragging: false,
+                uploadedFiles: [],
+                errorMessage: '',
+
+                // ── Department options ──
+                departments: ['HR & Admin', 'Finance', 'IT', 'Operations'],
+
+                // ── Integration modal ──
+                modalVisible: false,
+                modalServiceName: ''
+            };
+        },
+
+        mounted() {
+            this.filteredLast7Days  = [...this.last7Days];
+            this.filteredLast30Days = [...this.last30Days];
+
+            // Close dropdowns on outside click
+            document.addEventListener('click', this.closeAllDropdowns);
+        },
+
+        beforeUnmount() {
+            document.removeEventListener('click', this.closeAllDropdowns);
+        },
+
+        methods: {
+            // ── Sidebar ──
+            toggleSidebar() {
+                this.sidebarOpen = !this.sidebarOpen;
+            },
+            toggleSearch() {
+                this.searchActive = !this.searchActive;
+                if (!this.searchActive) {
+                    this.searchQuery = '';
+                    this.filterReports();
                 }
             },
-            mounted() {
-                // Initialize filtered lists
-                this.filteredLast7Days = [...this.last7Days];
-                this.filteredLast30Days = [...this.last30Days];
-            },
-            methods: {
-                toggleSidebar() {
-                    this.sidebarOpen = !this.sidebarOpen;
-                },
-                toggleSearch() {
-                    this.searchActive = !this.searchActive;
-                    if (!this.searchActive) {
-                        this.searchQuery = '';
-                        this.filterReports();
-                    }
-                },
-                goToHome() {
-                    window.location.href = 'home.html';
-                },
-                filterReports() {
-                    const query = this.searchQuery.toLowerCase();
-                    if (query === '') {
-                        this.filteredLast7Days = [...this.last7Days];
-                        this.filteredLast30Days = [...this.last30Days];
-                    } else {
-                        this.filteredLast7Days = this.last7Days.filter(report => 
-                            report.toLowerCase().includes(query)
-                        );
-                        this.filteredLast30Days = this.last30Days.filter(report => 
-                            report.toLowerCase().includes(query)
-                        );
-                    }
-                },
-                toggleCompanyMenu() {
-                    this.companyMenuOpen = !this.companyMenuOpen;
-                },
-                closeCompanyMenu() {
-                    setTimeout(() => {
-                        this.companyMenuOpen = false;
-                    }, 200);
-                },
-                showProfile() {
-                    window.location.href = 'profile.html';
-                },
-                showHelp() {
-                    window.location.href = 'user_support.html';
-                },
-                openReport(reportName) {
-                    window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
-                },
-                triggerFileInput() {
-                    this.$refs.fileInput.click();
-                },
-                handleDragOver(e) {
-                    this.isDragging = true;
-                },
-                handleDragLeave(e) {
-                    this.isDragging = false;
-                },
-                handleDrop(e) {
-                    this.isDragging = false;
-                    const files = Array.from(e.dataTransfer.files);
-                    this.processFiles(files);
-                },
-                handleFileSelect(e) {
-                    const files = Array.from(e.target.files);
-                    this.processFiles(files);
-                    // Reset file input
-                    e.target.value = '';
-                },
-                processFiles(files) {
-                    this.errorMessage = '';
-
-                    // Check total file count
-                    const totalFiles = this.uploadedFiles.length + files.length;
-                    if (totalFiles > 10) {
-                        this.errorMessage = `Maximum 10 files allowed. You're trying to upload ${totalFiles} files.`;
-                        return;
-                    }
-
-                    // Validate each file
-                    for (let file of files) {
-                        // Check file size (50MB = 50 * 1024 * 1024 bytes)
-                        if (file.size > 50 * 1024 * 1024) {
-                            this.errorMessage = `File "${file.name}" exceeds 50MB limit.`;
-                            continue;
-                        }
-
-                        // Check file type
-                        const validExtensions = ['.pdf', '.docx', '.txt'];
-                        const fileName = file.name.toLowerCase();
-                        const isValid = validExtensions.some(ext => fileName.endsWith(ext));
-                        
-                        if (!isValid) {
-                            this.errorMessage = `File "${file.name}" is not supported. Only PDF, DOCX, and TXT files are allowed.`;
-                            continue;
-                        }
-
-                        // Add file to upload list
-                        const fileObj = {
-                            name: file.name,
-                            size: file.size,
-                            uploading: true,
-                            uploaded: false,
-                            error: false
-                        };
-                        
-                        this.uploadedFiles.push(fileObj);
-
-                        // Simulate upload (since backend is not implemented)
-                        this.simulateUpload(fileObj);
-                    }
-                },
-                simulateUpload(fileObj) {
-                    // Simulate upload delay (1.5 seconds)
-                    setTimeout(() => {
-                        fileObj.uploading = false;
-                        fileObj.uploaded = true;
-                    }, 1500);
-                },
-                formatFileSize(bytes) {
-                    if (bytes === 0) return '0 Bytes';
-                    const k = 1024;
-                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                    const i = Math.floor(Math.log(bytes) / Math.log(k));
-                    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+            filterReports() {
+                const q = this.searchQuery.toLowerCase();
+                if (!q) {
+                    this.filteredLast7Days  = [...this.last7Days];
+                    this.filteredLast30Days = [...this.last30Days];
+                } else {
+                    this.filteredLast7Days  = this.last7Days.filter(r => r.toLowerCase().includes(q));
+                    this.filteredLast30Days = this.last30Days.filter(r => r.toLowerCase().includes(q));
                 }
+            },
+            goToHome() {
+                window.location.href = 'home.html';
+            },
+            showProfile() {
+                window.location.href = 'profile.html';
+            },
+            showHelp() {
+                window.location.href = 'user_support.html';
+            },
+            openReport(reportName) {
+                window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
+            },
+
+            // ── File Triggers ──
+            triggerFileInput() {
+                this.$refs.fileInput.click();
+            },
+            handleDragOver() {
+                this.isDragging = true;
+            },
+            handleDragLeave() {
+                this.isDragging = false;
+            },
+            handleDrop(e) {
+                this.isDragging = false;
+                this.processFiles(Array.from(e.dataTransfer.files));
+            },
+            handleFileSelect(e) {
+                this.processFiles(Array.from(e.target.files));
+                e.target.value = '';
+            },
+
+            // ── File Processing ──
+            processFiles(files) {
+                this.errorMessage = '';
+
+                if (this.uploadedFiles.length + files.length > 10) {
+                    this.errorMessage = `Maximum 10 files allowed. You currently have ${this.uploadedFiles.length} file(s) uploaded.`;
+                    return;
+                }
+
+                for (const file of files) {
+                    if (file.size > 50 * 1024 * 1024) {
+                        this.errorMessage = `"${file.name}" exceeds the 50 MB limit.`;
+                        continue;
+                    }
+                    const validExts = ['.pdf', '.docx', '.txt'];
+                    if (!validExts.some(ext => file.name.toLowerCase().endsWith(ext))) {
+                        this.errorMessage = `"${file.name}" is not supported. Only PDF, DOCX, and TXT files are allowed.`;
+                        continue;
+                    }
+
+                    const fileObj = {
+                        name: file.name,
+                        size: file.size,
+                        status: 'uploading',   // uploading | uploaded | analysing | analysed
+                        department: '',
+                        deptOpen: false
+                        // NOTE: status transitions to 'analysing' and 'analysed' will be
+                        //       triggered by backend signals once the API is integrated.
+                    };
+
+                    this.uploadedFiles.push(fileObj);
+                    this.simulateUpload(fileObj);
+                }
+            },
+
+            simulateUpload(fileObj) {
+                // Simulates the upload phase only.
+                // Transitions to 'analysing' and 'analysed' are reserved for backend integration.
+                setTimeout(() => {
+                    fileObj.status = 'uploaded';
+                }, 1500);
+            },
+
+            // ── Remove File ──
+            removeFile(index) {
+                this.uploadedFiles.splice(index, 1);
+            },
+
+            // ── Department Dropdown ──
+            toggleDeptDropdown(index) {
+                const isOpen = this.uploadedFiles[index].deptOpen;
+                // close all others first
+                this.uploadedFiles.forEach(f => f.deptOpen = false);
+                this.uploadedFiles[index].deptOpen = !isOpen;
+            },
+            assignDepartment(index, dept) {
+                this.uploadedFiles[index].department = dept;
+                this.uploadedFiles[index].deptOpen   = false;
+            },
+            closeAllDropdowns() {
+                this.uploadedFiles.forEach(f => f.deptOpen = false);
+            },
+
+            // ── Integration Modal ──
+            showIntegrationModal(serviceName) {
+                this.modalServiceName = serviceName;
+                this.modalVisible     = true;
+            },
+            closeModal() {
+                this.modalVisible = false;
+            },
+
+            // ── Utilities ──
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
             }
-        }).mount('#app');
-    </script>
+        }
+    }).mount('#app');
+</script>
 </body>
 </html>

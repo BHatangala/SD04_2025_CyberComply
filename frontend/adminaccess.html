@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Administrative Access</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <!-- Custom OTP Component -->
+    <script src="otp_component.js"></script>
     <style>
         * {
             margin: 0;
@@ -24,7 +26,7 @@
             min-height: 100vh;
         }
 
-        /* Top Header */
+        /* === HEADER SECTION === */
         .top-header {
             background-color: #1a2845;
             padding: 15px 30px;
@@ -71,7 +73,7 @@
             fill: #1a2845;
         }
 
-        /* Sidebar */
+        /* === SIDEBAR STYLES === */
         .sidebar {
             position: absolute;
             left: 0;
@@ -201,7 +203,7 @@
             font-style: italic;
         }
 
-        /* Main Content */
+        /* === MAIN CONTENT AREA === */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
             padding: 60px 80px;
@@ -280,7 +282,7 @@
             transform: translateY(-2px);
         }
 
-        /* Wavy Background */
+        /* === BACKGROUND ELEMENTS === */
         .wavy-background {
             position: fixed;
             bottom: 0;
@@ -297,7 +299,7 @@
             display: block;
         }
 
-        /* Scrollbar Styling */
+        /* === SCROLLBAR STYLING === */
         .sidebar::-webkit-scrollbar {
             width: 6px;
         }
@@ -315,6 +317,120 @@
             background: #4a8fe7;
         }
 
+        .back-arrow {
+            position: absolute;
+            left: 30px;
+            top: 80px;
+            cursor: pointer;
+            font-size: 32px;
+            color: #8b9dc3;
+            transition: all 0.3s;
+            font-weight: 300;
+            z-index: 95;
+        }
+
+        .back-arrow::after {
+            content: "Back to Profile";
+            position: absolute;
+            left: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #1a2845;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .back-arrow:hover::after {
+            opacity: 1;
+        }
+
+        .back-arrow.shifted {
+            left: 310px;
+        }
+
+        .back-arrow:hover {
+            color: #ffffff;
+        }
+
+        /* === MESSAGE BANNER STYLES === */
+        .message-banner {
+            margin: 20px auto;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            max-width: 400px;
+        }
+
+        .message-banner.success {
+            background: #166534;
+            border: 1px solid #4ade80;
+            color: white;
+        }
+
+        .message-banner.error {
+            background: #fee2e2;
+            border: 1px solid #f87171;
+            color: #b91c1c;
+        }
+
+        .success-title {
+            color: #ffffff;
+        }
+
+        .success-text {
+            color: #c5d0e6;
+        }
+
+        /* === MODAL STYLES === */
+        .otp-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            backdrop-filter: blur(4px);
+        }
+
+        /* CENTERED OTP BOX */
+        .otp-modal {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2a4a7c 100%);
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+        }
+
+        /* BACK BUTTON */
+        .back-btn {
+            margin-top: 20px;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+        }
+
+        .otp-modal h3 {
+            margin-bottom: 24px;
+            font-size: 22px;
+            color: #ffffff;
+        }
+
+        .otp-modal p {
+            color: #c5d0e6;
+            margin-bottom: 28px;
+            font-size: 15px;
+        }
+
+        /* === RESPONSIVE DESIGN === */
         @media screen and (max-width: 1200px) {
             .sidebar {
                 position: fixed;
@@ -329,7 +445,7 @@
 </head>
 <body>
     <div id="app">
-        <!-- Top Header -->
+        <!-- Header Section -->
         <div class="top-header">
             <div class="menu-icon" @click="toggleSidebar">●●●</div>
             <div class="user-profile" @click="showProfile">
@@ -339,9 +455,12 @@
             </div>
         </div>
 
+        <!-- Back Navigation -->
+        <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goToProfile">←</div>
+
         <!-- Sidebar -->
         <div class="sidebar" :class="{ open: sidebarOpen }">
-            <!-- Icon Bar (Search and Plus) -->
+            <!-- Icon Bar (with Search and Plus) -->
             <div class="sidebar-icon-bar">
                 <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
                     <svg viewBox="0 0 24 24">
@@ -366,6 +485,7 @@
                 >
             </div>
 
+            <!-- Last 7 Days Reports Section -->
             <div class="sidebar-section">
                 <div class="sidebar-header">
                     <svg viewBox="0 0 24 24">
@@ -388,6 +508,7 @@
                 </div>
             </div>
 
+            <!-- Last 30 Days Reports Section -->
             <div class="sidebar-section">
                 <div class="sidebar-header">
                     <svg viewBox="0 0 24 24">
@@ -422,7 +543,17 @@
                 <p class="admin-description">
                     Enter organizational email address below for verification.
                 </p>
+
+                <!-- Admin Grant Form -->
                 <div class="admin-form">
+                    <transition name="fade">
+                        <div v-if="message.text"
+                            class="message-banner"
+                            :class="message.type">
+                            {{ message.text }}
+                        </div>
+                    </transition>
+
                     <label>EMAIL</label>
                     <input 
                         type="email" 
@@ -434,6 +565,49 @@
             </div>
         </div>
 
+        <!-- OTP Verification + Success Modal -->
+        <div v-if="step === 'otp' || step === 'success'" class="otp-overlay">
+
+            <div class="otp-modal">
+
+                <!-- OTP Verification View -->
+                <div v-if="step === 'otp'">
+
+                    <h2>Enter the OTP sent to {{ orgEmail }}</h2>
+
+                    <transition name="fade">
+                        <div v-if="message.text"
+                            class="message-banner"
+                            :class="message.type">
+                            {{ message.text }}
+                        </div>
+                    </transition>
+
+                    <otp-verification 
+                        :email="orgEmail" 
+                        @verified="handleOtpVerified">
+                    </otp-verification>
+
+                </div>
+
+
+                <!-- Success Confirmation View -->
+                <div v-if="step === 'success'" class="success-step">
+
+                    <h2 class="success-title">Admin Access Granted</h2>
+
+                    <p class="success-text">
+                        <br>
+                        Redirecting to profile page...
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
         <!-- Curly Line Background -->
         <div class="wavy-background">
             <img src="img5.png" alt="Curly Line Design">
@@ -443,11 +617,14 @@
     <script>
         const { createApp } = Vue;
 
-        createApp({
+        const app = createApp({
             data() {
                 return {
                     sidebarOpen: false,
                     orgEmail: '',
+                    step: 'form',              // 'form' | 'otp' | 'success'
+                    message: { text: '', type: '' },
+                    loading: false,
                     last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
                     last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
                     searchActive: false,
@@ -472,11 +649,71 @@
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
                 sendVerification() {
-                    if (this.orgEmail) {
-                        alert(`Verification email sent to: ${this.orgEmail}`);
-                        // Implement send logic here
+                    // Clear previous message
+                    this.message = { text: '', type: '' };
+
+                    // Same email regex used in login page
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+                    // Check empty or invalid format
+                    if (!this.orgEmail || !emailRegex.test(this.orgEmail)) {
+                        this.message = {
+                            text: 'Please enter a valid email address.',
+                            type: 'error'
+                        };
+                        return;
+                    }
+
+                    // simulate sending OTP
+                    this.step = 'otp';
+                    this.message = {
+                        text: `OTP sent to ${this.orgEmail}`,
+                        type: 'success'
+                    };
+                },
+                handleOtpVerified() {
+                    // save email for profile page
+                    sessionStorage.setItem('userRole', 'Administrative User');
+                    sessionStorage.setItem('userEmail', this.orgEmail);
+
+                    // show green success message
+                    this.message = {
+                        text: 'Administrative access granted successfully.',
+                        type: 'success'
+                    };
+
+                    this.step = 'success';
+
+                    // redirect after message
+                    setTimeout(() => {
+                        window.location.href = 'profile.html';
+                    }, 2200);
+                },
+                goToProfile() {
+                    window.location.href = 'profile.html';
+                },
+                toggleSearch() {
+                    this.searchActive = !this.searchActive;
+                    if (!this.searchActive) {
+                        this.searchQuery = '';
+                        this.filterReports();
+                    }
+                },
+                goToHome() {
+                    window.location.href = 'home.html';
+                },
+                filterReports() {
+                    const query = this.searchQuery.toLowerCase();
+                    if (query === '') {
+                        this.filteredLast7Days = [...this.last7Days];
+                        this.filteredLast30Days = [...this.last30Days];
                     } else {
-                        alert('Please enter a valid email.');
+                        this.filteredLast7Days = this.last7Days.filter(report => 
+                            report.toLowerCase().includes(query)
+                        );
+                        this.filteredLast30Days = this.last30Days.filter(report => 
+                            report.toLowerCase().includes(query)
+                        );
                     }
                 },
                 toggleSearch() {
@@ -504,7 +741,9 @@
                     }
                 }
             }
-        }).mount('#app');
+        });
+        registerOtpComponent(app);
+        app.mount('#app');
     </script>
 </body>
 </html>
