@@ -10,10 +10,14 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.contrib.auth import authenticate
 from django.utils import timezone
+from datetime import timedelta
 from django.core.exceptions import ObjectDoesNotExist
 import json
 
 from .models import UserProfile, LoginHistory
+
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
 
 AI_API_URL = "http://127.0.0.1:5000"
 
@@ -135,14 +139,20 @@ def login(request):
     except ObjectDoesNotExist:
         profile = None
 
+    # Auto-unlock if lock time expired
+    if profile and profile.locked_until and profile.locked_until <= timezone.now():
+        profile.locked_until = None
+        profile.failed_login_count = 0
+        profile.save(update_fields=["locked_until", "failed_login_count"])    
+
     # If user exists but soft-deleted, block login
     if profile and profile.deleted_at is not None:
-        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        _record_login_attempt(profile, request, LoginHistory.Status.LOCKED)
         return JsonResponse({"detail": "Invalid credentials"}, status=401)
 
     # If account is temporarily locked, block login
     if profile and profile.locked_until and profile.locked_until > timezone.now():
-        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        _record_login_attempt(profile, request, LoginHistory.Status.LOCKED)
         return JsonResponse({"detail": "Account is temporarily locked. Try again later."}, status=423)
 
     # Authenticate using Django auth
@@ -152,17 +162,33 @@ def login(request):
         # Wrong password OR user not found
         if profile:
             profile.failed_login_count += 1
-            profile.save(update_fields=["failed_login_count"])
+
+            # Lock the account if max attempts reached
+            just_locked = False
+            if profile.failed_login_count >= MAX_LOGIN_ATTEMPTS:
+                profile.locked_until = timezone.now() + timedelta(minutes=LOCKOUT_MINUTES)
+                just_locked = True
+
+            profile.save(update_fields=["failed_login_count", "locked_until"])
+
+            # Record history
+            if just_locked:
+                _record_login_attempt(profile, request, LoginHistory.Status.LOCKED)
+                return JsonResponse(
+                    {"detail": f"Too many attempts. Account locked for {LOCKOUT_MINUTES} minutes."},
+                    status=423
+                )
 
             _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
-
+            
         return JsonResponse({"detail": "Invalid credentials"}, status=401)
-
+            
     # Success: reset failed login count, update last login
-    profile = user.profile 
+    profile =  UserProfile.objects.get(auth_user=user)
     profile.failed_login_count = 0
+    profile.locked_until = None
     profile.last_login_at = timezone.now()
-    profile.save(update_fields=["failed_login_count", "last_login_at"])
+    profile.save(update_fields=["failed_login_count", "locked_until", "last_login_at"])
 
     _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS)
 
@@ -176,7 +202,6 @@ def login(request):
         },
         status=200
     )
-
 
 def _record_login_attempt(profile: UserProfile, request, status: str) -> None:
     """Helper: saves one row in login_history for each login attempt."""

@@ -117,6 +117,7 @@ class LoginHistory(models.Model):
     class Status(models.TextChoices):
         SUCCESS = "SUCCESS", "SUCCESS"
         FAILED = "FAILED", "FAILED"
+        LOCKED = "LOCKED", "Locked"
 
     login_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(UserProfile, on_delete=models.PROTECT, related_name="login_history")
