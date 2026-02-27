@@ -715,6 +715,30 @@
                             report.toLowerCase().includes(query)
                         );
                     }
+                },
+                toggleSearch() {
+                    this.searchActive = !this.searchActive;
+                    if (!this.searchActive) {
+                        this.searchQuery = '';
+                        this.filterReports();
+                    }
+                },
+                goToHome() {
+                    window.location.href = 'home.html';   // or index.html / dashboard.html — adjust name
+                },
+                filterReports() {
+                    const query = this.searchQuery.toLowerCase();
+                    if (query === '') {
+                        this.filteredLast7Days = [...this.last7Days];
+                        this.filteredLast30Days = [...this.last30Days];
+                    } else {
+                        this.filteredLast7Days = this.last7Days.filter(report => 
+                            report.toLowerCase().includes(query)
+                        );
+                        this.filteredLast30Days = this.last30Days.filter(report => 
+                            report.toLowerCase().includes(query)
+                        );
+                    }
                 }
             }
         });
