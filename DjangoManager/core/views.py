@@ -8,9 +8,12 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
+from django.contrib.auth import authenticate
+from django.utils import timezone
+from django.core.exceptions import ObjectDoesNotExist
 import json
 
-from .models import UserProfile
+from .models import UserProfile, LoginHistory
 
 AI_API_URL = "http://127.0.0.1:5000"
 
@@ -101,4 +104,88 @@ def signup(request):
     return JsonResponse(
         {"detail": "Account created successfully"},
         status=201
-    )    
+    )  
+
+@csrf_exempt
+def login(request):
+    """
+    API endpoint for user authentication (login).
+    Validates user credentials and records each login attempt in LoginHistory.
+    """
+
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    # Parse JSON request body
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    email = (payload.get("email") or "").strip().lower()
+    password = payload.get("password") or ""
+
+    if not email or not password:
+        return JsonResponse({"detail": "Email and password are required"}, status=400)
+
+    # Find user profile (if not found, still return generic error)
+    profile = None
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
+    except ObjectDoesNotExist:
+        profile = None
+
+    # If user exists but soft-deleted, block login
+    if profile and profile.deleted_at is not None:
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        return JsonResponse({"detail": "Invalid credentials"}, status=401)
+
+    # If account is temporarily locked, block login
+    if profile and profile.locked_until and profile.locked_until > timezone.now():
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        return JsonResponse({"detail": "Account is temporarily locked. Try again later."}, status=423)
+
+    # Authenticate using Django auth
+    user = authenticate(username=email, password=password)
+
+    if user is None:
+        # Wrong password OR user not found
+        if profile:
+            profile.failed_login_count += 1
+            profile.save(update_fields=["failed_login_count"])
+
+            _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+
+        return JsonResponse({"detail": "Invalid credentials"}, status=401)
+
+    # Success: reset failed login count, update last login
+    profile = user.profile 
+    profile.failed_login_count = 0
+    profile.last_login_at = timezone.now()
+    profile.save(update_fields=["failed_login_count", "last_login_at"])
+
+    _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS)
+
+    # Minimal response for frontend
+    return JsonResponse(
+        {
+            "detail": "Login success",
+            "email": user.email,
+            "role": profile.role,
+            "full_name": profile.full_name,
+        },
+        status=200
+    )
+
+
+def _record_login_attempt(profile: UserProfile, request, status: str) -> None:
+    """Helper: saves one row in login_history for each login attempt."""
+    ip = request.META.get("REMOTE_ADDR")
+    user_agent = request.META.get("HTTP_USER_AGENT")
+
+    LoginHistory.objects.create(
+        user=profile,
+        status=status,
+        ip_address=ip,
+        user_agent=user_agent
+    )  

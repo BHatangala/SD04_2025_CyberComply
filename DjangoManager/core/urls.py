@@ -7,4 +7,7 @@ urlpatterns = [
     # User registration endpoint
     path("api/signup/", views.signup, name="signup"),
 
+    # User authentication (login) endpoint
+    path("api/login/", views.login, name="login"),
+
 ]
