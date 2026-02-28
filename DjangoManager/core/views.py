@@ -13,8 +13,10 @@ from django.utils import timezone
 from datetime import timedelta
 from django.core.exceptions import ObjectDoesNotExist
 import json
+import random
+import hashlib
 
-from .models import UserProfile, LoginHistory
+from .models import UserProfile, LoginHistory, OtpVerification
 
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
@@ -185,6 +187,27 @@ def login(request):
             
     # Success: reset failed login count, update last login
     profile =  UserProfile.objects.get(auth_user=user)
+
+    # If 2FA enabled, generate OTP and require verification
+    if profile.otp_is_enabled:
+
+        raw_otp = _generate_and_store_otp(
+            profile,
+            OtpVerification.Purpose.LOGIN_2FA
+        )
+
+        # TEMP: For backend testing only
+        print(f"DEBUG OTP for {profile.auth_user.email}: {raw_otp}")
+
+        return JsonResponse(
+            {
+                "requires_otp": True,
+                "detail": "OTP sent to your email."
+            },
+            status=200
+        )
+
+    # If 2FA is NOT enabled, complete login normally
     profile.failed_login_count = 0
     profile.locked_until = None
     profile.last_login_at = timezone.now()
@@ -214,3 +237,19 @@ def _record_login_attempt(profile: UserProfile, request, status: str) -> None:
         ip_address=ip,
         user_agent=user_agent
     )  
+
+def _generate_and_store_otp(profile: UserProfile, purpose: str) -> str:
+    """Generate 6-digit OTP, hash it, store in DB, return raw OTP."""
+
+    raw_otp = f"{random.randint(100000, 999999)}"
+
+    otp_hash = hashlib.sha256(raw_otp.encode()).hexdigest()
+
+    OtpVerification.objects.create(
+        user=profile,
+        otp_hash=otp_hash,
+        purpose=purpose,
+        expires_at=timezone.now() + timedelta(minutes=5)
+    )
+
+    return raw_otp    
