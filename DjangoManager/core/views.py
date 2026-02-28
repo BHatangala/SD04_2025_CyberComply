@@ -12,6 +12,8 @@ from django.contrib.auth import authenticate
 from django.utils import timezone
 from datetime import timedelta
 from django.core.exceptions import ObjectDoesNotExist
+from django.core import signing
+from django.core.signing import BadSignature, SignatureExpired
 import json
 import random
 import hashlib
@@ -345,3 +347,169 @@ def verify_otp(request):
         },
         status=200
     )   
+
+@csrf_exempt
+def request_password_reset(request):
+    """
+    Generates and stores a password reset OTP for the user (if exists).
+    """
+
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    email = (payload.get("email") or "").strip().lower()
+
+    if not email:
+        return JsonResponse({"detail": "Email is required"}, status=400)
+
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
+    except ObjectDoesNotExist:
+        # Security: Do NOT reveal if email exists
+        return JsonResponse(
+            {"detail": "If the email exists, an OTP will be sent."},
+            status=200
+        )
+
+    if profile.deleted_at is not None:
+        return JsonResponse(
+            {"detail": "If the email exists, an OTP will be sent."},
+            status=200
+        )
+
+    # Generate OTP with RESET_PASSWORD purpose
+    raw_otp = _generate_and_store_otp(
+        profile,
+        OtpVerification.Purpose.RESET_PASSWORD
+    )
+
+    # TEMP: For backend testing only
+    print(f"DEBUG RESET OTP for {profile.auth_user.email}: {raw_otp}")
+
+    return JsonResponse(
+        {"detail": "If the email exists, an OTP will be sent."},
+        status=200
+    )
+
+@csrf_exempt
+def verify_reset_otp(request):
+    """
+    Verifies RESET_PASSWORD OTP and returns a short-lived reset token.
+    """
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    email = (payload.get("email") or "").strip().lower()
+    otp = (payload.get("otp") or "").strip()
+
+    if not email or not otp:
+        return JsonResponse({"detail": "Email and OTP are required"}, status=400)
+    if not otp.isdigit() or len(otp) != 6:
+        return JsonResponse({"detail": "OTP must be exactly 6 digits"}, status=400)
+
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
+    except ObjectDoesNotExist:
+        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+
+    if profile.deleted_at is not None:
+        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+
+    otp_row = (
+        OtpVerification.objects
+        .filter(
+            user=profile,
+            purpose=OtpVerification.Purpose.RESET_PASSWORD,
+            used_at__isnull=True
+        )
+        .order_by("-created_at")
+        .first()
+    )
+
+    # No OTP found
+    if not otp_row:
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+
+    # OTP expired
+    if otp_row.expires_at <= timezone.now():
+        otp_row.used_at = timezone.now()
+        otp_row.save(update_fields=["used_at"])
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        return JsonResponse({"detail": "OTP expired. Please request a new one."}, status=401)
+
+    # Wrong OTP
+    incoming_hash = hashlib.sha256(otp.encode()).hexdigest()
+    if incoming_hash != otp_row.otp_hash:
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+
+    # Mark OTP used
+    otp_row.used_at = timezone.now()
+    otp_row.save(update_fields=["used_at"])
+
+    _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS)
+
+    # 10-min token
+    reset_token = signing.dumps({"uid": str(profile.user_id)}, salt="pwd-reset")
+
+    return JsonResponse({"detail": "OTP verified.", "reset_token": reset_token}, status=200)
+
+@csrf_exempt
+def reset_password(request):
+    """
+    Resets password using a verified reset token.
+    """
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    reset_token = (payload.get("reset_token") or "").strip()
+    new_password = payload.get("new_password") or ""
+
+    if not reset_token or not new_password:
+        return JsonResponse({"detail": "reset_token and new_password are required"}, status=400)
+
+    try:
+        data = signing.loads(reset_token, salt="pwd-reset", max_age=600)  # 10 mins
+    except SignatureExpired:
+        return JsonResponse({"detail": "Reset token expired. Please request OTP again."}, status=401)
+    except BadSignature:
+        return JsonResponse({"detail": "Invalid reset token"}, status=401)
+
+    user_id = data.get("uid")
+    if not user_id:
+        return JsonResponse({"detail": "Invalid reset token"}, status=401)
+
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(user_id=user_id)
+    except ObjectDoesNotExist:
+        return JsonResponse({"detail": "Invalid reset token"}, status=401)
+
+    if profile.deleted_at is not None:
+        return JsonResponse({"detail": "Invalid reset token"}, status=401)
+
+    auth_user = profile.auth_user
+    auth_user.set_password(new_password)
+    auth_user.save(update_fields=["password"])
+
+    # clear lock
+    profile.failed_login_count = 0
+    profile.locked_until = None
+    profile.save(update_fields=["failed_login_count", "locked_until"])
+
+    return JsonResponse({"detail": "Password reset successful"}, status=200)
