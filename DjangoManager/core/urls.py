@@ -10,4 +10,7 @@ urlpatterns = [
     # User authentication (login) endpoint
     path("api/login/", views.login, name="login"),
 
+    # Verify OTP endpoint
+    path("api/verify-otp/", views.verify_otp, name="verify_otp"),
+
 ]

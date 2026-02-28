@@ -252,4 +252,96 @@ def _generate_and_store_otp(profile: UserProfile, purpose: str) -> str:
         expires_at=timezone.now() + timedelta(minutes=5)
     )
 
-    return raw_otp    
+    return raw_otp 
+
+@csrf_exempt
+def verify_otp(request):
+    """
+    API endpoint to verify OTP for login 2FA.
+    Verifies the submitted OTP for login 2FA and completes authentication if valid.
+    """
+
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    # Parse JSON request body
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    email = (payload.get("email") or "").strip().lower()
+    otp = (payload.get("otp") or "").strip()
+
+    if not email or not otp:
+        return JsonResponse({"detail": "Email and OTP are required"}, status=400)
+
+    if not otp.isdigit() or len(otp) != 6:
+        return JsonResponse({"detail": "OTP must be exactly 6 digits"}, status=400)
+
+    # Find profile
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
+    except ObjectDoesNotExist:
+        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+
+    # Block if soft deleted
+    if profile.deleted_at is not None:
+        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+
+    # Block if currently locked
+    if profile.locked_until and profile.locked_until > timezone.now():
+        _record_login_attempt(profile, request, LoginHistory.Status.LOCKED)
+        return JsonResponse({"detail": "Account is temporarily locked. Try again later."}, status=423)
+
+    # Get latest unused OTP for LOGIN_2FA
+    otp_row = (
+        OtpVerification.objects
+        .filter(
+            user=profile,
+            purpose=OtpVerification.Purpose.LOGIN_2FA,
+            used_at__isnull=True
+        )
+        .order_by("-created_at")
+        .first()
+    )
+
+    # No OTP found
+    if not otp_row:
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+
+    # OTP expired
+    if otp_row.expires_at <= timezone.now():
+        otp_row.used_at = timezone.now()                
+        otp_row.save(update_fields=["used_at"])
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        return JsonResponse({"detail": "OTP expired. Please login again."}, status=401)
+
+    # Wrong OTP
+    incoming_hash = hashlib.sha256(otp.encode()).hexdigest()
+    if incoming_hash != otp_row.otp_hash:
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+
+    # Mark OTP used
+    otp_row.used_at = timezone.now()
+    otp_row.save(update_fields=["used_at"])
+
+    # OTP success
+    profile.failed_login_count = 0
+    profile.locked_until = None
+    profile.last_login_at = timezone.now()
+    profile.save(update_fields=["failed_login_count", "locked_until", "last_login_at"])
+
+    _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS)
+
+    return JsonResponse(
+        {
+            "detail": "Login success",
+            "email": profile.auth_user.email,
+            "role": profile.role,
+            "full_name": profile.full_name,
+        },
+        status=200
+    )   
