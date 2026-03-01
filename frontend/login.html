@@ -187,11 +187,13 @@
                     btn.disabled = true;
 
                     try {
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-
-                        if (form.email === 'error@test.com') {
-                            throw new Error('Invalid credentials provided.');
-                        }
+                        const response = await fetch('http://127.0.0.1:8000/api/send-otp/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: form.email })
+                        });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.error || 'Failed to send OTP.');
 
                         // Move to OTP step
                         step.value = 2;

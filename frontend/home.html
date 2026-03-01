@@ -1178,20 +1178,67 @@
                     };
 
                     this.uploadedFiles.push(fileObj);
-                    this.simulateUpload(fileObj);
+                    this.simulateUpload(fileObj, file);
                 }
             },
 
-            simulateUpload(fileObj) {
+            //simulateUpload(fileObj) {
                 // Simulates the upload phase only.
                 // Transitions to 'analysing' and 'analysed' are reserved for backend integration.
-                setTimeout(() => {
-                    fileObj.status = 'uploaded';
-                }, 1500);
+                //setTimeout(() => {
+                    //fileObj.status = 'uploaded';
+                //}, 1500);
+            //},
+            async simulateUpload(fileObj, file) {
+                try {
+                    const formData = new FormData();
+                    formData.append('document', file);
+                    formData.append('company_name', this.companyName);
+                    formData.append('department', fileObj.department);
+
+                    const response = await fetch('http://127.0.0.1:8000/api/analyze/', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        const index = this.uploadedFiles.indexOf(fileObj);
+                        this.uploadedFiles[index] = {...fileObj, status: 'uploaded'};
+
+                        // Store uploaded file name in sessionStorage for logout cleanup
+                        const uploaded = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                        uploaded.push(file.name);
+                        sessionStorage.setItem('uploadedFileNames', JSON.stringify(uploaded));
+                    } else {
+                        const index = this.uploadedFiles.indexOf(fileObj);
+                        this.uploadedFiles.splice(index, 1);
+                        this.errorMessage = data.error || 'Upload failed — file may have been rejected.';
+                    }
+                } catch (error) {
+                    const index = this.uploadedFiles.indexOf(fileObj);
+                    this.uploadedFiles[index] = { ...fileObj, status: 'uploaded' };
+                    this.errorMessage = 'Could not connect to server.';
+                }
             },
 
             // ── Remove File ──
-            removeFile(index) {
+            async removeFile(index) {
+                const file = this.uploadedFiles[index];
+
+                //Delete from S3
+                if (file.status === 'uploaded'){
+                    try {
+                        await fetch('http://127.0.0.1:8000/api/delete-file/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json'},
+                            body: JSON.stringify({ file_name: file.name})
+                        });
+                    } catch (error) {
+                        console.error('Failed to delete from S3:', error);
+                    }
+                }
                 this.uploadedFiles.splice(index, 1);
             },
 

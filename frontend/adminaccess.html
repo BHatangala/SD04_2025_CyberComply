@@ -648,28 +648,30 @@
                 openReport(reportName) {
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
-                sendVerification() {
-                    // Clear previous message
+                async sendVerification() {
                     this.message = { text: '', type: '' };
 
-                    // Same email regex used in login page
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-                    // Check empty or invalid format
-                    if (!this.orgEmail || !emailRegex.test(this.orgEmail)) {
-                        this.message = {
-                            text: 'Please enter a valid email address.',
-                            type: 'error'
-                        };
+                        if (!this.orgEmail || !emailRegex.test(this.orgEmail)) {
+                        this.message = { text: 'Please enter a valid email address.', type: 'error' };
                         return;
-                    }
+                        }
 
-                    // simulate sending OTP
-                    this.step = 'otp';
-                    this.message = {
-                        text: `OTP sent to ${this.orgEmail}`,
-                        type: 'success'
-                    };
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/api/send-otp/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: this.orgEmail })
+                        });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.error || 'Failed to send OTP.');
+
+                        this.step = 'otp';
+                        this.message = { text: `OTP sent to ${this.orgEmail}`, type: 'success' };
+
+                    } catch (err) {
+                        this.message = { text: err.message || 'Error sending OTP. Please try again.', type: 'error' };
+                    }
                 },
                 handleOtpVerified() {
                     // save email for profile page

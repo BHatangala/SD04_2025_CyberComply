@@ -122,7 +122,13 @@ const OtpVerification = {
                 // ── END BACKEND INTEGRATION POINT ─────────────────────────────
 
                 // Simulated delay — any 6-digit number passes for now
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                const response = await fetch('http://127.0.0.1:8000/api/verify-otp/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: this.email, otp: this.otp })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Invalid OTP.');
 
                 // Emit to parent — parent controls what happens next
                 this.$emit('verified');
