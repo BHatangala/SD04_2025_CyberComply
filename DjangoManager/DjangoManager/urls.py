@@ -16,7 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from core.views import analyze_compliance, send_otp, verify_otp, delete_file
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/analyze/', analyze_compliance),
+    path('api/send-otp/', send_otp),
+    path('api/verify-otp/', verify_otp),
+    path('api/delete-file/', delete_file),
 ]
