@@ -40,6 +40,10 @@ const OtpVerification = {
         email: {
             type: String,
             default: ''
+        },
+        mode: {
+            type: String,
+            default: 'login'
         }
     },
 
@@ -93,7 +97,7 @@ const OtpVerification = {
 
     methods: {
         async verify() {
-            this.message.text = '';
+            this.message = { text: '', type: '' };
 
             // ── Client-side validation ──
             if (!this.otp) {
@@ -108,7 +112,12 @@ const OtpVerification = {
             this.loading = true;
 
             try {
-                const response = await fetch("http://127.0.0.1:8000/api/verify-otp/", {
+                const endpoint =
+                    this.mode === "reset"
+                        ? "http://127.0.0.1:8000/api/verify-reset-otp/"
+                        : "http://127.0.0.1:8000/api/verify-otp/";
+
+                const response = await fetch(endpoint, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -123,11 +132,20 @@ const OtpVerification = {
                     throw new Error(data.detail || "Invalid OTP.");
                 }
 
+                // Safety check if backend didn't return token in reset mode
+                if (this.mode === "reset" && !data.reset_token) {
+                    throw new Error("Reset token not received. Please try again.");
+                }
+
                 // Clear OTP after success
                 this.otp = "";
 
-                // Informs the parent page OTP is verified
-                this.$emit("verified");
+                // If reset mode, send token back
+                if (this.mode === "reset") {
+                    this.$emit("verified", data.reset_token);
+                } else {
+                    this.$emit("verified");
+                }
 
                 // Simulated delay — any 6-digit number passes for now
                 // await new Promise(resolve => setTimeout(resolve, 1000));
