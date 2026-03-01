@@ -187,12 +187,28 @@ def login(request):
             
         return JsonResponse({"detail": "Invalid credentials"}, status=401)
             
-    # Success: reset failed login count, update last login
+    # Success: get profile
     profile =  UserProfile.objects.get(auth_user=user)
+
+    # Require OTP on first login
+    if not profile.is_verified:
+        raw_otp = _generate_and_store_otp(
+            profile,
+            OtpVerification.Purpose.FIRST_LOGIN
+        )
+
+        print(f"DEBUG FIRST LOGIN OTP for {profile.auth_user.email}: {raw_otp}")
+
+        return JsonResponse(
+            {
+                "requires_otp": True,
+                "detail": "OTP sent to your email (first login verification)."
+            },
+            status=200
+        )
 
     # If 2FA enabled, generate OTP and require verification
     if profile.otp_is_enabled:
-
         raw_otp = _generate_and_store_otp(
             profile,
             OtpVerification.Purpose.LOGIN_2FA
@@ -301,7 +317,10 @@ def verify_otp(request):
         OtpVerification.objects
         .filter(
             user=profile,
-            purpose=OtpVerification.Purpose.LOGIN_2FA,
+            purpose__in=[
+                OtpVerification.Purpose.LOGIN_2FA,
+                OtpVerification.Purpose.FIRST_LOGIN
+            ],
             used_at__isnull=True
         )
         .order_by("-created_at")
@@ -317,7 +336,9 @@ def verify_otp(request):
     if otp_row.expires_at <= timezone.now():
         otp_row.used_at = timezone.now()                
         otp_row.save(update_fields=["used_at"])
+
         _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+
         return JsonResponse({"detail": "OTP expired. Please login again."}, status=401)
 
     # Wrong OTP
@@ -334,7 +355,12 @@ def verify_otp(request):
     profile.failed_login_count = 0
     profile.locked_until = None
     profile.last_login_at = timezone.now()
-    profile.save(update_fields=["failed_login_count", "locked_until", "last_login_at"])
+
+    # Mark verified only if this OTP was for first login
+    if otp_row.purpose == OtpVerification.Purpose.FIRST_LOGIN:
+        profile.is_verified = True
+
+    profile.save(update_fields=["failed_login_count", "locked_until", "last_login_at", "is_verified"])
 
     _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS)
 

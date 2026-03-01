@@ -87,7 +87,7 @@ class UserProfile(models.Model):
 # =========================
 class OtpVerification(models.Model):
     class Purpose(models.TextChoices):
-        VERIFY_EMAIL = "VERIFY_EMAIL", "VERIFY_EMAIL"
+        FIRST_LOGIN = "FIRST_LOGIN", "FIRST_LOGIN"
         LOGIN_2FA = "LOGIN_2FA", "LOGIN_2FA"
         RESET_PASSWORD = "RESET_PASSWORD", "RESET_PASSWORD"
         DELETE_ACCOUNT = "DELETE_ACCOUNT", "DELETE_ACCOUNT"
