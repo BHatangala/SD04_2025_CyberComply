@@ -108,24 +108,32 @@ const OtpVerification = {
             this.loading = true;
 
             try {
-                // ── BACKEND INTEGRATION POINT ─────────────────────────────────
-                // When the Django endpoint is ready, replace the simulation below:
-                //
-                //   const response = await fetch('/api/verify-otp/', {
-                //       method: 'POST',
-                //       headers: { 'Content-Type': 'application/json' },
-                //       body: JSON.stringify({ email: this.email, otp: this.otp })
-                //   });
-                //   const data = await response.json();
-                //   if (!response.ok) throw new Error(data.detail || 'Invalid OTP.');
-                //
-                // ── END BACKEND INTEGRATION POINT ─────────────────────────────
+                const response = await fetch("http://127.0.0.1:8000/api/verify-otp/", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: this.email,
+                        otp: this.otp
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || "Invalid OTP.");
+                }
+
+                // Clear OTP after success
+                this.otp = "";
+
+                // Informs the parent page OTP is verified
+                this.$emit("verified");
 
                 // Simulated delay — any 6-digit number passes for now
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // await new Promise(resolve => setTimeout(resolve, 1000));
 
                 // Emit to parent — parent controls what happens next
-                this.$emit('verified');
+                // this.$emit('verified');
 
             } catch (err) {
                 this.setMessage('error', err.message || 'Verification failed. Please try again.');
