@@ -264,7 +264,7 @@
           const regex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-\\[\]\/`~+=;']).{8,}$/;
           return regex.test(password);
         },
-        submitForm() {
+        async submitForm() {
           this.errors = {};
 
           if (!this.form.name.trim()) {
@@ -288,8 +288,34 @@
             this.errors.terms = "You must accept the Terms & Conditions.";
           }
 
-         if (Object.keys(this.errors).length === 0) {
-            window.location.href = "home.html";
+          if (Object.keys(this.errors).length === 0) {
+            try {
+              const response = await fetch("http://127.0.0.1:8000/api/signup/", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  name: this.form.name,
+                  email: this.form.email,
+                  password: this.form.password,
+                  role: this.form.role
+                })
+              });
+
+              const data = await response.json();
+
+              if (!response.ok) {
+                this.errors.email = data.detail || "Signup failed.";
+                return;
+              }
+
+              alert("Account created successfully!");
+              window.location.href = "login.html";
+
+            } catch (error) {
+              alert("Cannot connect to backend server.");
+            }
           }
         }
       }
