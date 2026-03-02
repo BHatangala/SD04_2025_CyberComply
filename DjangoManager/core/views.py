@@ -151,12 +151,12 @@ def login(request):
 
     # If user exists but soft-deleted, block login
     if profile and profile.deleted_at is not None:
-        _record_login_attempt(profile, request, LoginHistory.Status.LOCKED)
+        _record_login_attempt(profile, request, LoginHistory.Status.LOCKED, LoginHistory.Purpose.LOGIN)
         return JsonResponse({"detail": "Invalid credentials"}, status=401)
 
     # If account is temporarily locked, block login
     if profile and profile.locked_until and profile.locked_until > timezone.now():
-        _record_login_attempt(profile, request, LoginHistory.Status.LOCKED)
+        _record_login_attempt(profile, request, LoginHistory.Status.LOCKED, LoginHistory.Purpose.LOGIN)
         return JsonResponse({"detail": "Account is temporarily locked. Try again later."}, status=423)
 
     # Authenticate using Django auth
@@ -177,13 +177,13 @@ def login(request):
 
             # Record history
             if just_locked:
-                _record_login_attempt(profile, request, LoginHistory.Status.LOCKED)
+                _record_login_attempt(profile, request, LoginHistory.Status.LOCKED, LoginHistory.Purpose.LOGIN)
                 return JsonResponse(
                     {"detail": f"Too many attempts. Account locked for {LOCKOUT_MINUTES} minutes."},
                     status=423
                 )
 
-            _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+            _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.LOGIN)
             
         return JsonResponse({"detail": "Invalid credentials"}, status=401)
             
@@ -197,6 +197,13 @@ def login(request):
             OtpVerification.Purpose.FIRST_LOGIN
         )
 
+        _record_login_attempt(
+            profile,
+            request,
+            LoginHistory.Status.PENDING_OTP,
+            LoginHistory.Purpose.FIRST_LOGIN_OTP
+        )
+    
         print(f"DEBUG FIRST LOGIN OTP for {profile.auth_user.email}: {raw_otp}")
 
         return JsonResponse(
@@ -212,6 +219,13 @@ def login(request):
         raw_otp = _generate_and_store_otp(
             profile,
             OtpVerification.Purpose.LOGIN_2FA
+        )
+
+        _record_login_attempt(
+            profile,
+            request,
+            LoginHistory.Status.PENDING_OTP,
+            LoginHistory.Purpose.LOGIN_2FA_OTP
         )
 
         # TEMP: For backend testing only
@@ -231,7 +245,7 @@ def login(request):
     profile.last_login_at = timezone.now()
     profile.save(update_fields=["failed_login_count", "locked_until", "last_login_at"])
 
-    _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS)
+    _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS, LoginHistory.Purpose.LOGIN)
 
     # Minimal response for frontend
     return JsonResponse(
@@ -244,7 +258,7 @@ def login(request):
         status=200
     )
 
-def _record_login_attempt(profile: UserProfile, request, status: str) -> None:
+def _record_login_attempt(profile: UserProfile, request, status: str, purpose: str) -> None:
     """Helper: saves one row in login_history for each login attempt."""
     ip = request.META.get("REMOTE_ADDR")
     user_agent = request.META.get("HTTP_USER_AGENT")
@@ -252,6 +266,7 @@ def _record_login_attempt(profile: UserProfile, request, status: str) -> None:
     LoginHistory.objects.create(
         user=profile,
         status=status,
+        purpose=purpose,
         ip_address=ip,
         user_agent=user_agent
     )  
@@ -277,6 +292,10 @@ def verify_otp(request):
     """
     API endpoint to verify OTP for login 2FA.
     Verifies the submitted OTP for login 2FA and completes authentication if valid.
+
+    Logging rule:
+    - If OTP record exists: log FIRST_LOGIN_OTP or LOGIN_2FA_OTP based on otp_row.purpose
+    - If no OTP record exists: log OTP_SUBMISSION as a fallbacK
     """
 
     if request.method != "POST":
@@ -306,11 +325,16 @@ def verify_otp(request):
     # Block if soft deleted
     if profile.deleted_at is not None:
         return JsonResponse({"detail": "Invalid OTP"}, status=401)
-
-    # Block if currently locked
-    if profile.locked_until and profile.locked_until > timezone.now():
-        _record_login_attempt(profile, request, LoginHistory.Status.LOCKED)
-        return JsonResponse({"detail": "Account is temporarily locked. Try again later."}, status=423)
+    
+    # If user is already verified and 2FA is NOT enabled, OTP submission is not valid.
+    if profile.is_verified and not profile.otp_is_enabled:
+        _record_login_attempt(
+            profile,
+            request,
+            LoginHistory.Status.FAILED,
+            LoginHistory.Purpose.OTP_SUBMISSION
+        )
+        return JsonResponse({"detail": "OTP not required for this account."}, status=400)    
 
     # Get latest unused OTP for LOGIN_2FA
     otp_row = (
@@ -327,9 +351,24 @@ def verify_otp(request):
         .first()
     )
 
+    if otp_row:
+        otp_purpose = (
+            LoginHistory.Purpose.FIRST_LOGIN_OTP
+            if otp_row.purpose == OtpVerification.Purpose.FIRST_LOGIN
+            else LoginHistory.Purpose.LOGIN_2FA_OTP
+        )
+    else:
+        # Random/invalid/late OTP request where no OTP exists
+        otp_purpose = LoginHistory.Purpose.OTP_SUBMISSION 
+
+    # Block if currently locked
+    if profile.locked_until and profile.locked_until > timezone.now():
+        _record_login_attempt(profile, request, LoginHistory.Status.LOCKED, otp_purpose)
+        return JsonResponse({"detail": "Account is temporarily locked. Try again later."}, status=423)    
+
     # No OTP found
     if not otp_row:
-        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED, otp_purpose)
         return JsonResponse({"detail": "Invalid OTP"}, status=401)
 
     # OTP expired
@@ -337,14 +376,14 @@ def verify_otp(request):
         otp_row.used_at = timezone.now()                
         otp_row.save(update_fields=["used_at"])
 
-        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED, otp_purpose)
 
         return JsonResponse({"detail": "OTP expired. Please login again."}, status=401)
 
     # Wrong OTP
     incoming_hash = hashlib.sha256(otp.encode()).hexdigest()
     if incoming_hash != otp_row.otp_hash:
-        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED, otp_purpose)
         return JsonResponse({"detail": "Invalid OTP"}, status=401)
 
     # Mark OTP used
@@ -362,7 +401,7 @@ def verify_otp(request):
 
     profile.save(update_fields=["failed_login_count", "locked_until", "last_login_at", "is_verified"])
 
-    _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS)
+    _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS, otp_purpose)
 
     return JsonResponse(
         {
@@ -464,27 +503,27 @@ def verify_reset_otp(request):
 
     # No OTP found
     if not otp_row:
-        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.RESET_PASSWORD_OTP)
         return JsonResponse({"detail": "Invalid OTP"}, status=401)
 
     # OTP expired
     if otp_row.expires_at <= timezone.now():
         otp_row.used_at = timezone.now()
         otp_row.save(update_fields=["used_at"])
-        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.RESET_PASSWORD_OTP)
         return JsonResponse({"detail": "OTP expired. Please request a new one."}, status=401)
 
     # Wrong OTP
     incoming_hash = hashlib.sha256(otp.encode()).hexdigest()
     if incoming_hash != otp_row.otp_hash:
-        _record_login_attempt(profile, request, LoginHistory.Status.FAILED)
+        _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.RESET_PASSWORD_OTP)
         return JsonResponse({"detail": "Invalid OTP"}, status=401)
 
     # Mark OTP used
     otp_row.used_at = timezone.now()
     otp_row.save(update_fields=["used_at"])
 
-    _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS)
+    _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS, LoginHistory.Purpose.RESET_PASSWORD_OTP)
 
     # 10-min token
     reset_token = signing.dumps({"uid": str(profile.user_id)}, salt="pwd-reset")

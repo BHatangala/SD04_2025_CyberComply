@@ -17,19 +17,35 @@ class Command(BaseCommand):
             help="Delete OTPs older than this many days (default: 7)."
         )
 
+        # Added minutes argument for demo purposes
+        parser.add_argument(
+            "--minutes",
+            type=int,
+            default=None,
+            help="Delete OTPs older than this many minutes (for demo use)."
+        )
+
     def handle(self, *args, **options):
         days = options["days"]
-        cutoff = timezone.now() - timedelta(days=days)
+        minutes = options["minutes"]
+
+        if minutes is not None:
+            cutoff = timezone.now() - timedelta(minutes=minutes)
+            retention_label = f"{minutes} minute(s)"
+        else:
+            cutoff = timezone.now() - timedelta(days=days)
+            retention_label = f"{days} days"
 
         qs = OtpVerification.objects.filter(
-            created_at__lt=cutoff,  # Delete OTPs only older than retention window
+            created_at__lt=cutoff
         ).filter(
-            models.Q(used_at__isnull=False) | models.Q(expires_at__lt=timezone.now())  # Delete OTPs used OR expired
+            models.Q(used_at__isnull=False) |
+            models.Q(expires_at__lt=timezone.now())
         )
 
         count = qs.count()
         qs.delete()
 
         self.stdout.write(self.style.SUCCESS(
-            f"Deleted {count} OTP records older than {days} days (used or expired)."
+            f"Deleted {count} OTP records older than {retention_label}."
         ))

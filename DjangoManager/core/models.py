@@ -117,13 +117,23 @@ class LoginHistory(models.Model):
     class Status(models.TextChoices):
         SUCCESS = "SUCCESS", "SUCCESS"
         FAILED = "FAILED", "FAILED"
-        LOCKED = "LOCKED", "Locked"
+        LOCKED = "LOCKED", "LOCKED"
+        PENDING_OTP = "PENDING_OTP", "PENDING_OTP"
+
+    class Purpose(models.TextChoices):
+        LOGIN = "LOGIN", "LOGIN"
+        FIRST_LOGIN_OTP = "FIRST_LOGIN_OTP", "FIRST_LOGIN_OTP"
+        LOGIN_2FA_OTP = "LOGIN_2FA_OTP", "LOGIN_2FA_OTP"
+        RESET_PASSWORD_OTP = "RESET_PASSWORD_OTP", "RESET_PASSWORD_OTP"
+        OTP_SUBMISSION = "OTP_SUBMISSION", "OTP_SUBMISSION" # Fallback purpose used when no active OTP record exists
 
     login_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(UserProfile, on_delete=models.PROTECT, related_name="login_history")
 
     attempt_time = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=10, choices=Status.choices)
+    status = models.CharField(max_length=20, choices=Status.choices)
+
+    purpose = models.CharField(max_length=30,choices=Purpose.choices)
 
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(null=True, blank=True)
