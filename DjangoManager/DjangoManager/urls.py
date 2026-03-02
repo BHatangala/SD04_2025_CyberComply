@@ -24,10 +24,3 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('ai/', include('core.urls')),
 ]
-
-# serves static and media files in development
-if settings.DEBUG:
-    urlpatterns += static(
-        settings.STATIC_URL, 
-        document_root=os.path.join(settings.BASE_DIR.parent, 'frontend')
-    )

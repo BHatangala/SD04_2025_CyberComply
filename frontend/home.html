@@ -1,11 +1,9 @@
-{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Dashboard</title>
-    <meta name="csrf-token" content="{{ csrf_token }}">
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <style>
         * {
@@ -1045,7 +1043,7 @@
 
     <!-- Wavy Background -->
     <div class="wavy-background">
-        <img src="{% static 'img3.png' %}" alt="Wavy Design">
+        <img src="img3.png" alt="Wavy Design">
     </div>
 
 </div>
@@ -1083,7 +1081,7 @@
                 modalServiceName: '',
                 
                 // ── API endpoint ──
-                apiEndpoint: "{% url 'analyze_compliance' %}"  
+                apiEndpoint: "http://127.0.0.1:8000/ai/analyze/" 
             };
         },
 
@@ -1185,22 +1183,17 @@
                 }
             },
 
-            uploadToDjango(fileObj) {
+            async uploadToDjango(fileObj) {
                 const formData = new FormData();
                 formData.append('document', fileObj.file);
                 formData.append('company_name', this.companyName || '');
                 formData.append('department', fileObj.department || '');
 
-                const csrfToken = document.querySelector('[name=csrf-token]').content;
-                
-                // Find the index to enable reactive updates
                 const fileIndex = this.uploadedFiles.indexOf(fileObj);
 
                 console.log('🚀 Uploading:', fileObj.name);
-                
-                // Helper function to update status reactively
+
                 const updateStatus = (newStatus) => {
-                    // Force Vue reactivity by creating new object
                     this.uploadedFiles[fileIndex] = {
                         ...this.uploadedFiles[fileIndex],
                         status: newStatus
@@ -1208,47 +1201,79 @@
                     console.log(`📊 Status: ${newStatus}`);
                 };
 
-                updateStatus('uploading');
+                try {
+                    updateStatus('uploading');
 
-                fetch(this.apiEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': csrfToken,
-                    },
-                    body: formData
-                })
-                .then(response => {
-                    console.log('📡 Response status:', response.status);
-                    
+                    const response = await fetch(this.apiEndpoint, {
+                        method: 'POST',
+                        body: formData
+                    });
+
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
-                    
-                    // ✅ Step 1: Uploaded to Django
-                    updateStatus('uploaded');
-                    
-                    // ✅ Step 2: Wait 500ms, then start analysing
-                    setTimeout(() => {
-                        updateStatus('analysing');
-                    }, 500);
-                    
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('✅ Analysis complete:', data);
-                    
-                    // ✅ Step 3: Analysis complete
-                    this.uploadedFiles[fileIndex] = {
-                        ...this.uploadedFiles[fileIndex],
-                        status: 'analysed',
-                        analysisResults: data
-                    };
-                })
-                .catch(error => {
+
+                    // Read SSE stream chunk by chunk — each chunk is a real server event
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        const text = decoder.decode(value);
+
+                        // SSE lines look like: "data: {...}\n\n"
+                        // A single chunk may contain multiple events so split and process each
+                        const lines = text.split('\n');
+                        for (const line of lines) {
+                            if (!line.startsWith('data: ')) continue;
+
+                            try {
+                                const payload = JSON.parse(line.slice(6)); // strip "data: " prefix
+                                console.log('📡 SSE event:', payload.status);
+
+                                if (payload.status === 'uploaded') {
+                                    updateStatus('uploaded');
+                                }
+                                else if (payload.status === 'analysing') {
+                                    updateStatus('analysing');
+                                }
+                                else if (payload.status === 'analysed') {
+                                    updateStatus('analysed');
+
+                                    // TODO: Replace localStorage with PostgreSQL write once DB is ready.
+                                    localStorage.setItem('latestAnalysisResult', JSON.stringify({
+                                        ...payload.result,
+                                        _meta: {
+                                            filename: fileObj.name,
+                                            company: this.companyName || 'Unknown Organization',
+                                            timestamp: new Date().toISOString()
+                                        }
+                                    }));
+
+                                    // Show 'analysed' for 1.5s before redirecting
+                                    setTimeout(() => {
+                                        window.location.href = 'document_analysis.html';
+                                    }, 1500);
+                                }
+                                else if (payload.status === 'error') {
+                                    updateStatus('error');
+                                    this.errorMessage = payload.message;
+                                }
+
+                            } catch (parseError) {
+                                // Ignore incomplete/non-JSON lines — SSE chunks can split mid-line
+                                console.warn('Could not parse SSE line:', line);
+                            }
+                        }
+                    }
+
+                } catch (error) {
                     console.error('❌ Error:', error);
                     updateStatus('error');
                     this.errorMessage = `Failed to upload "${fileObj.name}": ${error.message}`;
-                });
+                }
             },
             
             // ── Remove File ──
