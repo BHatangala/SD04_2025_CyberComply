@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
+import hashlib
 
 # Database Model Unit Tests.
 from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory
@@ -60,9 +61,12 @@ class CoreModelsTest(TestCase):
         )
 
         # OTP Records
+        raw_otp1 = "123456"
+        raw_otp2 = "654321"
+
         self.otp1 = OtpVerification.objects.create(
             user=self.profile1,
-            otp_hash="pbkdf2_sha256$600000$AbCdEf123$XyZHashValueExample1",
+            otp_hash=hashlib.sha256(raw_otp1.encode()).hexdigest(),
             purpose=OtpVerification.Purpose.LOGIN_2FA,
             expires_at=self.now + timedelta(minutes=3),
             used_at=self.now
@@ -70,7 +74,7 @@ class CoreModelsTest(TestCase):
 
         self.otp2 = OtpVerification.objects.create(
             user=self.profile2,
-            otp_hash="pbkdf2_sha256$600000$GhIjKl456$XyZHashValueExample2",
+            otp_hash=hashlib.sha256(raw_otp2.encode()).hexdigest(),
             purpose=OtpVerification.Purpose.RESET_PASSWORD,
             expires_at=self.now + timedelta(minutes=3),
             used_at=None
@@ -80,6 +84,7 @@ class CoreModelsTest(TestCase):
         self.login1 = LoginHistory.objects.create(
             user=self.profile1,
             status=LoginHistory.Status.SUCCESS,
+            purpose=LoginHistory.Purpose.LOGIN,
             ip_address="203.143.27.18",
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15"
         )
@@ -87,6 +92,7 @@ class CoreModelsTest(TestCase):
         self.login2 = LoginHistory.objects.create(
             user=self.profile2,
             status=LoginHistory.Status.FAILED,
+            purpose=LoginHistory.Purpose.LOGIN,
             ip_address="112.134.45.201",
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36"
         )
@@ -238,6 +244,7 @@ class CoreModelsTest(TestCase):
         log = LoginHistory(
             user=self.profile1,
             status="NOT_VALID",
+            purpose=LoginHistory.Purpose.LOGIN,
             ip_address="127.0.0.1",
             user_agent="Test"
         )
@@ -249,11 +256,23 @@ class CoreModelsTest(TestCase):
         log = LoginHistory.objects.create(
             user=self.profile1,
             status=LoginHistory.Status.SUCCESS,
+            purpose=LoginHistory.Purpose.LOGIN,
             ip_address=None,
             user_agent=None
         )
         self.assertIsNone(log.ip_address)
         self.assertIsNone(log.user_agent)
+
+    def test_login_pending_otp_status_allowed(self):
+        # PENDING_OTP should be allowed as a valid login status
+        log = LoginHistory.objects.create(
+            user=self.profile1,
+            status=LoginHistory.Status.PENDING_OTP,
+            purpose=LoginHistory.Purpose.FIRST_LOGIN_OTP,
+            ip_address="127.0.0.1",
+            user_agent="Test"
+        )
+        self.assertEqual(log.status, LoginHistory.Status.PENDING_OTP)        
 
     # -----------------------------------------------------
     # Delete cascade behavior tests
