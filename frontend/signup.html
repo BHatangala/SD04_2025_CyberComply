@@ -306,7 +306,13 @@
               const data = await response.json();
 
               if (!response.ok) {
-                this.errors.email = data.detail || "Signup failed.";
+                if (response.status === 409) {
+                  this.errors.email = "This email is already registered. Please use a different email.";
+                  this.form.password = "";
+                  this.form.confirmPassword = "";
+                } else {
+                  this.errors.email = data.detail || "Signup failed. Please try again.";
+                }
                 return;
               }
 
