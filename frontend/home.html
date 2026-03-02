@@ -964,7 +964,7 @@
                     <div class="file-details">
                         <div class="file-name">[[ file.name ]]</div>
                         <div class="file-size">[[ formatFileSize(file.size) ]]</div>
-                        <div v-if="file.status === 'uploading' || file.analyzing" class="loading-bar">
+                        <div v-if="file.status === 'uploading'" class="loading-bar">
                             <div class="loading-progress"></div>
                         </div>
                     </div>
@@ -988,7 +988,7 @@
                             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                         </svg>
 
-                        <span>{{ file.department || 'Assign Dept' }}</span>
+                        <span>[[ file.department || 'Assign Dept' ]]</span>
 
                         <svg class="dept-chevron" viewBox="0 0 24 24" style="transform: rotate(90deg);">
                             <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/>
@@ -1002,7 +1002,7 @@
                                 class="dept-option"
                                 :class="{ selected: file.department === dept }"
                                 @click.stop="assignDepartment(index, dept)"
-                            >{{ dept }}</div>
+                            >[[ dept ]]</div>
                         </div>
                     </div>
 
@@ -1033,7 +1033,7 @@
             <div class="modal-icon">🔗</div>
             <h3>Implementation In Progress</h3>
             <p>
-                <strong>{{ modalServiceName }}</strong> integration is currently being developed.<br>
+                <strong>[[ modalServiceName ]]</strong> integration is currently being developed.<br>
                 Please use <strong>My Device</strong> to upload files for now.
             </p>
             <div class="modal-close-btn" @click="closeModal">Got It</div>
@@ -1054,7 +1054,7 @@
     const { createApp } = Vue;
 
     createApp({
-            delimiters: ['[[', ']]'],
+        delimiters: ['[[', ']]'],
         data() {
             return {
                 // ── Sidebar ──
@@ -1065,11 +1065,10 @@
                 last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
                 filteredLast7Days: [],
                 filteredLast30Days: [],
-,
-                    apiEndpoint: "{% url 'analyze_compliance' %}"  // Django URL
+
                 // ── Admin fields ──
-                // TODO: replace with isAdmin flag from auth/database once implemented
                 companyName: '',
+                selectedDepartment: '',  
 
                 // ── Upload ──
                 isDragging: false,
@@ -1081,15 +1080,16 @@
 
                 // ── Integration modal ──
                 modalVisible: false,
-                modalServiceName: ''
+                modalServiceName: '',
+                
+                // ── API endpoint ──
+                apiEndpoint: "{% url 'analyze_compliance' %}"  
             };
         },
 
         mounted() {
             this.filteredLast7Days  = [...this.last7Days];
             this.filteredLast30Days = [...this.last30Days];
-
-            // Close dropdowns on outside click
             document.addEventListener('click', this.closeAllDropdowns);
         },
 
@@ -1176,24 +1176,81 @@
                         size: file.size,
                         status: 'uploading',   // uploading | uploaded | analysing | analysed
                         department: '',
-                        deptOpen: false
-                        // NOTE: status transitions to 'analysing' and 'analysed' will be
-                        //       triggered by backend signals once the API is integrated.
+                        deptOpen: false,
+                        file: file  // ← Store actual File object
                     };
 
                     this.uploadedFiles.push(fileObj);
-                    this.simulateUpload(fileObj);
+                    this.uploadToDjango(fileObj);  // ← Actually upload to Django
                 }
             },
 
-            simulateUpload(fileObj) {
-                // Simulates the upload phase only.
-                // Transitions to 'analysing' and 'analysed' are reserved for backend integration.
-                setTimeout(() => {
-                    fileObj.status = 'uploaded';
-                }, 1500);
-            },
+            uploadToDjango(fileObj) {
+                const formData = new FormData();
+                formData.append('document', fileObj.file);
+                formData.append('company_name', this.companyName || '');
+                formData.append('department', fileObj.department || '');
 
+                const csrfToken = document.querySelector('[name=csrf-token]').content;
+                
+                // Find the index to enable reactive updates
+                const fileIndex = this.uploadedFiles.indexOf(fileObj);
+
+                console.log('🚀 Uploading:', fileObj.name);
+                
+                // Helper function to update status reactively
+                const updateStatus = (newStatus) => {
+                    // Force Vue reactivity by creating new object
+                    this.uploadedFiles[fileIndex] = {
+                        ...this.uploadedFiles[fileIndex],
+                        status: newStatus
+                    };
+                    console.log(`📊 Status: ${newStatus}`);
+                };
+
+                updateStatus('uploading');
+
+                fetch(this.apiEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                    },
+                    body: formData
+                })
+                .then(response => {
+                    console.log('📡 Response status:', response.status);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    // ✅ Step 1: Uploaded to Django
+                    updateStatus('uploaded');
+                    
+                    // ✅ Step 2: Wait 500ms, then start analysing
+                    setTimeout(() => {
+                        updateStatus('analysing');
+                    }, 500);
+                    
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('✅ Analysis complete:', data);
+                    
+                    // ✅ Step 3: Analysis complete
+                    this.uploadedFiles[fileIndex] = {
+                        ...this.uploadedFiles[fileIndex],
+                        status: 'analysed',
+                        analysisResults: data
+                    };
+                })
+                .catch(error => {
+                    console.error('❌ Error:', error);
+                    updateStatus('error');
+                    this.errorMessage = `Failed to upload "${fileObj.name}": ${error.message}`;
+                });
+            },
+            
             // ── Remove File ──
             removeFile(index) {
                 this.uploadedFiles.splice(index, 1);
@@ -1202,7 +1259,6 @@
             // ── Department Dropdown ──
             toggleDeptDropdown(index) {
                 const isOpen = this.uploadedFiles[index].deptOpen;
-                // close all others first
                 this.uploadedFiles.forEach(f => f.deptOpen = false);
                 this.uploadedFiles[index].deptOpen = !isOpen;
             },
@@ -1228,7 +1284,7 @@
                 if (bytes === 0) return '0 Bytes';
                 const k = 1024;
                 const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                const i = Math.floor(Math.log(bytes) / Math.log(k));  
                 return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
             }
         }
