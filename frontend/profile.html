@@ -718,8 +718,23 @@
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
                 // Handles user logout
-                logout() {
-                    alert('Logging out...');
+                async logout() {
+                    //Delete all uploaded files from S3 before logging out
+                    const fileNames = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+    
+                    if (fileNames.length > 0) {
+                        try {
+                            await fetch('http://127.0.0.1:8000/api/delete-all-files/', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ file_names: fileNames })
+                            });
+                        } catch (error) {
+                            console.error('Failed to delete files on logout:', error);
+                        }
+                    }
+
+                    sessionStorage.clear();
                     window.location.href = 'welcome.html';
                 },
                 // Navigates to admin access granting page

@@ -1191,14 +1191,14 @@
 
                 const fileIndex = this.uploadedFiles.indexOf(fileObj);
 
-                console.log('🚀 Uploading:', fileObj.name);
+                console.log('Uploading:', fileObj.name);
 
                 const updateStatus = (newStatus) => {
                     this.uploadedFiles[fileIndex] = {
                         ...this.uploadedFiles[fileIndex],
                         status: newStatus
                     };
-                    console.log(`📊 Status: ${newStatus}`);
+                    console.log(`Status: ${newStatus}`);
                 };
 
                 try {
@@ -1270,7 +1270,7 @@
                     }
 
                 } catch (error) {
-                    console.error('❌ Error:', error);
+                    console.error('Error:', error);
                     updateStatus('error');
                     this.errorMessage = `Failed to upload "${fileObj.name}": ${error.message}`;
                 }
