@@ -821,7 +821,7 @@
                     :key="report"
                     class="sidebar-item"
                     @click="openReport(report)"
-                >{{ report }}</div>
+                >[[ report ]]</div>
             </div>
         </div>
 
@@ -839,7 +839,7 @@
                     :key="report"
                     class="sidebar-item"
                     @click="openReport(report)"
-                >{{ report }}</div>
+                >[[ report ]]</div>
             </div>
         </div>
     </div>
@@ -939,7 +939,7 @@
             >
 
             <!-- Error Messages -->
-            <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+            <div v-if="errorMessage" class="error-message">[[ errorMessage ]]</div>
 
             <!-- ── File List ── -->
             <div class="upload-status" v-if="uploadedFiles.length > 0">
@@ -960,8 +960,8 @@
 
                     <!-- File name + size + loading bar -->
                     <div class="file-details">
-                        <div class="file-name">{{ file.name }}</div>
-                        <div class="file-size">{{ formatFileSize(file.size) }}</div>
+                        <div class="file-name">[[ file.name ]]</div>
+                        <div class="file-size">[[ formatFileSize(file.size) ]]</div>
                         <div v-if="file.status === 'uploading'" class="loading-bar">
                             <div class="loading-progress"></div>
                         </div>
@@ -986,7 +986,7 @@
                             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                         </svg>
 
-                        <span>{{ file.department || 'Assign Dept' }}</span>
+                        <span>[[ file.department || 'Assign Dept' ]]</span>
 
                         <svg class="dept-chevron" viewBox="0 0 24 24" style="transform: rotate(90deg);">
                             <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/>
@@ -1000,7 +1000,7 @@
                                 class="dept-option"
                                 :class="{ selected: file.department === dept }"
                                 @click.stop="assignDepartment(index, dept)"
-                            >{{ dept }}</div>
+                            >[[ dept ]]</div>
                         </div>
                     </div>
 
@@ -1031,7 +1031,7 @@
             <div class="modal-icon">🔗</div>
             <h3>Implementation In Progress</h3>
             <p>
-                <strong>{{ modalServiceName }}</strong> integration is currently being developed.<br>
+                <strong>[[ modalServiceName ]]</strong> integration is currently being developed.<br>
                 Please use <strong>My Device</strong> to upload files for now.
             </p>
             <div class="modal-close-btn" @click="closeModal">Got It</div>
@@ -1052,6 +1052,7 @@
     const { createApp } = Vue;
 
     createApp({
+        delimiters: ['[[', ']]'],
         data() {
             return {
                 // ── Sidebar ──
@@ -1064,8 +1065,8 @@
                 filteredLast30Days: [],
 
                 // ── Admin fields ──
-                // TODO: replace with isAdmin flag from auth/database once implemented
                 companyName: '',
+                selectedDepartment: '',  
 
                 // ── Upload ──
                 isDragging: false,
@@ -1077,15 +1078,16 @@
 
                 // ── Integration modal ──
                 modalVisible: false,
-                modalServiceName: ''
+                modalServiceName: '',
+                
+                // ── API endpoint ──
+                apiEndpoint: "http://127.0.0.1:8000/ai/analyze/" 
             };
         },
 
         mounted() {
             this.filteredLast7Days  = [...this.last7Days];
             this.filteredLast30Days = [...this.last30Days];
-
-            // Close dropdowns on outside click
             document.addEventListener('click', this.closeAllDropdowns);
         },
 
@@ -1172,24 +1174,108 @@
                         size: file.size,
                         status: 'uploading',   // uploading | uploaded | analysing | analysed
                         department: '',
-                        deptOpen: false
-                        // NOTE: status transitions to 'analysing' and 'analysed' will be
-                        //       triggered by backend signals once the API is integrated.
+                        deptOpen: false,
+                        file: file  // ← Store actual File object
                     };
 
                     this.uploadedFiles.push(fileObj);
-                    this.simulateUpload(fileObj);
+                    this.uploadToDjango(fileObj);  // ← Actually upload to Django
                 }
             },
 
-            simulateUpload(fileObj) {
-                // Simulates the upload phase only.
-                // Transitions to 'analysing' and 'analysed' are reserved for backend integration.
-                setTimeout(() => {
-                    fileObj.status = 'uploaded';
-                }, 1500);
-            },
+            async uploadToDjango(fileObj) {
+                const formData = new FormData();
+                formData.append('document', fileObj.file);
+                formData.append('company_name', this.companyName || '');
+                formData.append('department', fileObj.department || '');
 
+                const fileIndex = this.uploadedFiles.indexOf(fileObj);
+
+                console.log('🚀 Uploading:', fileObj.name);
+
+                const updateStatus = (newStatus) => {
+                    this.uploadedFiles[fileIndex] = {
+                        ...this.uploadedFiles[fileIndex],
+                        status: newStatus
+                    };
+                    console.log(`📊 Status: ${newStatus}`);
+                };
+
+                try {
+                    updateStatus('uploading');
+
+                    const response = await fetch(this.apiEndpoint, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    // Read SSE stream chunk by chunk — each chunk is a real server event
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        const text = decoder.decode(value);
+
+                        // SSE lines look like: "data: {...}\n\n"
+                        // A single chunk may contain multiple events so split and process each
+                        const lines = text.split('\n');
+                        for (const line of lines) {
+                            if (!line.startsWith('data: ')) continue;
+
+                            try {
+                                const payload = JSON.parse(line.slice(6)); // strip "data: " prefix
+                                console.log('📡 SSE event:', payload.status);
+
+                                if (payload.status === 'uploaded') {
+                                    updateStatus('uploaded');
+                                }
+                                else if (payload.status === 'analysing') {
+                                    updateStatus('analysing');
+                                }
+                                else if (payload.status === 'analysed') {
+                                    updateStatus('analysed');
+
+                                    // TODO: Replace localStorage with PostgreSQL write once DB is ready.
+                                    localStorage.setItem('latestAnalysisResult', JSON.stringify({
+                                        ...payload.result,
+                                        _meta: {
+                                            filename: fileObj.name,
+                                            company: this.companyName || 'Unknown Organization',
+                                            timestamp: new Date().toISOString()
+                                        }
+                                    }));
+
+                                    // Show 'analysed' for 1.5s before redirecting
+                                    setTimeout(() => {
+                                        window.location.href = 'document_analysis.html';
+                                    }, 1500);
+                                }
+                                else if (payload.status === 'error') {
+                                    updateStatus('error');
+                                    this.errorMessage = payload.message;
+                                }
+
+                            } catch (parseError) {
+                                // Ignore incomplete/non-JSON lines — SSE chunks can split mid-line
+                                console.warn('Could not parse SSE line:', line);
+                            }
+                        }
+                    }
+
+                } catch (error) {
+                    console.error('❌ Error:', error);
+                    updateStatus('error');
+                    this.errorMessage = `Failed to upload "${fileObj.name}": ${error.message}`;
+                }
+            },
+            
             // ── Remove File ──
             removeFile(index) {
                 this.uploadedFiles.splice(index, 1);
@@ -1198,7 +1284,6 @@
             // ── Department Dropdown ──
             toggleDeptDropdown(index) {
                 const isOpen = this.uploadedFiles[index].deptOpen;
-                // close all others first
                 this.uploadedFiles.forEach(f => f.deptOpen = false);
                 this.uploadedFiles[index].deptOpen = !isOpen;
             },
@@ -1224,7 +1309,7 @@
                 if (bytes === 0) return '0 Bytes';
                 const k = 1024;
                 const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                const i = Math.floor(Math.log(bytes) / Math.log(k));  
                 return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
             }
         }
