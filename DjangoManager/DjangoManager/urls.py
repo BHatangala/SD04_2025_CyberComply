@@ -23,4 +23,5 @@ import os
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('ai/', include('core.urls')),
+    path('', include('core.urls')),
 ]
