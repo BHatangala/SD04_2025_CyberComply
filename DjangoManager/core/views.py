@@ -18,7 +18,10 @@ import random
 import hashlib
 import json, time
 
+from .models import UserProfile, LoginHistory, OtpVerification
 
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
 
 AI_API_URL = "http://127.0.0.1:5000/api"  # Change this if your Flask server runs on a different address or port
 
