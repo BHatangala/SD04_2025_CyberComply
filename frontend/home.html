@@ -310,7 +310,6 @@
             margin-bottom: 0;
         }
 
-        /* divider */
         .upload-divider {
             display: flex;
             align-items: center;
@@ -331,7 +330,6 @@
             white-space: nowrap;
         }
 
-        /* Source icons row */
         .upload-sources {
             display: flex;
             justify-content: center;
@@ -439,9 +437,9 @@
         .file-remove::after {
             content: "Remove file";
             position: absolute;
-            left: calc(100% + 10px);  /* appears to the right of the × */
+            left: calc(100% + 10px);
             top: 50%;
-            transform: translateY(-50%);  /* vertically centred with the × */
+            transform: translateY(-50%);
             background: #24365c;
             color: white;
             padding: 6px 12px;
@@ -488,7 +486,6 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            /* leave space for the × at top-right */
             padding-right: 20px;
         }
 
@@ -498,7 +495,6 @@
             margin-top: 2px;
         }
 
-        /* Loading bar (uploading state) */
         .loading-bar {
             width: 100%;
             height: 3px;
@@ -568,7 +564,6 @@
             transition: transform 0.2s;
         }
 
-        /* Department dropdown */
         .dept-dropdown {
             position: absolute;
             top: calc(100% + 6px);
@@ -821,7 +816,7 @@
                     :key="report"
                     class="sidebar-item"
                     @click="openReport(report)"
-                >[[ report ]]</div>
+                >{{ report }}</div>
             </div>
         </div>
 
@@ -839,7 +834,7 @@
                     :key="report"
                     class="sidebar-item"
                     @click="openReport(report)"
-                >[[ report ]]</div>
+                >{{ report }}</div>
             </div>
         </div>
     </div>
@@ -889,7 +884,6 @@
                     <!-- Google Drive -->
                     <div class="source-btn" @click.stop="showIntegrationModal('Google Drive')">
                         <div class="source-icon">
-                            <!-- Google Drive SVG logo -->
                             <svg viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
                                 <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
                                 <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
@@ -905,7 +899,6 @@
                     <!-- Microsoft OneDrive -->
                     <div class="source-btn" @click.stop="showIntegrationModal('Microsoft OneDrive')">
                         <div class="source-icon">
-                            <!-- Official OneDrive cloud-shape SVG -->
                             <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                                 <path fill="#0364B8" d="M28.087 16.502l-.665-.386A11.047 11.047 0 0 0 21.8 14.5C15.592 14.5 10.5 19.444 10.5 25.524c0 .18.007.36.018.538l.039.66-.588.276A7.44 7.44 0 0 0 6.5 33.5c0 4.136 3.364 7.5 7.5 7.5h26c3.866 0 7-3.134 7-7 0-3.445-2.494-6.37-5.876-6.916l-.553-.088-.164-.535a11.01 11.01 0 0 0-2.32-4.459z"/>
                                 <path fill="#0078D4" d="M29.888 17.371A13.443 13.443 0 0 0 21.8 14.5a13.42 13.42 0 0 0-10.5 5.058A11.01 11.01 0 0 1 21.5 17.5c2.967 0 5.693 1.124 7.752 2.966l.636.576z"/>
@@ -939,7 +932,7 @@
             >
 
             <!-- Error Messages -->
-            <div v-if="errorMessage" class="error-message">[[ errorMessage ]]</div>
+            <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
 
             <!-- ── File List ── -->
             <div class="upload-status" v-if="uploadedFiles.length > 0">
@@ -948,20 +941,18 @@
                     :key="index"
                     class="file-item"
                 >
-                    <!-- Remove button -->
+                    <!-- Remove button — also triggers S3 deletion if already uploaded -->
                     <div class="file-remove" @click="removeFile(index)">×</div>
 
-                    <!-- File type icon -->
                     <div class="file-icon">
                         <svg viewBox="0 0 24 24">
                             <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
                         </svg>
                     </div>
 
-                    <!-- File name + size + loading bar -->
                     <div class="file-details">
-                        <div class="file-name">[[ file.name ]]</div>
-                        <div class="file-size">[[ formatFileSize(file.size) ]]</div>
+                        <div class="file-name">{{ file.name }}</div>
+                        <div class="file-size">{{ formatFileSize(file.size) }}</div>
                         <div v-if="file.status === 'uploading'" class="loading-bar">
                             <div class="loading-progress"></div>
                         </div>
@@ -977,22 +968,19 @@
                         :class="{ unassigned: !file.department }"
                         @click.stop="toggleDeptDropdown(index)"
                     >
-                        <!-- assigned icon -->
                         <svg v-if="file.department" viewBox="0 0 24 24">
                             <path d="M12 2l-5.5 9h11L12 2zm0 3.84L14.6 9h-5.2L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5S15.01 22 17.5 22s4.5-2.01 4.5-4.5S19.99 13 17.5 13zm0 7c-1.38 0-2.5-1.12-2.5-2.5S16.12 15 17.5 15s2.5 1.12 2.5 2.5S18.88 20 17.5 20zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z"/>
                         </svg>
-                        <!-- unassigned icon -->
                         <svg v-else viewBox="0 0 24 24">
                             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                         </svg>
 
-                        <span>[[ file.department || 'Assign Dept' ]]</span>
+                        <span>{{ file.department || 'Assign Dept' }}</span>
 
                         <svg class="dept-chevron" viewBox="0 0 24 24" style="transform: rotate(90deg);">
                             <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/>
                         </svg>
 
-                        <!-- Department Dropdown -->
                         <div class="dept-dropdown" v-if="file.deptOpen" @click.stop>
                             <div
                                 v-for="dept in departments"
@@ -1000,7 +988,7 @@
                                 class="dept-option"
                                 :class="{ selected: file.department === dept }"
                                 @click.stop="assignDepartment(index, dept)"
-                            >[[ dept ]]</div>
+                            >{{ dept }}</div>
                         </div>
                     </div>
 
@@ -1031,7 +1019,7 @@
             <div class="modal-icon">🔗</div>
             <h3>Implementation In Progress</h3>
             <p>
-                <strong>[[ modalServiceName ]]</strong> integration is currently being developed.<br>
+                <strong>{{ modalServiceName }}</strong> integration is currently being developed.<br>
                 Please use <strong>My Device</strong> to upload files for now.
             </p>
             <div class="modal-close-btn" @click="closeModal">Got It</div>
@@ -1052,7 +1040,6 @@
     const { createApp } = Vue;
 
     createApp({
-        delimiters: ['[[', ']]'],
         data() {
             return {
                 // ── Sidebar ──
@@ -1065,8 +1052,8 @@
                 filteredLast30Days: [],
 
                 // ── Admin fields ──
+                // TODO: Replace with isAdmin flag from auth/database once implemented.
                 companyName: '',
-                selectedDepartment: '',  
 
                 // ── Upload ──
                 isDragging: false,
@@ -1079,9 +1066,14 @@
                 // ── Integration modal ──
                 modalVisible: false,
                 modalServiceName: '',
-                
-                // ── API endpoint ──
-                apiEndpoint: "http://127.0.0.1:8000/ai/analyze/" 
+
+                // ── API endpoints ──
+                // Primary: SSE streaming endpoint from the AI branch.
+                // Handles the full pipeline: upload → S3 store → analyse → result.
+                analyzeEndpoint: 'http://127.0.0.1:8000/ai/analyze/',
+                // Secondary: S3 file deletion endpoint from the AWS branch.
+                // Called when the user removes a file that has already been uploaded.
+                deleteEndpoint: 'http://127.0.0.1:8000/api/delete-file/'
             };
         },
 
@@ -1096,6 +1088,7 @@
         },
 
         methods: {
+
             // ── Sidebar ──
             toggleSidebar() {
                 this.sidebarOpen = !this.sidebarOpen;
@@ -1117,29 +1110,17 @@
                     this.filteredLast30Days = this.last30Days.filter(r => r.toLowerCase().includes(q));
                 }
             },
-            goToHome() {
-                window.location.href = 'home.html';
-            },
-            showProfile() {
-                window.location.href = 'profile.html';
-            },
-            showHelp() {
-                window.location.href = 'user_support.html';
-            },
+            goToHome()   { window.location.href = 'home.html'; },
+            showProfile(){ window.location.href = 'profile.html'; },
+            showHelp()   { window.location.href = 'user_support.html'; },
             openReport(reportName) {
                 window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
             },
 
-            // ── File Triggers ──
-            triggerFileInput() {
-                this.$refs.fileInput.click();
-            },
-            handleDragOver() {
-                this.isDragging = true;
-            },
-            handleDragLeave() {
-                this.isDragging = false;
-            },
+            // ── File Input Triggers ──
+            triggerFileInput() { this.$refs.fileInput.click(); },
+            handleDragOver()   { this.isDragging = true; },
+            handleDragLeave()  { this.isDragging = false; },
             handleDrop(e) {
                 this.isDragging = false;
                 this.processFiles(Array.from(e.dataTransfer.files));
@@ -1149,7 +1130,7 @@
                 e.target.value = '';
             },
 
-            // ── File Processing ──
+            // ── Validate files and add them to the queue ──
             processFiles(files) {
                 this.errorMessage = '';
 
@@ -1169,116 +1150,180 @@
                         continue;
                     }
 
+                    // Push a reactive file object immediately so the UI shows
+                    // the UPLOADING state and progress bar right away.
                     const fileObj = {
-                        name: file.name,
-                        size: file.size,
-                        status: 'uploading',   // uploading | uploaded | analysing | analysed
+                        name:       file.name,
+                        size:       file.size,
+                        status:     'uploading', // uploading | uploaded | analysing | analysed
                         department: '',
-                        deptOpen: false,
-                        file: file  // ← Store actual File object
+                        deptOpen:   false,
+                        rawFile:    file          // keep the actual File for FormData
                     };
 
                     this.uploadedFiles.push(fileObj);
-                    this.uploadToDjango(fileObj);  // ← Actually upload to Django
+
+                    // Do NOT await — multiple files upload concurrently
+                    this.uploadToDjango(fileObj);
                 }
             },
 
+            // ── Core upload method: SSE streaming (AI branch) + S3 session tracking (AWS branch) ──
             async uploadToDjango(fileObj) {
-                const formData = new FormData();
-                formData.append('document', fileObj.file);
-                formData.append('company_name', this.companyName || '');
-                formData.append('department', fileObj.department || '');
 
-                const fileIndex = this.uploadedFiles.indexOf(fileObj);
+                // Re-resolve the index each time we mutate, because other files
+                // may be added or removed while this async function is running.
+                const getIndex = () => this.uploadedFiles.indexOf(fileObj);
 
-                console.log('Uploading:', fileObj.name);
-
+                // Helper: safely update the status of this specific file.
                 const updateStatus = (newStatus) => {
-                    this.uploadedFiles[fileIndex] = {
-                        ...this.uploadedFiles[fileIndex],
-                        status: newStatus
-                    };
-                    console.log(`Status: ${newStatus}`);
+                    const i = getIndex();
+                    if (i === -1) return; // user removed the file mid-upload — do nothing
+                    // Object.assign keeps Vue 3's reactivity intact on array items.
+                    Object.assign(this.uploadedFiles[i], { status: newStatus });
+                    console.log(`📊 [${fileObj.name}] → ${newStatus}`);
                 };
 
-                try {
-                    updateStatus('uploading');
+                const formData = new FormData();
+                formData.append('document',     fileObj.rawFile);
+                formData.append('company_name', this.companyName || '');
+                formData.append('department',   fileObj.department || '');
 
-                    const response = await fetch(this.apiEndpoint, {
+                console.log(`🚀 Uploading: ${fileObj.name}`);
+
+                try {
+                    const response = await fetch(this.analyzeEndpoint, {
                         method: 'POST',
                         body: formData
                     });
 
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        throw new Error(`Server returned HTTP ${response.status}`);
                     }
 
-                    // Read SSE stream chunk by chunk — each chunk is a real server event
-                    const reader = response.body.getReader();
+                    // ── Read the SSE stream ──
+                    // Django streams `data: {...}\n\n` events as each pipeline stage completes.
+                    // We buffer across chunk boundaries so we never try to parse a split event.
+                    const reader  = response.body.getReader();
                     const decoder = new TextDecoder();
+                    let   buffer  = '';
 
                     while (true) {
                         const { done, value } = await reader.read();
                         if (done) break;
 
-                        const text = decoder.decode(value);
+                        buffer += decoder.decode(value, { stream: true });
 
-                        // SSE lines look like: "data: {...}\n\n"
-                        // A single chunk may contain multiple events so split and process each
-                        const lines = text.split('\n');
-                        for (const line of lines) {
-                            if (!line.startsWith('data: ')) continue;
+                        // SSE events are delimited by double newlines.
+                        // Split on \n\n and keep any incomplete trailing fragment in the buffer.
+                        const events = buffer.split('\n\n');
+                        buffer = events.pop(); // last element may be incomplete
+
+                        for (const event of events) {
+                            // Find the "data:" line within this event block
+                            const dataLine = event
+                                .split('\n')
+                                .find(line => line.startsWith('data: '));
+
+                            if (!dataLine) continue;
 
                             try {
-                                const payload = JSON.parse(line.slice(6)); // strip "data: " prefix
-                                console.log('📡 SSE event:', payload.status);
+                                const payload = JSON.parse(dataLine.slice(6)); // strip "data: "
+                                console.log(`📡 [${fileObj.name}] SSE:`, payload.status);
 
-                                if (payload.status === 'uploaded') {
-                                    updateStatus('uploaded');
-                                }
-                                else if (payload.status === 'analysing') {
-                                    updateStatus('analysing');
-                                }
-                                else if (payload.status === 'analysed') {
-                                    updateStatus('analysed');
+                                switch (payload.status) {
 
-                                    // TODO: Replace localStorage with PostgreSQL write once DB is ready.
-                                    localStorage.setItem('latestAnalysisResult', JSON.stringify({
-                                        ...payload.result,
-                                        _meta: {
-                                            filename: fileObj.name,
-                                            company: this.companyName || 'Unknown Organization',
-                                            timestamp: new Date().toISOString()
+                                    case 'uploaded':
+                                        updateStatus('uploaded');
+                                        // Track in sessionStorage for S3 cleanup on session end
+                                        // (AWS branch pattern — remove when DB layer is ready)
+                                        {
+                                            const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                                            if (!tracked.includes(fileObj.name)) {
+                                                tracked.push(fileObj.name);
+                                                sessionStorage.setItem('uploadedFileNames', JSON.stringify(tracked));
+                                            }
                                         }
-                                    }));
+                                        break;
 
-                                    // Show 'analysed' for 1.5s before redirecting
-                                    setTimeout(() => {
-                                        window.location.href = 'document_analysis.html';
-                                    }, 1500);
-                                }
-                                else if (payload.status === 'error') {
-                                    updateStatus('error');
-                                    this.errorMessage = payload.message;
+                                    case 'analysing':
+                                        updateStatus('analysing');
+                                        break;
+
+                                    case 'analysed':
+                                        updateStatus('analysed');
+                                        // Persist the result for the report page.
+                                        // TODO: Replace with a PostgreSQL-backed API call
+                                        //       once the database layer is implemented.
+                                        localStorage.setItem('latestAnalysisResult', JSON.stringify({
+                                            ...payload.result,
+                                            _meta: {
+                                                filename:  fileObj.name,
+                                                company:   this.companyName || 'Unknown Organisation',
+                                                timestamp: new Date().toISOString()
+                                            }
+                                        }));
+                                        // Brief pause so the user sees "✓ ANALYSED" before redirect
+                                        setTimeout(() => {
+                                            window.location.href = 'document_analysis.html';
+                                        }, 1500);
+                                        break;
+
+                                    case 'error':
+                                        updateStatus('error');
+                                        this.errorMessage = payload.message || `Error processing "${fileObj.name}".`;
+                                        break;
                                 }
 
                             } catch (parseError) {
-                                // Ignore incomplete/non-JSON lines — SSE chunks can split mid-line
-                                console.warn('Could not parse SSE line:', line);
+                                // Incomplete or non-JSON fragment — safe to skip
+                                console.warn(`Could not parse SSE line for ${fileObj.name}:`, dataLine);
                             }
                         }
                     }
 
                 } catch (error) {
-                    console.error('Error:', error);
-                    updateStatus('error');
+                    console.error(`❌ Upload failed for ${fileObj.name}:`, error);
+                    const i = getIndex();
+                    if (i !== -1) {
+                        Object.assign(this.uploadedFiles[i], { status: 'error' });
+                    }
                     this.errorMessage = `Failed to upload "${fileObj.name}": ${error.message}`;
                 }
             },
-            
-            // ── Remove File ──
-            removeFile(index) {
+
+            // ── Remove File (× button) ──
+            // Removes the file from the UI immediately, then calls the S3 delete
+            // endpoint if the file has already been received by the server.
+            async removeFile(index) {
+                const file = this.uploadedFiles[index];
+
+                // Remove from UI list first for instant feedback
                 this.uploadedFiles.splice(index, 1);
+
+                // Only hit the delete endpoint if the file made it past the uploading phase.
+                // (No point deleting something that never reached S3.)
+                if (file.status !== 'uploading') {
+                    try {
+                        await fetch(this.deleteEndpoint, {
+                            method:  'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body:    JSON.stringify({ file_name: file.name })
+                        });
+                        console.log(`🗑️ Deleted from S3: ${file.name}`);
+
+                        // Keep sessionStorage tracking list in sync
+                        const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                        sessionStorage.setItem(
+                            'uploadedFileNames',
+                            JSON.stringify(tracked.filter(n => n !== file.name))
+                        );
+
+                    } catch (error) {
+                        // Non-critical — the UI has already updated, just log the failure
+                        console.error(`Failed to delete "${file.name}" from S3:`, error);
+                    }
+                }
             },
 
             // ── Department Dropdown ──
@@ -1307,9 +1352,9 @@
             // ── Utilities ──
             formatFileSize(bytes) {
                 if (bytes === 0) return '0 Bytes';
-                const k = 1024;
+                const k     = 1024;
                 const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));  
+                const i     = Math.floor(Math.log(bytes) / Math.log(k));
                 return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
             }
         }
