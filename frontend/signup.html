@@ -5,9 +5,7 @@
   <title>Create New Account</title>
   <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
   <style>
-    * {
-    box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -19,6 +17,7 @@
       align-items: center;
       height: 100vh;
     }
+
     .container {
       z-index: 2;
       max-width: 400px;
@@ -26,18 +25,16 @@
       padding: 20px;
       text-align: center;
     }
-    h1 {
-      font-size: 32px;
-      margin-bottom: 10px;
-    }
+
+    h1 { font-size: 32px; margin-bottom: 10px; }
+
     .form-group {
       text-align: left;
       margin-bottom: 15px;
     }
-    label {
-      font-size: 12px;
-      letter-spacing: 1px;
-    }
+
+    label { font-size: 12px; letter-spacing: 1px; }
+
     input, select {
       width: 100%;
       padding: 10px;
@@ -46,13 +43,17 @@
       color: #fff;
       border-radius: 4px;
       margin-top: 5px;
-      
     }
+
     .note {
-      font-size: 10px;
-      color: #a0a8b5;
-      margin-top: 8px;
+      font-size: 12px;
+      margin-top: 5px;
     }
+
+    .error {
+      color: #ff6b6b;
+    }
+
     button {
       margin-top: 20px;
       width: 100%;
@@ -64,71 +65,264 @@
       cursor: pointer;
       border-radius: 4px;
     }
+
     .link-text {
       font-size: 14px;
       margin-bottom: 20px;
     }
+
     .wave-right {
       position: absolute;
       bottom: 0;
       right: 0;
       width: 65%;
       z-index: 1;
-      opacity: 1;
       pointer-events: none;
     }
+
+    .terms-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .terms-label input {
+      width: auto;
+      margin: 0;
+    }
+
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    /* UPDATED TO MAKE SCROLLABLE */
+    .modal-content {
+      background: #fff;
+      color: #000;
+      padding: 20px;
+      width: 420px;
+      max-height: 80vh;      /* limits height */
+      overflow-y: auto;      /* enables scrolling */
+      border-radius: 8px;
+      text-align: left;
+    }
+
+    .modal-content h3 {
+      margin-top: 0;
+      text-align: center;
+    }
+
   </style>
 </head>
+
 <body>
   <div id="app" class="container">
     <h1>Create New Account</h1>
-    <div class="link-text">Already Registered? <a href="login.html" style="color: #a2b8c8;">Log in here.</a></div>
-    
-    <div class="form-group">
-      <label for="name">NAME</label>
-      <input type="text" id="name" v-model="form.name" placeholder="Enter your name">
+
+    <div class="link-text">
+      Already Registered?
+      <a href="login.html" style="color: #a2b8c8;">Log in here.</a>
     </div>
 
     <div class="form-group">
-      <label for="email">EMAIL</label>
-      <input type="email" id="email" v-model="form.email" placeholder="Enter your email">
-      <div class="note">Use organizational email for administrative privileges</div>
+      <label>NAME</label>
+      <input type="text" v-model="form.name" placeholder="Enter your name">
+      <div class="note error" v-if="errors.name">{{ errors.name }}</div>
     </div>
 
     <div class="form-group">
-      <label for="password">PASSWORD</label>
-      <input type="password" id="password" v-model="form.password" placeholder="Enter your password">
+      <label>EMAIL</label>
+      <input type="email" v-model="form.email" placeholder="Enter your organization email">
+      <div class="note error" v-if="errors.email">{{ errors.email }}</div>
     </div>
 
     <div class="form-group">
-      <label for="role">ROLE</label>
-      <select id="role" v-model="form.role">
+      <label>PASSWORD</label>
+      <input type="password" v-model="form.password" placeholder="Enter your password">
+      <div class="note error" v-if="errors.password">{{ errors.password }}</div>
+    </div>
+
+    <div class="form-group" v-if="form.password.length > 0">
+      <label>CONFIRM PASSWORD</label>
+      <input type="password" v-model="form.confirmPassword" placeholder="Retype your password">
+      <div class="note error" v-if="errors.confirmPassword">
+        {{ errors.confirmPassword }}
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>ROLE</label>
+      <select v-model="form.role">
         <option disabled value="">Select</option>
-        <option>Admin</option>
-        <option>User</option>
+        <option>General user</option>
+        <option>Administrative user</option>
       </select>
+    </div>
+
+    <div class="form-group">
+      <label class="terms-label">
+        <input type="checkbox" v-model="form.terms">
+        <span>
+          I accept the
+          <a href="#" @click.prevent="showTerms = true" style="color:#a2b8c8;">
+            Terms & Conditions
+          </a>
+        </span>
+      </label>
+      <div class="note error" v-if="errors.terms">
+        {{ errors.terms }}
+      </div>
     </div>
 
     <button @click="submitForm">Sign Up</button>
 
     <img src="img2.png" alt="Wave design right" class="wave-right">
+
+    <!-- SCROLLABLE TERMS MODAL -->
+    <div v-if="showTerms" class="modal">
+      <div class="modal-content">
+        <h3>CyberComply – Terms & Conditions</h3>
+
+        <p><strong>1. Acceptance of Terms</strong><br>
+        By creating an account on CyberComply, you acknowledge that you have read, understood,
+        and agreed to comply with these Terms & Conditions and all applicable cybersecurity
+        and data protection regulations.</p>
+
+        <p><strong>2. User Account Responsibility</strong><br>
+        • You are responsible for maintaining the confidentiality of your login credentials.<br>
+        • Multi-Factor Authentication (OTP verification) may be required.<br>
+        • Unauthorized access must be reported immediately.</p>
+
+        <p><strong>3. Role-Based Access Control</strong><br>
+        • General Users may upload and analyse only their own documents.<br>
+        • Administrative Users must register using a valid organisational email.<br>
+        • Access to dashboards and reports is role-restricted.</p>
+
+        <p><strong>4. Document Upload & Storage</strong><br>
+        • Documents are stored temporarily for compliance analysis.<br>
+        • Files are automatically deleted after processing.<br>
+        • Malware scanning and validation are performed.</p>
+
+        <p><strong>5. Data Protection & Encryption</strong><br>
+        • All data is encrypted via HTTPS/TLS.<br>
+        • Stored data is protected using AES-256 encryption.<br>
+        • System aligns with GDPR and PDPA regulations.</p>
+
+        <p><strong>6. AI Disclaimer</strong><br>
+        Compliance results are AI-generated and for guidance only. They do not replace legal advice.</p>
+
+        <p><strong>7. Prohibited Activities</strong><br>
+        • Uploading malicious content<br>
+        • Attempting to bypass security mechanisms<br>
+        • Accessing other users' documents</p>
+
+        <p><strong>8. Suspension</strong><br>
+        Accounts violating policies may be suspended or terminated.</p>
+
+        <p><strong>9. Updates</strong><br>
+        Continued use of the platform indicates acceptance of updated terms.</p>
+
+        <br>
+        <button @click="showTerms = false">Close</button>
+      </div>
+    </div>
+
   </div>
 
   <script>
     new Vue({
       el: '#app',
       data: {
+        showTerms: false,
         form: {
           name: '',
           email: '',
           password: '',
-          role: ''
-        }
+          confirmPassword: '',
+          role: '',
+          terms: false
+        },
+        errors: {}
       },
       methods: {
-        submitForm() {
-          console.log("Form submitted:", this.form);
-          alert(`Welcome, ${this.form.name || 'User'}!`);
+        validateEmail(email) {
+          const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          return regex.test(email);
+        },
+        validatePassword(password) {
+          const regex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-\\[\]\/`~+=;']).{8,}$/;
+          return regex.test(password);
+        },
+        async submitForm() {
+          this.errors = {};
+
+          if (!this.form.name.trim()) {
+            this.errors.name = "Name is required.";
+          }
+
+          if (!this.validateEmail(this.form.email)) {
+            this.errors.email = "Invalid email format.";
+          }
+
+          if (!this.validatePassword(this.form.password)) {
+            this.errors.password =
+              "Password must contain at least 8 characters with a minimum of 1 uppercase letter, 1 digit and 1 special character.";
+          }
+
+          if (this.form.password !== this.form.confirmPassword) {
+            this.errors.confirmPassword = "Passwords do not match.";
+          }
+
+          if (!this.form.terms) {
+            this.errors.terms = "You must accept the Terms & Conditions.";
+          }
+
+          if (Object.keys(this.errors).length === 0) {
+            try {
+              const response = await fetch("http://127.0.0.1:8000/api/signup/", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  name: this.form.name,
+                  email: this.form.email,
+                  password: this.form.password,
+                  role: this.form.role
+                })
+              });
+
+              const data = await response.json();
+
+              if (!response.ok) {
+                if (response.status === 409) {
+                  this.errors.email = "This email is already registered. Please use a different email.";
+                  this.form.password = "";
+                  this.form.confirmPassword = "";
+                } else {
+                  this.errors.email = data.detail || "Signup failed. Please try again.";
+                }
+                return;
+              }
+
+              alert("Account created successfully!");
+              window.location.href = "login.html";
+
+            } catch (error) {
+              alert("Cannot connect to backend server.");
+            }
+          }
         }
       }
     });

@@ -163,7 +163,8 @@
             left: 0;
             top: 60px;
             width: 280px;
-            height: calc(100vh - 60px);
+            bottom: 0;
+            min-height: calc(100vh - 60px);
             background-color: #0d1420;
             transform: translateX(-100%);
             transition: transform 0.3s ease-in-out;
@@ -318,6 +319,7 @@
             letter-spacing: 2px;
             margin-bottom: 30px;
             text-transform: uppercase;
+            padding-left: 20px;
         }
 
         .metrics-row {
@@ -333,8 +335,9 @@
             background-color: white;
             color: black;
             padding: 15px 20px;
-            width: 200px;
-            /* Fixed width for boxy look */
+            min-width: 200px;
+            width: auto;
+            /* Flexible width for longer names */
             height: 70px;
             display: flex;
             align-items: center;
@@ -343,25 +346,54 @@
             font-weight: 800;
             font-size: 1rem;
             text-transform: capitalize;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
             line-height: 1.2;
         }
 
-        .metric-stats {
-            text-align: left;
-            font-size: 1.2rem;
-            letter-spacing: 1px;
-            font-weight: 400;
+        .custom-select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            border: none;
+            cursor: pointer;
+            background-image: url('data:image/svg+xml;utf8,<svg fill="black" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+            background-repeat: no-repeat;
+            background-position-x: calc(100% - 15px);
+            background-position-y: center;
+            padding-right: 45px;
         }
 
-        .metric-stats div {
+        .custom-select:focus {
+            outline: none;
+        }
+
+        .info-box {
+            background-color: #1a2845;
+            padding: 25px 20px;
+            border-radius: 12px;
+            border-left: 5px solid #4a8fe7;
+        }
+
+        .stat-box {
+            text-align: left;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+            font-weight: 400;
+            min-width: 200px;
+            padding: 15px 20px;
+            /* Adjust padding for the stats to be slightly thinner */
+        }
+
+        .stat-box div {
             margin-bottom: 8px;
+        }
+
+        .stat-box div:last-child {
+            margin-bottom: 0;
         }
 
         .recommendations-section {
             margin-top: 40px;
-            padding-left: 20px;
-            /* Indent slightly as per image */
         }
 
         .rec-title {
@@ -536,39 +568,46 @@
                 <div class="company-name">ABC Company</div>
 
                 <div class="metrics-row">
-                    <div class="metric-box">
-                        Security <br> Department
-                    </div>
+                    <select class="metric-box custom-select" v-model="selectedDepartment">
+                        <option value="Security">Security Department</option>
+                        <option value="IT">IT Department</option>
+                        <option value="Finance">Finance Department</option>
+                        <option value="HR">HR Department</option>
+                        <option value="Admin">Admin Department</option>
+                    </select>
 
-                    <div class="metric-stats">
+                    <div class="info-box stat-box">
                         <div>Score : 80%</div>
                         <div>Risk Level : Low</div>
                     </div>
 
-                    <div class="metric-box" style="cursor: pointer;" @click="showGraphic">
+                    <div class="metric-box" style="cursor: pointer;" @click="showGraphic" v-if="userRole === 'admin'">
                         Graphical View
                     </div>
                 </div>
 
-                <div class="recommendations-section">
-                    <h2 class="rec-title">CYBERCOMPLY Recommendations :</h2>
+                <div class="info-box recommendations-section">
+                    <h2 class="rec-title">{{ selectedDepartment }} DEPARTMENTAL RECOMMENDATIONS :</h2>
                     <ul class="rec-list">
                         <li>
                             Lorem ipsum dolor sit amet, consectetur adipiscing elit
                             <ul class="sub-rec-list">
-                                <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
+                                <li>As mentioned in page 15, line 18 of the Personal Data Protection Act No 9 of 2022
+                                </li>
                             </ul>
                         </li>
                         <li>
                             Lorem ipsum dolor sit amet, consectetur adipiscing elit
                             <ul class="sub-rec-list">
-                                <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
+                                <li>As mentioned in page 15, line 18 of the Personal Data Protection Act No 9 of 2022
+                                </li>
                             </ul>
                         </li>
                         <li>
                             Lorem ipsum dolor sit amet, consectetur adipiscing elit
                             <ul class="sub-rec-list">
-                                <li>As mentioned in page 15, line 18 of the Data Protection Act</li>
+                                <li>As mentioned in page 15, line 18 of the Personal Data Protection Act No 9 of 2022
+                                </li>
                             </ul>
                         </li>
                     </ul>
@@ -588,9 +627,11 @@
         createApp({
             data() {
                 return {
+                    userRole: 'admin', // Change this to 'user' to test the button disappearing
                     sidebarOpen: true,
                     searchActive: false,
                     searchQuery: '',
+                    selectedDepartment: 'Security',
                     last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
                     last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
                     filteredLast7Days: [],

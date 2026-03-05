@@ -43,7 +43,8 @@
             position: fixed;
             bottom: 0;
             right: 0;
-            width: 85%;
+            width: 100%;
+            height: 100%;
             z-index: 0;
             pointer-events: none;
         }
@@ -58,51 +59,84 @@
         <div class="flex-1 flex items-center justify-center px-4">
 
             <div class="w-full max-w-md text-center space-y-8">
-                <div class="space-y-6">
-                    <h1 class="text-5xl font-medium tracking-tight">Login</h1>
-                    <p class="text-gray-400 text-sm tracking-wide">Sign in to continue</p>
+
+                <!-- Step 1: Login Credentials -->
+                <div v-if="step === 1">
+                    <div class="space-y-2 mb-8">
+                        <h1 class="text-5xl font-medium tracking-tight">Login</h1>
+                        <p class="text-gray-400 text-sm tracking-wide">Sign in to continue</p>
+                    </div>
+
+                    <form @submit.prevent class="space-y-6 text-left w-3/4 mx-auto" novalidate>
+
+                        <transition name="fade">
+                            <div v-if="message.text" :class="[
+                                'text-sm p-3 rounded text-center shadow-lg border',
+                                message.type === 'error' ? 'bg-gray-200 text-red-600 border-red-400' : 'bg-green-600 text-white border-green-400'
+                            ]">
+                                {{ message.text }}
+                            </div>
+                        </transition>
+
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Email</label>
+                            <input v-model="form.email" type="email" placeholder="hello@reallygreatsite.com"
+                                class="custom-input w-full p-3 text-sm placeholder-gray-400">
+                        </div>
+
+                        <div class="space-y-2">
+                            <label
+                                class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Password</label>
+                            <input v-model="form.password" type="password" placeholder="******"
+                                class="custom-input w-full p-3 text-sm placeholder-gray-400">
+                        </div>
+
+                        <div class="pt-2 space-y-4 text-center">
+                            <button @click.prevent="handleLogin"
+                                class="custom-btn w-full py-3 uppercase tracking-wider text-sm shadow-lg">
+                                Log In
+                            </button>
+                            <div>
+                                <a href="forgot_password.html"
+                                    class="text-sm text-white font-medium hover:text-blue-300 transition-colors tracking-wide">
+                                    Forgot Password?
+                                </a>
+                            </div>
+                        </div>
+                    </form>
                 </div>
 
-                <form @submit.prevent="handleLogin" class="space-y-6 text-left w-3/4 mx-auto" novalidate>
+                <!-- Step 2: OTP Verification -->
+                <div v-if="step === 2">
+                    <div class="space-y-2 mb-8">
+                        <h1 class="text-5xl font-medium tracking-tight">Verify OTP</h1>
+                        <p class="text-gray-400 text-sm tracking-wide">Enter the OTP sent to your email</p>
+                    </div>
 
-                    <!-- 3. Error/Success Message Box -->
+                    <!-- Page-level success banner (e.g. "OTP sent to ...") -->
                     <transition name="fade">
                         <div v-if="message.text" :class="[
-                            'text-sm p-3 rounded text-center shadow-lg border',
+                            'text-sm p-3 mb-4 rounded text-center shadow-lg border w-3/4 mx-auto',
                             message.type === 'error' ? 'bg-gray-200 text-red-600 border-red-400' : 'bg-green-600 text-white border-green-400'
                         ]">
                             {{ message.text }}
                         </div>
                     </transition>
 
-                    <!-- Email Field -->
-                    <div class="space-y-2">
-                        <label class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Email</label>
-                        <input v-model="form.email" type="email" placeholder="hello@reallygreatsite.com"
-                            class="custom-input w-full p-3 text-sm placeholder-gray-400" required>
-                    </div>
+                    <!-- Shared OTP component handles input, validation & verify button -->
+                    <div class="w-3/4 mx-auto space-y-4">
+                        <otp-verification :email="form.email" @verified="handleOtpVerified">
+                        </otp-verification>
 
-                    <!-- Password Field -->
-                    <div class="space-y-2">
-                        <label class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Password</label>
-                        <input v-model="form.password" type="password" placeholder="******"
-                            class="custom-input w-full p-3 text-sm placeholder-gray-400" required>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="pt-4 space-y-6 text-center">
-                        <button type="submit" class="custom-btn w-full py-3 uppercase tracking-wider text-sm shadow-lg">
-                            log in
-                        </button>
-
-                        <div>
-                            <a href="forgot_password.html"
-                                class="text-sm text-white font-medium hover:text-blue-300 transition-colors tracking-wide">
-                                Forgot Password?
-                            </a>
+                        <div class="text-center pt-2">
+                            <button @click.prevent="step = 1; message.text = ''"
+                                class="text-xs text-gray-400 hover:text-white transition-colors tracking-wide">
+                                &larr; Back
+                            </button>
                         </div>
                     </div>
-                </form>
+                </div>
+
             </div>
         </div>
     </div>
@@ -110,67 +144,91 @@
     <!-- Decorative Waves -->
     <img src="img2.png" alt="Decorative Wave Right" class="right-wave">
 
+    <!-- Shared OTP component — must be loaded AFTER Vue, BEFORE the app script -->
+    <script src="otp_component.js"></script>
+
     <script>
         const { createApp, reactive, ref } = Vue;
 
-        createApp({
+        const app = createApp({
             setup() {
                 const form = reactive({
                     email: '',
                     password: ''
                 });
 
-                const message = reactive({
-                    text: '',
-                    type: ''
-                });
+                const step = ref(1); // 1: credentials | 2: otp
+                const message = reactive({ text: '', type: '' });
 
+                const setMessage = (type, text) => {
+                    message.type = type;
+                    message.text = text;
+                };
+
+                // Step 1: Login (email+password)
                 const handleLogin = async () => {
                     message.text = '';
 
-                    // Manual Email Validation
-                    if (!form.email || !form.email.includes('@')) {
-                        message.type = 'error';
-                        message.text = "Please include an '@' in the email address.";
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!form.email || !emailRegex.test(form.email)) {
+                        setMessage('error', 'Please enter a valid email address.');
                         return;
                     }
 
-                    const btn = document.activeElement;
-                    const originalText = btn.innerText;
-                    btn.innerText = "LOADING...";
-                    btn.disabled = true;
-
-                    console.log("Logging in with:", form.email);
+                    if (!form.password) {
+                        setMessage('error', 'Please enter your password.');
+                        return;
+                    }
 
                     try {
-                        // API CALL SIMULATION
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        const response = await fetch("http://127.0.0.1:8000/api/login/", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                email: form.email,
+                                password: form.password
+                            })
+                        });
 
-                        if (form.email === 'error@test.com') {
-                            throw new Error("Invalid credentials provided.");
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            setMessage("error", data.detail || "Login failed.");
+                            return;
                         }
-                        // Success scenario
-                        console.log("Login Success");
-                        message.type = 'success';
-                        message.text = 'Login Success! Redirecting...';
-                        setTimeout(() => {
-                            window.location.href = 'home.html';
-                        }, 1500);
 
-                    } catch (e) {
-                        // Set Error Message state
-                        message.type = 'error';
-                        message.text = e.message || "An error occurred during login.";
-                    } finally {
-                        btn.innerText = originalText;
-                        btn.disabled = false;
+                        // If OTP required → go to step 2
+                        if (data.requires_otp) {
+                            step.value = 2;
+                            setMessage("success", data.detail || `OTP sent to ${form.email}`);
+                            return;
+                        }
+
+                        // If OTP not required → direct login
+                        setMessage("success", "Login successful! Redirecting...");
+                        setTimeout(() => {
+                            window.location.href = "home.html";
+                        }, 1000);
+
+                    } catch (err) {
+                        setMessage("error", "Cannot connect to backend server.");
                     }
                 };
 
-                return { form, message, handleLogin };
+                // Step 2: OTP success handler (called by otp component)
+                const handleOtpVerified = () => {
+                    setMessage("success", "Login successful! Redirecting...");
+                    setTimeout(() => {
+                        window.location.href = "home.html";
+                    }, 1000);
+                };
+
+                return { form, step, message, handleLogin, handleOtpVerified };
             }
-        }).mount('#app');
+        });
+
+        registerOtpComponent(app);
+        app.mount('#app');
     </script>
 </body>
-
 </html>
