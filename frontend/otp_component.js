@@ -147,12 +147,6 @@ const OtpVerification = {
                     this.$emit("verified");
                 }
 
-                // Simulated delay — any 6-digit number passes for now
-                // await new Promise(resolve => setTimeout(resolve, 1000));
-
-                // Emit to parent — parent controls what happens next
-                // this.$emit('verified');
-
             } catch (err) {
                 this.setMessage('error', err.message || 'Verification failed. Please try again.');
             } finally {
