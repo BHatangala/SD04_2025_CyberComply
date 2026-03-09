@@ -439,16 +439,10 @@
 
         .compliance-bar-fill {
             height: 100%;
-            width: 50%;
             background: linear-gradient(90deg, #3a7bd5, #4a8fe7, #7ab8ff);
             border-radius: 99px;
             position: relative;
-            animation: barGrow 1s cubic-bezier(0.22,1,0.36,1) both;
-        }
-
-        @keyframes barGrow {
-            from { width: 0; }
-            to   { width: 50%; }
+            transition: width 1s ease-in-out;
         }
 
         /* ─── Recommendations List ─── */
@@ -465,18 +459,24 @@
             color: #c5d0e6;
             font-size: 15px;
             line-height: 1.6;
-            margin-bottom: 6px;
-            display: flex;
-            align-items: flex-start;
+            margin-bottom: 10px;
+            padding-left: 22px;
+            position: relative;
         }
 
         .recommendation-item::before {
             content: "→";
-            margin-right: 12px;
+            position: absolute;
+            left: 0;
+            top: 0;
             font-size: 14px;
-            flex-shrink: 0;
             color: #4a8fe7;
-            margin-top: 2px;
+        }
+
+        .recommendation-item strong {
+            display: block;
+            margin-bottom: 3px;
+            color: #ffffff;
         }
 
         /* ─── Action Buttons ─── */
@@ -578,7 +578,7 @@
             left: 0;
             width: 75%;
             z-index: 0;
-            opacity: 0.35;
+            opacity: 0.75;
             pointer-events: none;
         }
 
@@ -787,7 +787,7 @@
                     </svg>
                 </div>
                 <div class="document-title">DOCUMENT ANALYSIS</div>
-                <div class="document-subtitle">COMPLIANCE ANALYSIS REPORT</div>
+                <div class="document-subtitle">{{ analysedCompany }} — COMPLIANCE ANALYSIS REPORT</div>
             </div>
 
             <!-- Content Container -->
@@ -806,11 +806,11 @@
                         </button>
                     </div>
                     <div class="compliance-details">
-                        <div class="compliance-item">50% &nbsp;—&nbsp; Medium Compliance Level</div>
+                        <div class="compliance-item">{{ complianceScore }}% &nbsp;—&nbsp; {{ complianceLabel }}</div>
                         <div class="compliance-bar-wrapper">
                             <div class="compliance-bar-label">COMPLIANCE SCORE</div>
                             <div class="compliance-bar-track">
-                                <div class="compliance-bar-fill"></div>
+                                <div class="compliance-bar-fill" :style="{ width: barWidth }"></div>
                             </div>
                         </div>
                     </div>
@@ -833,10 +833,21 @@
                         </button>
                     </div>
                     <div class="recommendations-list">
-                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</div>
-                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</div>
-                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit. wertyuiopasdfghjklasdfghjkl</div>
-                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit....... more</div>
+                        <div class="recommendation-item" v-if="topRecommendation">
+                            {{ topRecommendation }}
+                        </div>
+                        <!-- Per-clause findings from AI -->
+                        <div
+                            class="recommendation-item"
+                            v-for="detail in complianceDetails"
+                            :key="detail.requirement_id"
+                        >
+                            <strong>{{ detail.clause }}</strong>
+                            <span>{{ detail.reasoning }}</span>
+                        </div>
+                        <div v-if="!topRecommendation && complianceDetails.length === 0" class="recommendation-item">
+                            No recommendations available.
+                        </div>
                     </div>
                 </div>
 
@@ -910,12 +921,57 @@
                     last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
                     last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
                     filteredLast7Days: [],
-                    filteredLast30Days: []
+                    filteredLast30Days: [],
+
+                    // ── AI Result Fields ──
+                    // TODO: Replace this localStorage read with a fetch('/api/results/latest') once PostgreSQL is connected.
+                    complianceScore: 0,
+                    complianceLabel: 'Loading...',
+                    barWidth: '0%',
+                    analysedFilename: 'DOCUMENT ANALYSIS',
+                    analysedCompany: '',
+                    topRecommendation: '',
+                    complianceDetails: []
                 }
             },
             mounted() {
                 this.filteredLast7Days  = [...this.last7Days];
                 this.filteredLast30Days = [...this.last30Days];
+
+                // ── Load AI result from localStorage ──
+                const raw = localStorage.getItem('latestAnalysisResult');
+                if (raw) {
+                    try {
+                        const result = JSON.parse(raw);
+
+                        // Metadata (set by home.html before redirect)
+                        this.analysedFilename = result._meta?.filename || 'Document Analysis';
+                        this.analysedCompany  = result._meta?.company  || '';
+
+                        // Compliance score and label
+                        const score = result.compliance?.compliance_score ?? 0;
+                        this.complianceScore = Math.round(score);
+                        this.complianceLabel = score >= 75 ? 'High Compliance Level'
+                                            : score >= 40 ? 'Medium Compliance Level'
+                                            :               'Low Compliance Level';
+
+                        // Per-clause details for Recommendations section
+                        this.complianceDetails = (result.compliance?.details || []).filter(
+                            d => d.status === 'non-compliant' || d.status === 'partial' || d.status === 'non_compliant'
+                        );
+
+                        // Top recommendation from Flask placeholder
+                        this.topRecommendation = result.recommendations?.top_action || '';
+
+                        // Animate bar after a short delay (allows CSS transition to fire)
+                        setTimeout(() => {
+                            this.barWidth = `${this.complianceScore}%`;
+                        }, 300);
+
+                    } catch (e) {
+                        console.error('Failed to parse analysis result from localStorage:', e);
+                    }
+                }
             },
             methods: {
                 toggleSidebar() {

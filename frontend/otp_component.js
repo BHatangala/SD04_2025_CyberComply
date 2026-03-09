@@ -40,6 +40,10 @@ const OtpVerification = {
         email: {
             type: String,
             default: ''
+        },
+        mode: {
+            type: String,
+            default: 'login'
         }
     },
 
@@ -93,7 +97,7 @@ const OtpVerification = {
 
     methods: {
         async verify() {
-            this.message.text = '';
+            this.message = { text: '', type: '' };
 
             // ── Client-side validation ──
             if (!this.otp) {
@@ -108,24 +112,40 @@ const OtpVerification = {
             this.loading = true;
 
             try {
-                // ── BACKEND INTEGRATION POINT ─────────────────────────────────
-                // When the Django endpoint is ready, replace the simulation below:
-                //
-                //   const response = await fetch('/api/verify-otp/', {
-                //       method: 'POST',
-                //       headers: { 'Content-Type': 'application/json' },
-                //       body: JSON.stringify({ email: this.email, otp: this.otp })
-                //   });
-                //   const data = await response.json();
-                //   if (!response.ok) throw new Error(data.detail || 'Invalid OTP.');
-                //
-                // ── END BACKEND INTEGRATION POINT ─────────────────────────────
+                const endpoint =
+                    this.mode === "reset"
+                        ? "http://127.0.0.1:8000/api/verify-reset-otp/"
+                        : "http://127.0.0.1:8000/api/verify-otp/";
 
-                // Simulated delay — any 6-digit number passes for now
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                const response = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: this.email,
+                        otp: this.otp
+                    })
+                });
 
-                // Emit to parent — parent controls what happens next
-                this.$emit('verified');
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || "Invalid OTP.");
+                }
+
+                // Safety check if backend didn't return token in reset mode
+                if (this.mode === "reset" && !data.reset_token) {
+                    throw new Error("Reset token not received. Please try again.");
+                }
+
+                // Clear OTP after success
+                this.otp = "";
+
+                // If reset mode, send token back
+                if (this.mode === "reset") {
+                    this.$emit("verified", data.reset_token);
+                } else {
+                    this.$emit("verified");
+                }
 
             } catch (err) {
                 this.setMessage('error', err.message || 'Verification failed. Please try again.');
