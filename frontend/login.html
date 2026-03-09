@@ -157,8 +157,7 @@
                     password: ''
                 });
 
-                const step = ref(1); // 1: Credentials  |  2: OTP
-
+                const step = ref(1); // 1: credentials | 2: otp
                 const message = reactive({ text: '', type: '' });
 
                 const setMessage = (type, text) => {
@@ -166,7 +165,7 @@
                     message.text = text;
                 };
 
-                // ─── Step 1: Validate credentials and send OTP ────────────────
+                // Step 1: Login (email+password)
                 const handleLogin = async () => {
                     message.text = '';
 
@@ -181,46 +180,55 @@
                         return;
                     }
 
-                    const btn = document.activeElement;
-                    const originalText = btn.innerText;
-                    btn.innerText = 'VERIFYING...';
-                    btn.disabled = true;
-
                     try {
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        const response = await fetch("http://127.0.0.1:8000/api/login/", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                email: form.email,
+                                password: form.password
+                            })
+                        });
 
-                        if (form.email === 'error@test.com') {
-                            throw new Error('Invalid credentials provided.');
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            setMessage("error", data.detail || "Login failed.");
+                            return;
                         }
 
-                        // Move to OTP step
-                        step.value = 2;
-                        setMessage('success', `OTP sent to ${form.email}`);
+                        // If OTP required → go to step 2
+                        if (data.requires_otp) {
+                            step.value = 2;
+                            setMessage("success", data.detail || `OTP sent to ${form.email}`);
+                            return;
+                        }
 
-                    } catch (e) {
-                        setMessage('error', e.message || 'An error occurred during login.');
-                    } finally {
-                        btn.innerText = originalText;
-                        btn.disabled = false;
+                        // If OTP not required → direct login
+                        setMessage("success", "Login successful! Redirecting...");
+                        setTimeout(() => {
+                            window.location.href = "home.html";
+                        }, 1000);
+
+                    } catch (err) {
+                        setMessage("error", "Cannot connect to backend server.");
                     }
                 };
 
-                // ─── Step 2: Called by <otp-verification @verified="..."> ──────
-                // The component emits @verified once the OTP passes.
-                // Here we show login success (and can redirect to dashboard).
+                // Step 2: OTP success handler (called by otp component)
                 const handleOtpVerified = () => {
-                    setMessage('success', 'Login Successful! Redirecting...');
-                    setTimeout(() => { window.location.href = 'Home.html'; }, 1500);
+                    setMessage("success", "Login successful! Redirecting...");
+                    setTimeout(() => {
+                        window.location.href = "home.html";
+                    }, 1000);
                 };
 
-                return { form, message, step, handleLogin, handleOtpVerified };
+                return { form, step, message, handleLogin, handleOtpVerified };
             }
         });
 
-        // Register the shared OTP component before mounting
         registerOtpComponent(app);
         app.mount('#app');
     </script>
 </body>
-
 </html>
