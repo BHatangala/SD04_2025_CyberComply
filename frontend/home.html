@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+
+    <!-- Google Identity Services (OAuth 2.0) + Google API client (Picker) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+
     <style>
         * {
             margin: 0;
@@ -882,7 +887,7 @@
                 <div class="upload-sources">
 
                     <!-- Google Drive -->
-                    <div class="source-btn" @click.stop="showIntegrationModal('Google Drive')">
+                    <div class="source-btn" @click.stop="initGoogleDrivePicker()">
                         <div class="source-icon">
                             <svg viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
                                 <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
@@ -1037,6 +1042,9 @@
 </div>
 
 <script>
+    const GOOGLE_CLIENT_ID = '813213515196-8jl2875doj2uci86dgipqv7j95p96e1i.apps.googleusercontent.com';
+    const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+
     const { createApp } = Vue;
 
     createApp({
@@ -1073,7 +1081,14 @@
                 analyzeEndpoint: 'http://127.0.0.1:8000/ai/analyze/',
                 // Secondary: S3 file deletion endpoint from the AWS branch.
                 // Called when the user removes a file that has already been uploaded.
-                deleteEndpoint: 'http://127.0.0.1:8000/api/delete-file/'
+                deleteEndpoint: 'http://127.0.0.1:8000/api/delete-file/',
+
+                // Google Drive: receives file_id + access_token, downloads on backend
+                driveUploadEndpoint: 'http://127.0.0.1:8000/ai/upload-from-drive/',
+
+                // ── Google Drive state ──
+                googleAccessToken: null,   // OAuth token, held only for current session
+                pickerApiLoaded: false     // tracks whether gapi picker is ready
             };
         },
 
@@ -1181,7 +1196,7 @@
                     if (i === -1) return; // user removed the file mid-upload — do nothing
                     // Object.assign keeps Vue 3's reactivity intact on array items.
                     Object.assign(this.uploadedFiles[i], { status: newStatus });
-                    console.log(`📊 [${fileObj.name}] → ${newStatus}`);
+                    console.log(`[${fileObj.name}] → ${newStatus}`);
                 };
 
                 const formData = new FormData();
@@ -1189,7 +1204,7 @@
                 formData.append('company_name', this.companyName || '');
                 formData.append('department',   fileObj.department || '');
 
-                console.log(`🚀 Uploading: ${fileObj.name}`);
+                console.log(`Uploading: ${fileObj.name}`);
 
                 try {
                     const response = await fetch(this.analyzeEndpoint, {
@@ -1283,7 +1298,7 @@
                     }
 
                 } catch (error) {
-                    console.error(`❌ Upload failed for ${fileObj.name}:`, error);
+                    console.error(`Upload failed for ${fileObj.name}:`, error);
                     const i = getIndex();
                     if (i !== -1) {
                         Object.assign(this.uploadedFiles[i], { status: 'error' });
@@ -1338,6 +1353,221 @@
             },
             closeAllDropdowns() {
                 this.uploadedFiles.forEach(f => f.deptOpen = false);
+            },
+
+            // ── Google Drive Integration ──
+
+            // Step 1 — Called when user clicks the Google Drive button.
+            //          Triggers the Google OAuth popup to get an access token.
+            initGoogleDrivePicker() {
+                // Guard: check the Google Identity Services script has loaded
+                if (typeof google === 'undefined' || !google.accounts) {
+                    this.errorMessage = 'Google API is still loading. Please try again in a moment.';
+                    return;
+                }
+
+                const tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CLIENT_ID,
+                    scope: GOOGLE_DRIVE_SCOPE,
+                    callback: (tokenResponse) => {
+                        if (tokenResponse.error) {
+                            this.errorMessage = `Google authorisation failed: ${tokenResponse.error}`;
+                            return;
+                        }
+                        // Store token for this session only — used to open Picker
+                        this.googleAccessToken = tokenResponse.access_token;
+                        // Now load the Picker API and open the file browser
+                        this.loadPickerApi();
+                    }
+                });
+
+                tokenClient.requestAccessToken({ prompt: 'consent' });
+            },
+
+            // Step 2 — Load the Google Picker API library, then open the picker.
+            loadPickerApi() {
+                if (this.pickerApiLoaded) {
+                    // Already loaded — go straight to opening the picker
+                    this.openGooglePicker();
+                    return;
+                }
+                gapi.load('picker', {
+                    callback: () => {
+                        this.pickerApiLoaded = true;
+                        this.openGooglePicker();
+                    }
+                });
+            },
+
+            // Step 3 — Build and display the Google Picker UI.
+            //          The Picker is a Google-hosted file browser popup.
+            openGooglePicker() {
+                const picker = new google.picker.PickerBuilder()
+                    // Only show Drive files (not shared drives or photos)
+                    .addView(google.picker.ViewId.DOCS)
+                    // Filter to file types the backend accepts: PDF, DOCX, TXT
+                    .addView(
+                        new google.picker.DocsView()
+                            .setMimeTypes('application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain')
+                    )
+                    .setOAuthToken(this.googleAccessToken)
+                    .setDeveloperKey('')   // Not needed for Picker-only flows with OAuth token
+                    .setCallback((data) => this.onPickerSelected(data))
+                    .setTitle('Select a file from Google Drive')
+                    .build();
+
+                picker.setVisible(true);
+            },
+
+            // Step 4 — Picker callback: called when user picks a file or cancels.
+            onPickerSelected(data) {
+                if (data.action !== google.picker.Action.PICKED) return; // user cancelled
+
+                const driveFile = data.docs[0]; // single-file selection
+                const fileId   = driveFile.id;
+                const fileName = driveFile.name;
+                const mimeType = driveFile.mimeType;
+                const fileSize = driveFile.sizeBytes || 0;
+
+                console.log(`📂 Google Drive file selected: ${fileName} (${fileId})`);
+
+                // Client-side validation — same rules as device uploads
+                const validMimes = [
+                    'application/pdf',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'text/plain'
+                ];
+                if (!validMimes.includes(mimeType)) {
+                    this.errorMessage = `"${fileName}" is not supported. Only PDF, DOCX, and TXT files are allowed.`;
+                    return;
+                }
+                if (fileSize > 50 * 1024 * 1024) {
+                    this.errorMessage = `"${fileName}" exceeds the 50 MB limit.`;
+                    return;
+                }
+                if (this.uploadedFiles.length >= 10) {
+                    this.errorMessage = 'Maximum 10 files allowed.';
+                    return;
+                }
+
+                // Add to file list immediately so UI shows UPLOADING state
+                const fileObj = {
+                    name:       fileName,
+                    size:       fileSize,
+                    status:     'uploading',
+                    department: '',
+                    deptOpen:   false,
+                    rawFile:    null,        // no local File object for cloud uploads
+                    source:     'google'     // identifies origin for S3 delete logic
+                };
+                this.uploadedFiles.push(fileObj);
+
+                // Fire the backend request — sends file_id + token to Django
+                this.uploadFromDrive(fileObj, fileId, this.googleAccessToken);
+
+                // Clear the token from memory after use (security best practice)
+                this.googleAccessToken = null;
+            },
+
+            // Step 5 — POST file_id + access_token to Django backend.
+            //          Django downloads the file from Drive, scans it, stores in S3, analyses it.
+            //          Uses the same SSE stream as device uploads.
+            async uploadFromDrive(fileObj, fileId, accessToken) {
+                const getIndex    = () => this.uploadedFiles.indexOf(fileObj);
+                const updateStatus = (newStatus) => {
+                    const i = getIndex();
+                    if (i === -1) return;
+                    Object.assign(this.uploadedFiles[i], { status: newStatus });
+                    console.log(`📊 [${fileObj.name}] → ${newStatus}`);
+                };
+
+                console.log(`🚀 Uploading from Google Drive: ${fileObj.name}`);
+
+                try {
+                    const response = await fetch(this.driveUploadEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            file_id:      fileId,
+                            access_token: accessToken,
+                            file_name:    fileObj.name,
+                            company_name: this.companyName || '',
+                            department:   fileObj.department || ''
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error || `Server returned HTTP ${response.status}`);
+                    }
+
+                    // Same SSE stream reading as device uploads
+                    const reader  = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let   buffer  = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const events = buffer.split('\n\n');
+                        buffer = events.pop();
+
+                        for (const event of events) {
+                            const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+                            if (!dataLine) continue;
+
+                            try {
+                                const payload = JSON.parse(dataLine.slice(6));
+                                console.log(`📡 [${fileObj.name}] SSE:`, payload.status);
+
+                                switch (payload.status) {
+                                    case 'uploaded':
+                                        updateStatus('uploaded');
+                                        {
+                                            const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                                            if (!tracked.includes(fileObj.name)) {
+                                                tracked.push(fileObj.name);
+                                                sessionStorage.setItem('uploadedFileNames', JSON.stringify(tracked));
+                                            }
+                                        }
+                                        break;
+                                    case 'analysing':
+                                        updateStatus('analysing');
+                                        break;
+                                    case 'analysed':
+                                        updateStatus('analysed');
+                                        localStorage.setItem('latestAnalysisResult', JSON.stringify({
+                                            ...payload.result,
+                                            _meta: {
+                                                filename:  fileObj.name,
+                                                company:   this.companyName || 'Unknown Organisation',
+                                                timestamp: new Date().toISOString(),
+                                                source:    'google_drive'
+                                            }
+                                        }));
+                                        setTimeout(() => {
+                                            window.location.href = 'document_analysis.html';
+                                        }, 1500);
+                                        break;
+                                    case 'error':
+                                        updateStatus('error');
+                                        this.errorMessage = payload.message || `Error processing "${fileObj.name}".`;
+                                        break;
+                                }
+                            } catch (parseError) {
+                                console.warn(`Could not parse SSE line for ${fileObj.name}:`, dataLine);
+                            }
+                        }
+                    }
+
+                } catch (error) {
+                    console.error(`❌ Drive upload failed for ${fileObj.name}:`, error);
+                    const i = getIndex();
+                    if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'error' });
+                    this.errorMessage = `Failed to upload "${fileObj.name}" from Google Drive: ${error.message}`;
+                }
             },
 
             // ── Integration Modal ──

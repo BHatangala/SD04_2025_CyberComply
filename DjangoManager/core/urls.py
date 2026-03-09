@@ -7,6 +7,9 @@ urlpatterns = [
     path('', views.home, name='home'),  # This makes home.html show at http://127.0.0.1:8000/ai/
     path('analyze/', views.analyze_compliance, name='analyze_compliance'),
 
+    # Google Drive upload — frontend sends file_id + OAuth token, Django downloads & processes
+    path('upload-from-drive/', views.upload_from_drive, name='upload_from_drive'),
+
     # S3 file deletion (called by frontend × button)
     path('api/delete-file/', views.delete_file, name='delete_file'),
 

@@ -239,6 +239,163 @@ def delete_file(request):
 
 
 # ──────────────────────────────────────────────
+# Google Drive Upload — frontend sends file_id + OAuth token,
+# Django downloads the file from Drive and runs the same pipeline
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def upload_from_drive(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    file_id      = (payload.get('file_id')      or '').strip()
+    access_token = (payload.get('access_token') or '').strip()
+    file_name    = (payload.get('file_name')    or '').strip()
+    company_name = (payload.get('company_name') or '').strip()
+    department   = (payload.get('department')   or '').strip()
+
+    if not file_id or not access_token or not file_name:
+        return JsonResponse({'error': 'file_id, access_token and file_name are required'}, status=400)
+
+    # Validate file extension (same rules as device uploads)
+    valid_exts = ('.pdf', '.docx', '.txt')
+    if not file_name.lower().endswith(valid_exts):
+        return JsonResponse(
+            {'error': f'"{file_name}" is not supported. Only PDF, DOCX and TXT files are allowed.'},
+            status=400
+        )
+
+    # Step 1 — Download the file from Google Drive using the OAuth token
+    download_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+    try:
+        drive_response = requests.get(
+            download_url,
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=60,
+            stream=True
+        )
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({'error': f'Failed to reach Google Drive: {str(e)}'}, status=502)
+
+    if drive_response.status_code == 401:
+        return JsonResponse({'error': 'Google access token is invalid or expired'}, status=401)
+    if drive_response.status_code == 403:
+        return JsonResponse({'error': 'Permission denied — cannot access this Google Drive file'}, status=403)
+    if not drive_response.ok:
+        return JsonResponse(
+            {'error': f'Google Drive returned HTTP {drive_response.status_code}'},
+            status=502
+        )
+
+    # Step 2 — Write downloaded content to a temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp:
+        for chunk in drive_response.iter_content(chunk_size=8192):
+            tmp.write(chunk)
+        temp_path = tmp.name
+
+    # streaming_started tracks whether we handed off to StreamingHttpResponse.
+    # If True, the event_stream() generator owns temp file cleanup via its finally block.
+    # If False (early validation failure or unexpected exception), we clean up here.
+    streaming_started = False
+
+    try:
+        # Step 3 — Size check (50 MB limit)
+        file_size = os.path.getsize(temp_path)
+        if file_size > 50 * 1024 * 1024:
+            return JsonResponse(
+                {'error': f'"{file_name}" exceeds the 50 MB limit.'},
+                status=400
+            )
+
+        # Step 4 — Password protection check
+        if is_password_protected(temp_path, file_name):
+            return JsonResponse(
+                {'error': 'File rejected — password protected files are not allowed'},
+                status=400
+            )
+
+        # Step 5 — Malware scan (skips gracefully if ClamAV unavailable)
+        scan_result = scan_file(temp_path)
+        if scan_result is not None:
+            return JsonResponse(
+                {'error': 'File rejected — malware detected', 'detail': scan_result},
+                status=400
+            )
+
+        # Step 6 — Upload to S3
+        s3_url = upload_to_s3(temp_path, file_name)
+        if s3_url is None:
+            return JsonResponse({'error': 'Failed to upload file to S3'}, status=500)
+
+        # Step 7 — Stream SSE status events back to frontend (same as device upload)
+        def event_stream():
+            yield f"data: {json.dumps({'status': 'uploaded', 's3_url': s3_url})}\n\n".encode('utf-8')
+            time.sleep(2)
+
+            try:
+                with open(temp_path, 'rb') as f:
+                    file_bytes = f.read()
+
+                files = {'file': (file_name, file_bytes, _mime_type_for(file_name))}
+                data  = {'company_name': company_name, 'department': department}
+
+                yield f"data: {json.dumps({'status': 'analysing'})}\n\n".encode('utf-8')
+
+                ai_response = requests.post(
+                    f"{AI_API_URL}/analyze",
+                    files=files,
+                    data=data,
+                    timeout=300
+                )
+                result = ai_response.json()
+
+                yield f"data: {json.dumps({'status': 'analysed', 'result': result})}\n\n".encode('utf-8')
+
+            except requests.exceptions.ConnectionError:
+                yield f"data: {json.dumps({'status': 'error', 'message': 'AI Server is not running.'})}\n\n".encode('utf-8')
+            except Exception as e:
+                yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n".encode('utf-8')
+            finally:
+                # Streaming is done — clean up the temp file
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+
+        streaming_started = True
+        return StreamingHttpResponse(
+            event_stream(),
+            content_type='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no',
+            }
+        )
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+    finally:
+        # Only clean up here if we never reached the streaming response.
+        # If streaming started, event_stream()'s finally block owns the cleanup.
+        if not streaming_started and os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+
+def _mime_type_for(file_name):
+    """Return the correct MIME type based on file extension."""
+    ext = file_name.lower().split('.')[-1]
+    return {
+        'pdf':  'application/pdf',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'txt':  'text/plain',
+    }.get(ext, 'application/octet-stream')
+
+
+# ──────────────────────────────────────────────
 # Auth — Signup
 # ──────────────────────────────────────────────
 
