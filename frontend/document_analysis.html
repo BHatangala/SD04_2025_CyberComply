@@ -19,19 +19,49 @@
             overflow-x: hidden;
         }
 
+        /* ─── Animated dot-grid background ─── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(circle, rgba(74,143,231,0.13) 1px, transparent 1px);
+            background-size: 36px 36px;
+            pointer-events: none;
+            z-index: 0;
+            animation: gridDrift 20s linear infinite;
+        }
+
+        @keyframes gridDrift {
+            0%   { background-position: 0 0; }
+            100% { background-position: 36px 36px; }
+        }
+
+        /* Subtle radial vignette to keep edges dark */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at 60% 40%, transparent 40%, rgba(10,16,28,0.72) 100%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
         #app {
             position: relative;
             min-height: 100vh;
+            z-index: 1;
         }
 
-        /* Top Header */
+        /* ─── Top Header ─── */
         .top-header {
-            background-color: #1a2845;
+            background-color: rgba(26,40,69,0.92);
+            backdrop-filter: blur(8px);
             padding: 15px 30px;
             display: flex;
             align-items: center;
             position: relative;
             z-index: 100;
+            border-bottom: 1px solid rgba(74,143,231,0.18);
         }
 
         .menu-icon {
@@ -112,32 +142,31 @@
             fill: #1a2845;
         }
 
-        /* Sidebar */
+        /* ─── Sidebar ─── */
         .sidebar {
             position: absolute;
             left: 0;
             top: 60px;
             width: 280px;
             height: calc(100vh - 60px);
-            background-color: #0d1420;
+            background-color: rgba(13,20,32,0.97);
             transform: translateX(-100%);
             transition: transform 0.3s ease-in-out;
             z-index: 90;
             overflow-y: auto;
             padding: 20px 0;
-            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
+            box-shadow: 4px 0 10px rgba(0,0,0,0.3);
         }
 
         .sidebar.open {
             transform: translateX(0);
         }
 
-        /* Sidebar Icon Bar */
         .sidebar-icon-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0px 10px 15px 10px; 
+            padding: 0px 10px 15px 10px;
             margin-bottom: 20px;
             border-bottom: 2px solid #1a2845;
         }
@@ -170,7 +199,6 @@
             fill: #ffffff;
         }
 
-        /* Search Input */
         .search-container {
             padding: 0 20px 20px;
             display: none;
@@ -243,7 +271,7 @@
             font-style: italic;
         }
 
-        /* Main Content */
+        /* ─── Main Content ─── */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
             padding: 60px 80px;
@@ -255,7 +283,7 @@
             margin-left: 280px;
         }
 
-        /* Document Title Section */
+        /* ─── Document Title ─── */
         .document-title-section {
             text-align: center;
             margin-bottom: 50px;
@@ -263,12 +291,15 @@
 
         .document-icon {
             margin-bottom: 20px;
+            position: relative;
+            display: inline-block;
         }
 
         .document-icon svg {
             width: 80px;
             height: 80px;
             fill: #c5d0e6;
+            filter: drop-shadow(0 0 14px rgba(74,143,231,0.45));
         }
 
         .document-title {
@@ -279,49 +310,101 @@
             color: #ffffff;
         }
 
-        /* Content Container */
+        .document-subtitle {
+            margin-top: 8px;
+            font-size: 13px;
+            letter-spacing: 2px;
+            color: #5a7aaa;
+            font-weight: 400;
+        }
+
+        /* ─── Content Container ─── */
         .content-container {
             max-width: 1000px;
             margin: 0 auto;
         }
 
-        /* Compliance Score Section */
-        .compliance-section {
-            margin-bottom: 50px;
+        /* ─── Section Cards ─── */
+        .compliance-section,
+        .recommendations-section {
+            margin-bottom: 28px;
             display: flex;
-            gap: 30px;
-            align-items: flex-start;
+            gap: 0;
+            align-items: stretch;
+            background: rgba(20,32,56,0.72);
+            border: 1px solid rgba(74,143,231,0.18);
+            border-left: 4px solid #4a8fe7;
+            border-radius: 10px;
+            backdrop-filter: blur(6px);
+            transition: box-shadow 0.3s, border-color 0.3s;
         }
 
+        .compliance-section:hover,
+        .recommendations-section:hover {
+            box-shadow: 0 4px 28px rgba(74,143,231,0.13);
+            border-color: rgba(74,143,231,0.38);
+            border-left-color: #4a8fe7;
+        }
+
+        /* ─── Section Header Buttons ─── */
         .section-header {
             background-color: #ffffff;
             color: #1a2845;
-            padding: 12px 25px;
-            font-size: 16px;
-            font-weight: 600;
+            padding: 18px 25px;
+            font-size: 15px;
+            font-weight: 700;
             letter-spacing: 1px;
             cursor: pointer;
             border: none;
             transition: all 0.3s;
             flex-shrink: 0;
+            min-width: 180px;
+            border-radius: 6px 0 0 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .section-header:hover {
             background-color: #4a8fe7;
             color: #ffffff;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(74, 143, 231, 0.4);
+            box-shadow: 4px 0 16px rgba(74,143,231,0.35);
         }
 
+        /* Admin-restricted section header */
+        .section-header.locked {
+            cursor: not-allowed;
+            opacity: 0.65;
+            background-color: #e0e6f0;
+        }
+
+        .section-header.locked:hover {
+            background-color: #e0e6f0;
+            color: #1a2845;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .lock-icon {
+            width: 15px;
+            height: 15px;
+            fill: #8b9dc3;
+            flex-shrink: 0;
+        }
+
+        /* ─── Compliance Details ─── */
         .compliance-details {
-            padding-left: 0;
+            padding: 18px 28px;
             flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 10px;
         }
 
         .compliance-item {
             color: #ffffff;
             font-size: 16px;
-            margin-bottom: 8px;
             display: flex;
             align-items: center;
         }
@@ -330,44 +413,79 @@
             content: "•";
             margin-right: 15px;
             font-size: 20px;
+            color: #4a8fe7;
         }
 
-        /* Recommendations Section */
-        .recommendations-section {
-            margin-bottom: 50px;
-            display: flex;
-            gap: 30px;
-            align-items: flex-start;
+        /* Progress bar for compliance score */
+        .compliance-bar-wrapper {
+            margin-top: 4px;
         }
 
+        .compliance-bar-label {
+            font-size: 12px;
+            color: #8b9dc3;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+
+        .compliance-bar-track {
+            width: 100%;
+            max-width: 320px;
+            height: 7px;
+            background: rgba(74,143,231,0.18);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+
+        .compliance-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3a7bd5, #4a8fe7, #7ab8ff);
+            border-radius: 99px;
+            position: relative;
+            transition: width 1s ease-in-out;
+        }
+
+        /* ─── Recommendations List ─── */
         .recommendations-list {
-            padding-left: 0;
+            padding: 18px 28px;
             flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 4px;
         }
 
         .recommendation-item {
-            color: #ffffff;
-            font-size: 16px;
+            color: #c5d0e6;
+            font-size: 15px;
             line-height: 1.6;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: flex-start;
+            margin-bottom: 10px;
+            padding-left: 22px;
+            position: relative;
         }
 
         .recommendation-item::before {
-            content: "•";
-            margin-right: 15px;
-            font-size: 20px;
-            flex-shrink: 0;
+            content: "→";
+            position: absolute;
+            left: 0;
+            top: 0;
+            font-size: 14px;
+            color: #4a8fe7;
         }
 
-        /* Action Buttons */
+        .recommendation-item strong {
+            display: block;
+            margin-bottom: 3px;
+            color: #ffffff;
+        }
+
+        /* ─── Action Buttons ─── */
         .action-buttons {
             display: flex;
             justify-content: space-between;
             gap: 350px;
             max-width: 1000px;
-            margin: 0 auto;
+            margin: 10px auto 0;
         }
 
         .action-button {
@@ -380,24 +498,87 @@
             cursor: pointer;
             transition: all 0.3s;
             border: none;
-            flex: 1;
+            width: 100%;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
         .action-button:hover {
             background-color: #4a8fe7;
             color: #ffffff;
             transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(74, 143, 231, 0.4);
+            box-shadow: 0 6px 20px rgba(74,143,231,0.4);
         }
 
-        /* Wavy Background */
+        /* Admin-restricted action button */
+        .action-button.locked {
+            cursor: not-allowed;
+            opacity: 0.55;
+            background-color: #d8dfe8;
+        }
+
+        .action-button.locked:hover {
+            background-color: #d8dfe8;
+            color: #1a2845;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .action-button .btn-lock-icon {
+            width: 14px;
+            height: 14px;
+            fill: #8b9dc3;
+            flex-shrink: 0;
+        }
+
+        /* ─── Access Denied Toast ─── */
+        .access-toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: linear-gradient(135deg, #1a2845, #0d1420);
+            border: 1px solid rgba(74,143,231,0.5);
+            border-left: 4px solid #e74a4a;
+            color: #ffffff;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 14px;
+            letter-spacing: 0.3px;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+            white-space: nowrap;
+        }
+
+        .access-toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .access-toast svg {
+            width: 18px;
+            height: 18px;
+            fill: #e74a4a;
+            flex-shrink: 0;
+        }
+
+        /* ─── Wavy Background ─── */
         .wavy-background {
-            position: absolute;
-            top: 55px;
-            right: 0;
+            position: fixed;
+            bottom: 0;
+            left: 0;
             width: 75%;
             z-index: 0;
-            opacity: 0.7;
+            opacity: 0.75;
             pointer-events: none;
         }
 
@@ -407,63 +588,114 @@
             display: block;
         }
 
-        /* Scrollbar Styling */
-        .sidebar::-webkit-scrollbar {
-            width: 6px;
+        /* ─── Tooltips ─── */
+        .tooltip-wrapper {
+            position: relative;
+            display: flex;
+            flex: 1;
         }
 
-        .sidebar::-webkit-scrollbar-track {
-            background: #0d1420;
+        .tooltip-wrapper .tooltip-text {
+            position: absolute;
+            bottom: calc(100% + 10px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(13, 20, 36, 0.96);
+            border: 1px solid rgba(74, 143, 231, 0.35);
+            color: #c5d0e6;
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            transform: translateX(-50%) translateY(4px);
+            z-index: 200;
         }
 
-        .sidebar::-webkit-scrollbar-thumb {
-            background: #2a4a7c;
-            border-radius: 3px;
+        /* little downward arrow */
+        .tooltip-wrapper .tooltip-text::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: rgba(74, 143, 231, 0.35);
         }
 
-        .sidebar::-webkit-scrollbar-thumb:hover {
-            background: #4a8fe7;
+        .tooltip-wrapper:hover .tooltip-text {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
         }
+
+        /* Section header tooltips anchor to the button width */
+        .section-tooltip-wrapper {
+            position: relative;
+            display: inline-flex;
+            flex-shrink: 0;
+        }
+
+        .section-tooltip-wrapper .tooltip-text {
+            position: absolute;
+            bottom: calc(100% + 10px);
+            left: 50%;
+            transform: translateX(-50%) translateY(4px);
+            background: rgba(13, 20, 36, 0.96);
+            border: 1px solid rgba(74, 143, 231, 0.35);
+            color: #c5d0e6;
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 200;
+        }
+
+        .section-tooltip-wrapper .tooltip-text::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: rgba(74, 143, 231, 0.35);
+        }
+
+        .section-tooltip-wrapper:hover .tooltip-text {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ─── Scrollbar ─── */
+        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar::-webkit-scrollbar-track { background: #0d1420; }
+        .sidebar::-webkit-scrollbar-thumb { background: #2a4a7c; border-radius: 3px; }
+        .sidebar::-webkit-scrollbar-thumb:hover { background: #4a8fe7; }
 
         @media screen and (max-width: 1200px) {
             .sidebar {
                 position: fixed;
-                box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+                box-shadow: 4px 0 20px rgba(0,0,0,0.5);
             }
-            
             .main-content.shifted {
                 margin-left: 0;
             }
         }
 
         @media screen and (max-width: 768px) {
-            .main-content {
-                padding: 40px 30px;
-            }
-
-            .action-buttons {
-                flex-direction: column;
-            }
-
-            .back-arrow {
-                left: 20px;
-                top: 75px;
-                font-size: 28px;
-            }
-
-            .back-arrow.shifted {
-                left: 300px;
-            }
-
+            .main-content { padding: 40px 30px; }
+            .action-buttons { flex-direction: column; gap: 16px; }
+            .back-arrow { left: 20px; top: 75px; font-size: 28px; }
+            .back-arrow.shifted { left: 300px; }
             .compliance-section,
-            .recommendations-section {
-                flex-direction: column;
-                gap: 15px;
-            }
-
-            .section-header {
-                width: 100%;
-            }
+            .recommendations-section { flex-direction: column; }
+            .section-header { border-radius: 6px 6px 0 0; min-width: unset; width: 100%; }
         }
     </style>
 </head>
@@ -484,7 +716,6 @@
 
         <!-- Sidebar -->
         <div class="sidebar" :class="{ open: sidebarOpen }">
-            <!-- Icon Bar (Search and Plus) -->
             <div class="sidebar-icon-bar">
                 <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
                     <svg viewBox="0 0 24 24">
@@ -498,12 +729,11 @@
                 </div>
             </div>
 
-            <!-- Search Input (Hidden by default) -->
             <div class="search-container" :class="{ active: searchActive }">
-                <input 
-                    type="text" 
-                    class="search-input" 
-                    v-model="searchQuery" 
+                <input
+                    type="text"
+                    class="search-input"
+                    v-model="searchQuery"
                     placeholder="Search documents..."
                     @input="filterReports"
                 >
@@ -516,18 +746,14 @@
                     </svg>
                     LAST 7 DAYS
                 </div>
-                <div v-if="filteredLast7Days.length === 0" class="no-results">
-                    No results to display
-                </div>
+                <div v-if="filteredLast7Days.length === 0" class="no-results">No results to display</div>
                 <div v-else>
-                    <div 
-                        v-for="report in filteredLast7Days" 
+                    <div
+                        v-for="report in filteredLast7Days"
                         :key="report"
                         class="sidebar-item"
                         @click="openReport(report)"
-                    >
-                        {{ report }}
-                    </div>
+                    >{{ report }}</div>
                 </div>
             </div>
 
@@ -538,24 +764,21 @@
                     </svg>
                     LAST 30 DAYS
                 </div>
-                <div v-if="filteredLast30Days.length === 0" class="no-results">
-                    No results to display
-                </div>
+                <div v-if="filteredLast30Days.length === 0" class="no-results">No results to display</div>
                 <div v-else>
-                    <div 
-                        v-for="report in filteredLast30Days" 
+                    <div
+                        v-for="report in filteredLast30Days"
                         :key="report"
                         class="sidebar-item"
                         @click="openReport(report)"
-                    >
-                        {{ report }}
-                    </div>
+                    >{{ report }}</div>
                 </div>
             </div>
         </div>
 
         <!-- Main Content -->
         <div class="main-content" :class="{ shifted: sidebarOpen }">
+
             <!-- Document Title -->
             <div class="document-title-section">
                 <div class="document-icon">
@@ -564,34 +787,94 @@
                     </svg>
                 </div>
                 <div class="document-title">DOCUMENT ANALYSIS</div>
+                <div class="document-subtitle">{{ analysedCompany }} — COMPLIANCE ANALYSIS REPORT</div>
             </div>
 
             <!-- Content Container -->
             <div class="content-container">
+
                 <!-- Compliance Score Section -->
                 <div class="compliance-section">
-                    <button class="section-header" @click="viewComplianceScore">Compliance Score</button>
+                    <div class="section-tooltip-wrapper">
+                        <span class="tooltip-text">View identified risks and compliance gaps in detail.</span>
+                        <button
+                            class="section-header"
+                            :class="{ locked: !isAdmin && false }"
+                            @click="viewComplianceScore"
+                        >
+                            Compliance Score
+                        </button>
+                    </div>
                     <div class="compliance-details">
-                        <div class="compliance-item">50%</div>
-                        <div class="compliance-item">Compliance Level : Medium</div>
+                        <div class="compliance-item">{{ complianceScore }}% &nbsp;—&nbsp; {{ complianceLabel }}</div>
+                        <div class="compliance-bar-wrapper">
+                            <div class="compliance-bar-label">COMPLIANCE SCORE</div>
+                            <div class="compliance-bar-track">
+                                <div class="compliance-bar-fill" :style="{ width: barWidth }"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Recommendations Section -->
+                <!-- Recommendations Section — ADMIN ONLY -->
                 <div class="recommendations-section">
-                    <button class="section-header" @click="viewRecommendations">Recommendations</button>
+                    <div class="section-tooltip-wrapper">
+                        <span class="tooltip-text">View detailed recommendations with PDPA Act references.</span>
+                        <button
+                            class="section-header"
+                            :class="{ locked: !isAdmin }"
+                            @click="viewRecommendations"
+                        >
+                            <!-- Lock icon shown for non-admin -->
+                            <svg v-if="!isAdmin" class="lock-icon" viewBox="0 0 24 24">
+                                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                            </svg>
+                            Recommendations
+                        </button>
+                    </div>
                     <div class="recommendations-list">
-                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</div>
-                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</div>
-                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit.wertyuiopasdfghjklasdfghjkl</div>
-                        <div class="recommendation-item">Lorem ipsum dolor sit amet, consectetur adipiscing elit.......more</div>
+                        <div class="recommendation-item" v-if="topRecommendation">
+                            {{ topRecommendation }}
+                        </div>
+                        <!-- Per-clause findings from AI -->
+                        <div
+                            class="recommendation-item"
+                            v-for="detail in complianceDetails"
+                            :key="detail.requirement_id"
+                        >
+                            <strong>{{ detail.clause }}</strong>
+                            <span>{{ detail.reasoning }}</span>
+                        </div>
+                        <div v-if="!topRecommendation && complianceDetails.length === 0" class="recommendation-item">
+                            No recommendations available.
+                        </div>
                     </div>
                 </div>
 
                 <!-- Action Buttons -->
                 <div class="action-buttons">
-                    <button class="action-button" @click="compareReport">Compare</button>
-                    <button class="action-button" @click="generateReports">Generate Reports</button>
+                    <!-- Compare — ADMIN ONLY -->
+                    <div class="tooltip-wrapper">
+                        <span class="tooltip-text">Compare compliance across departments.</span>
+                        <button
+                            class="action-button"
+                            :class="{ locked: !isAdmin }"
+                            @click="compareReport"
+                        >
+                            <svg v-if="!isAdmin" class="btn-lock-icon" viewBox="0 0 24 24">
+                                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                            </svg>
+                            Compare
+                        </button>
+                    </div>
+
+                    <!-- Generate Reports — accessible to all -->
+                    <div class="tooltip-wrapper">
+                        <span class="tooltip-text">View and download your formatted compliance report.</span>
+                        <button class="action-button" @click="generateReports">
+                            Generate Reports
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -600,10 +883,31 @@
         <div class="wavy-background">
             <img src="img4.png" alt="Wavy Design">
         </div>
+
+        <!-- Access Denied Toast -->
+        <div class="access-toast" :class="{ visible: toastVisible }">
+            <svg viewBox="0 0 24 24">
+                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+            </svg>
+            This feature is only available with administrative access.
+        </div>
     </div>
 
     <script>
         const { createApp } = Vue;
+
+        // ─────────────────────────────────────────────────────────────
+        // ADMIN ROLE FLAG
+        // Replace this with your backend authentication check when ready.
+        //
+        // Example (once backend exists):
+        //   const isAdminUser = await fetch('/api/auth/me')
+        //                         .then(r => r.json())
+        //                         .then(u => u.role === 'admin');
+        //
+        // For now, set manually:  true = admin,  false = general user
+        const isAdminUser = true;  // <-- swap to `true` to test admin view
+        // ─────────────────────────────────────────────────────────────
 
         createApp({
             data() {
@@ -611,16 +915,63 @@
                     sidebarOpen: false,
                     searchActive: false,
                     searchQuery: '',
+                    isAdmin: isAdminUser,
+                    toastVisible: false,
+                    toastTimer: null,
                     last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
                     last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
                     filteredLast7Days: [],
-                    filteredLast30Days: []
+                    filteredLast30Days: [],
+
+                    // ── AI Result Fields ──
+                    // TODO: Replace this localStorage read with a fetch('/api/results/latest') once PostgreSQL is connected.
+                    complianceScore: 0,
+                    complianceLabel: 'Loading...',
+                    barWidth: '0%',
+                    analysedFilename: 'DOCUMENT ANALYSIS',
+                    analysedCompany: '',
+                    topRecommendation: '',
+                    complianceDetails: []
                 }
             },
             mounted() {
-                // Initialize filtered lists
-                this.filteredLast7Days = [...this.last7Days];
+                this.filteredLast7Days  = [...this.last7Days];
                 this.filteredLast30Days = [...this.last30Days];
+
+                // ── Load AI result from localStorage ──
+                const raw = localStorage.getItem('latestAnalysisResult');
+                if (raw) {
+                    try {
+                        const result = JSON.parse(raw);
+
+                        // Metadata (set by home.html before redirect)
+                        this.analysedFilename = result._meta?.filename || 'Document Analysis';
+                        this.analysedCompany  = result._meta?.company  || '';
+
+                        // Compliance score and label
+                        const score = result.compliance?.compliance_score ?? 0;
+                        this.complianceScore = Math.round(score);
+                        this.complianceLabel = score >= 75 ? 'High Compliance Level'
+                                            : score >= 40 ? 'Medium Compliance Level'
+                                            :               'Low Compliance Level';
+
+                        // Per-clause details for Recommendations section
+                        this.complianceDetails = (result.compliance?.details || []).filter(
+                            d => d.status === 'non-compliant' || d.status === 'partial' || d.status === 'non_compliant'
+                        );
+
+                        // Top recommendation from Flask placeholder
+                        this.topRecommendation = result.recommendations?.top_action || '';
+
+                        // Animate bar after a short delay (allows CSS transition to fire)
+                        setTimeout(() => {
+                            this.barWidth = `${this.complianceScore}%`;
+                        }, 300);
+
+                    } catch (e) {
+                        console.error('Failed to parse analysis result from localStorage:', e);
+                    }
+                }
             },
             methods: {
                 toggleSidebar() {
@@ -637,17 +988,13 @@
                     window.location.href = 'home.html';
                 },
                 filterReports() {
-                    const query = this.searchQuery.toLowerCase();
-                    if (query === '') {
-                        this.filteredLast7Days = [...this.last7Days];
+                    const q = this.searchQuery.toLowerCase();
+                    if (q === '') {
+                        this.filteredLast7Days  = [...this.last7Days];
                         this.filteredLast30Days = [...this.last30Days];
                     } else {
-                        this.filteredLast7Days = this.last7Days.filter(report => 
-                            report.toLowerCase().includes(query)
-                        );
-                        this.filteredLast30Days = this.last30Days.filter(report => 
-                            report.toLowerCase().includes(query)
-                        );
+                        this.filteredLast7Days  = this.last7Days.filter(r => r.toLowerCase().includes(q));
+                        this.filteredLast30Days = this.last30Days.filter(r => r.toLowerCase().includes(q));
                     }
                 },
                 showProfile() {
@@ -659,17 +1006,33 @@
                 openReport(reportName) {
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
+
+                // ── Compliance Score: open to all ──
                 viewComplianceScore() {
                     window.location.href = 'compliance.html';
                 },
+
+                // ── Recommendations: admin only ──
                 viewRecommendations() {
+                    if (!this.isAdmin) { this.showAccessDenied(); return; }
                     window.location.href = 'recommendations.html';
                 },
+
+                // ── Compare: admin only ──
                 compareReport() {
+                    if (!this.isAdmin) { this.showAccessDenied(); return; }
                     window.location.href = 'comparison.html';
                 },
+
+                // ── Generate Reports: open to all ──
                 generateReports() {
                     window.location.href = 'report_viewing.html';
+                },
+
+                showAccessDenied() {
+                    if (this.toastTimer) clearTimeout(this.toastTimer);
+                    this.toastVisible = true;
+                    this.toastTimer = setTimeout(() => { this.toastVisible = false; }, 3500);
                 }
             }
         }).mount('#app');

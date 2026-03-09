@@ -59,3 +59,7 @@ __pycache__/
 
 # Ignore local environment variables (keys/secrets)
 .env
+
+# Local SQLite database (Django development only)
+db.sqlite3
+**/db.sqlite3

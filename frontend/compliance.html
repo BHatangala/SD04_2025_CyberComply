@@ -163,7 +163,8 @@
             left: 0;
             top: 60px;
             width: 280px;
-            height: calc(100vh - 60px);
+            bottom: 0;
+            min-height: calc(100vh - 60px);
             background-color: #0d1420;
             transform: translateX(-100%);
             transition: transform 0.3s ease-in-out;
@@ -289,8 +290,6 @@
             padding: 40px 60px;
             position: relative;
             z-index: 1;
-            /* Ensure space for valid right bar */
-            margin-right: 60px;
         }
 
         .main-content.shifted {
@@ -308,81 +307,32 @@
         }
 
         .info-section {
-            margin-bottom: 40px;
+            max-width: 900px;
+            margin: 0 auto 40px;
+            background-color: #1a2845;
+            padding: 25px 30px;
+            border-radius: 12px;
+            border-left: 5px solid #4a8fe7;
         }
 
         .section-header {
-            font-size: 1.3rem;
-            font-weight: 700;
-            letter-spacing: 1.5px;
-            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
             color: #ffffff;
         }
 
         .bullet-list {
-            list-style: none;
-            padding-left: 10px;
+            margin-top: 10px;
+            padding-left: 20px;
         }
 
         .bullet-list li {
-            font-size: 1.1rem;
-            margin-bottom: 12px;
-            color: #e0e6ed;
-            letter-spacing: 1.5px;
-            display: flex;
-            align-items: flex-start;
-        }
-
-        .bullet-list li::before {
-            content: "•";
-            margin-right: 15px;
-            font-size: 1.5rem;
-            line-height: 1.2rem;
-            color: #ffffff;
-        }
-
-        /* --- ACTION BAR (RIGHT) --- */
-        .action-bar {
-            position: fixed;
-            right: 0;
-            top: 60px;
-            bottom: 0;
-            width: 70px;
-            background-color: #0c2b4d;
-            /* Darker blue strip */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding-top: 150px;
-            /* Positions items lower as per screenshot */
-            gap: 20px;
-            z-index: 10;
-        }
-
-        @media screen and (max-width: 1200px) {
-            .action-bar {
-                display: none;
-            }
-
-            .main-content {
-                margin-right: 0;
-            }
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            color: #8b9dc3;
-            /* Muted color initially */
-            font-size: 24px;
-            cursor: pointer;
-            transition: color 0.3s, transform 0.2s;
-            padding: 10px;
-        }
-
-        .close-btn:hover {
-            color: #ffffff;
-            transform: scale(1.1);
+            font-size: 1rem;
+            margin-bottom: 8px;
+            color: #c5d0e6;
+            letter-spacing: normal;
         }
 
         /* --- WAVY BACKGROUND --- */
@@ -528,15 +478,7 @@
             </div>
         </div>
 
-        <!-- Right Action Bar -->
-        <aside class="action-bar">
-            <button class="close-btn"><i class="fa-solid fa-xmark"></i></button>
-            <button class="close-btn"><i class="fa-solid fa-xmark"></i></button>
-            <button class="close-btn"><i class="fa-solid fa-xmark"></i></button>
-            <button class="close-btn"><i class="fa-solid fa-xmark"></i></button>
-        </aside>
-
-        <!-- Wavy Background -->
+        <!-- WAVY Background -->
         <div class="wavy-background">
             <img src="img3.png" alt="Wavy Design">
         </div>
