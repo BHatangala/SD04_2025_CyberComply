@@ -4,7 +4,8 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.models import User
-from django.db import transaction
+from django.contrib.auth.password_validation import validate_password
+from django.db import transaction, IntegrityError
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.contrib.auth import authenticate
@@ -21,6 +22,7 @@ import socket
 import tempfile
 import os
 import boto3
+import re
 from botocore.exceptions import BotoCoreError, ClientError
 
 from .models import UserProfile, LoginHistory, OtpVerification
@@ -259,11 +261,35 @@ def signup(request):
 
     if not full_name or not email or not password or not role_ui:
         return JsonResponse({"detail": "All fields are required"}, status=400)
+    
+    full_name = " ".join(full_name.split())
+
+    if len(full_name) < 3:
+        return JsonResponse({"detail": "Please enter your full name (first and last name)"}, status=400)
+
+    full_name_pattern = r"^[A-Za-z'-]+(?:\s[A-Za-z'-]+)+$"
+    if not re.match(full_name_pattern, full_name):
+        return JsonResponse(
+            {"detail": "Please enter your full name (first and last name)"},
+            status=400
+        ) 
+
+    name_parts = full_name.split()
+    if any(len(part) < 2 for part in name_parts):
+        return JsonResponse(
+            {"detail": "Please enter your full name (first and last name)"},
+            status=400
+        )
 
     try:
         validate_email(email)
     except ValidationError:
         return JsonResponse({"detail": "Invalid email format"}, status=400)
+    
+    try:
+        validate_password(password)
+    except ValidationError as e:
+        return JsonResponse({"detail": e.messages[0]}, status=400)    
 
     role_map = {
         "General user": UserProfile.Role.GENERAL,
@@ -277,18 +303,33 @@ def signup(request):
     if User.objects.filter(username=email).exists():
         return JsonResponse({"detail": "Email already registered"}, status=409)
 
-    with transaction.atomic():
-        auth_user = User.objects.create_user(
-            username=email,
-            email=email,
-            password=password
-        )
-        UserProfile.objects.create(
-            auth_user=auth_user,
-            full_name=full_name,
-            role=role_db
+    # This ensures that if creating the UserProfile fails, the User record is also rolled back.
+    try:
+        with transaction.atomic():
+            auth_user = User.objects.create_user(
+                username=email,
+                email=email,
+                password=password
+            )
+
+            UserProfile.objects.create(
+                auth_user=auth_user,
+                full_name=full_name,
+                role=role_db
+            )
+
+    # Handle duplicate creation race condition safely
+    except IntegrityError:
+        return JsonResponse({"detail": "Email already registered"}, status=409)
+
+    # Handle unexpected server/database errors gracefully
+    except Exception:
+        return JsonResponse(
+            {"detail": "Account creation failed. Please try again."},
+            status=500
         )
 
+    # Success response
     return JsonResponse({"detail": "Account created successfully"}, status=201)
 
 

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Create New Account</title>
   <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     * { box-sizing: border-box; }
 
@@ -15,7 +16,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
     }
 
     .container {
@@ -52,7 +53,7 @@
 
     .error {
       color: #ff6b6b;
-    }
+    }    
 
     button {
       margin-top: 20px;
@@ -104,6 +105,7 @@
       justify-content: center;
       align-items: center;
       padding: 20px;
+      animation: fadeIn 0.25s ease;
     }
 
     /* UPDATED TO MAKE SCROLLABLE */
@@ -118,9 +120,146 @@
       text-align: left;
     }
 
-    .modal-content h3 {
-      margin-top: 0;
+    /* Real-time password rules styling */
+    .password-rules {
+      margin-top: 8px;
+      padding: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(169,199,255,0.15);
+      border-radius: 4px;
+    }
+
+    .password-wrapper {
+      position: relative;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      font-size: 16px;
+      color: #cbd5e1;
+    }
+
+    /* Hover effect */
+    .toggle-password:hover {
+      color: #ffffff;
+    }
+
+    /* Click effect */
+    .toggle-password:active {
+      transform: translateY(-50%) scale(0.95);
+    }
+
+    /* Keyboard focus (accessibility) */
+    .toggle-password:focus {
+      outline: none;
+      color: #a9c7ff;
+    }
+
+    .password-wrapper input {
+      padding-right: 55px;
+    }
+
+    .rule-item {
+      font-size: 12px;
+      margin-bottom: 6px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      transition: color 0.2s ease;
+    }
+
+    .rule-item.valid {
+      color: #159544;
+    }
+
+    .rule-item.invalid {
+      color: #c13333;
+    }
+
+    /* Password rule icons */
+    .rule-item span {
+      font-weight: bold;
+      width: 18px;
       text-align: center;
+    }
+
+    /* Green tick */
+    .rule-item.valid span {
+      color: #159544;
+    }
+
+    /* Red cross */
+    .rule-item.invalid span {
+      color: #c13333;
+    }
+
+    /* Input focus effect */
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #a9c7ff;
+      box-shadow: 0 0 0 2px rgba(169, 199, 255, 0.18);
+    }
+
+    /* Button hover effect */
+    button:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+      transition: all 0.2s ease;
+    }   
+    
+    /* Disabled button style */
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }  
+
+    .success-modal-content {
+      line-height: 1.6;
+      background: #234561;
+      color: #f0f4ff;
+      padding: 24px 20px;
+      width: 100%;
+      max-width: 360px;
+      border-radius: 10px;
+      text-align: center;
+      border: 1px solid #90a0b5;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      animation: popIn 0.25s ease;
+    }
+
+    .success-modal-content h3 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      color: #ffffff;
+    }
+
+    .success-modal-content p {
+      margin: 0;
+      font-size: 14px;
+      color: #e6eef7;
+      line-height: 1.5;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0 }
+      to { opacity: 1 }
+    }
+
+    @keyframes popIn {
+      from {
+        transform: scale(0.9);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
     }
 
   </style>
@@ -136,43 +275,107 @@
     </div>
 
     <div class="form-group">
-      <label>NAME</label>
-      <input type="text" v-model="form.name" placeholder="Enter your name">
+      <label for="name">NAME</label>
+      <input id="name" type="text" v-model="form.name" placeholder="Enter your full name">
       <div class="note error" v-if="errors.name">{{ errors.name }}</div>
     </div>
 
     <div class="form-group">
-      <label>EMAIL</label>
-      <input type="email" v-model="form.email" placeholder="Enter your organization email">
+      <label for="email">EMAIL</label>
+      <input id="email" type="email" v-model="form.email" placeholder="Enter your email">
       <div class="note error" v-if="errors.email">{{ errors.email }}</div>
     </div>
 
     <div class="form-group">
-      <label>PASSWORD</label>
-      <input type="password" v-model="form.password" placeholder="Enter your password">
+      <label for="password">PASSWORD</label>
+      
+      <div class="password-wrapper">
+        <input
+          id="password"
+          :type="showPassword ? 'text' : 'password'"
+          v-model="form.password"
+          placeholder="Create a secure password"
+        >
+
+        <span class="toggle-password" @click="showPassword = !showPassword">
+          <i :class="showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+        </span>
+      </div>
       <div class="note error" v-if="errors.password">{{ errors.password }}</div>
-    </div>
+
+      <!-- Real-time password requirement checks -->
+      <div class="password-rules" v-if="form.password.length > 0 && !allPasswordRulesValid">
+        
+        <div :class="['rule-item', passwordChecks.length ? 'valid' : 'invalid']">
+          <span>{{ passwordChecks.length ? '✓' : '✗' }}</span>
+          At least 8 characters
+        </div>
+
+        <div :class="['rule-item', passwordChecks.uppercase ? 'valid' : 'invalid']">
+          <span>{{ passwordChecks.uppercase ? '✓' : '✗' }}</span>
+          1 uppercase letter
+        </div>
+
+        <div :class="['rule-item', passwordChecks.digit ? 'valid' : 'invalid']">
+          <span>{{ passwordChecks.digit ? '✓' : '✗' }}</span>
+          1 digit
+        </div>
+
+        <div :class="['rule-item', passwordChecks.special ? 'valid' : 'invalid']">
+          <span>{{ passwordChecks.special ? '✓' : '✗' }}</span>
+          1 special character
+        </div>
+      </div>
+    </div>    
 
     <div class="form-group" v-if="form.password.length > 0">
-      <label>CONFIRM PASSWORD</label>
-      <input type="password" v-model="form.confirmPassword" placeholder="Retype your password">
-      <div class="note error" v-if="errors.confirmPassword">
+      <label for="confirmPassword">CONFIRM PASSWORD</label>
+      
+      <div class="password-wrapper">
+        <input
+          id="confirmPassword"
+          :type="showConfirmPassword ? 'text' : 'password'"
+          v-model="form.confirmPassword"
+          placeholder="Retype your password"
+        >
+
+        <span class="toggle-password" @click="showConfirmPassword = !showConfirmPassword">
+          <i :class="showConfirmPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+        </span>
+      </div>
+
+      <div class="password-rules" v-if="form.confirmPassword.length > 0">
+        <div :class="['rule-item', passwordMatch ? 'valid' : 'invalid']">
+          <span>{{ passwordMatch ? '✓' : '✗' }}</span>
+          {{ passwordMatch ? "Passwords match" : "Passwords do not match" }}
+        </div>  
+      </div>
+
+      <div class="note error" v-if="submitted && errors.confirmPassword">
         {{ errors.confirmPassword }}
       </div>
     </div>
 
     <div class="form-group">
-      <label>ROLE</label>
-      <select v-model="form.role">
+      <label for="role">ROLE</label>
+      <select id="role" v-model="form.role">
         <option disabled value="">Select</option>
         <option>General user</option>
         <option>Administrative user</option>
       </select>
+
+      <!-- Role explanation note -->
+      <div class="note" v-if="form.role === 'Administrative user'">
+        Administrative access requires organization email verification.
+      </div>
+
+      <!-- Role validation error -->
+      <div class="note error" v-if="errors.role">{{ errors.role }}</div>      
     </div>
 
     <div class="form-group">
-      <label class="terms-label">
-        <input type="checkbox" v-model="form.terms">
+      <label class="terms-label" for="terms">
+        <input id="terms" type="checkbox" v-model="form.terms">
         <span>
           I accept the
           <a href="#" @click.prevent="showTerms = true" style="color:#a2b8c8;">
@@ -185,7 +388,9 @@
       </div>
     </div>
 
-    <button @click="submitForm">Sign Up</button>
+    <button @click="submitForm" :disabled="loading">
+      {{ loading ? "Creating Account..." : "Sign Up" }}
+    </button>
 
     <img src="img2.png" alt="Wave design right" class="wave-right">
 
@@ -238,6 +443,13 @@
       </div>
     </div>
 
+    <!-- Success Popup -->
+    <div v-if="showSuccessPopup" class="modal">
+      <div class="success-modal-content">
+        <h3>Account Created</h3>
+        <p>Your account has been created successfully. Redirecting to login...</p>
+      </div>
+    </div>  
   </div>
 
   <script>
@@ -245,6 +457,13 @@
       el: '#app',
       data: {
         showTerms: false,
+        showSuccessPopup: false, 
+        loading: false,
+        submitted: false, 
+        
+        showPassword: false,
+        showConfirmPassword: false,
+
         form: {
           name: '',
           email: '',
@@ -255,33 +474,101 @@
         },
         errors: {}
       },
+
+      // Real-time password checks while typing
+      computed: {
+        passwordChecks() {
+          const password = this.form.password || "";
+          return {
+            length: password.length >= 8,
+            uppercase: /[A-Z]/.test(password),
+            digit: /\d/.test(password),
+            special: /[!@#$%^&*(),.?":{}|<>_\-\\[\]\/`~+=;']/.test(password)
+          };
+        },
+
+        // Check if all password rules are satisfied
+        allPasswordRulesValid() {
+          const c = this.passwordChecks;
+          return c.length && c.uppercase && c.digit && c.special;
+        },
+        
+        passwordMatch() {
+          return this.form.password.length > 0 &&
+            this.form.confirmPassword.length > 0 &&
+            this.form.password === this.form.confirmPassword;
+        }  
+      },
+
       methods: {
         validateEmail(email) {
           const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           return regex.test(email);
         },
-        validatePassword(password) {
-          const regex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-\\[\]\/`~+=;']).{8,}$/;
-          return regex.test(password);
-        },
-        async submitForm() {
-          this.errors = {};
 
-          if (!this.form.name.trim()) {
-            this.errors.name = "Name is required.";
+        // Full name validation matching backend expectations
+        validateFullName(name) {
+          const trimmed = name.trim();
+          const normalized = trimmed.replace(/\s+/g, ' ');
+          const regex = /^[A-Za-z'-]+(?:\s[A-Za-z'-]+)+$/;
+
+          if (!trimmed) {
+            return "Full name is required.";
           }
 
-          if (!this.validateEmail(this.form.email)) {
+          if (normalized.length < 3) {
+            return "Please enter your full name (first and last name).";
+          }
+
+          if (!regex.test(normalized)) {
+            return "Please enter your full name (first and last name).";
+          }
+
+          const parts = normalized.split(' ');
+          if (parts.some(part => part.length < 2)) {
+            return "Please enter your full name (first and last name).";
+          }
+
+          return null;
+        },
+
+        async submitForm() {
+          this.errors = {};
+          this.showSuccessPopup = false;
+          this.submitted = true;
+
+          // Full name validation
+          const nameError = this.validateFullName(this.form.name);
+          if (nameError) {
+            this.errors.name = nameError;
+          }
+
+          if (!this.validateEmail(this.form.email.trim())) {
             this.errors.email = "Invalid email format.";
           }
 
-          if (!this.validatePassword(this.form.password)) {
+          if (!this.form.password) {
+            this.errors.password = "Password is required.";
+          } else if (
+            !this.passwordChecks.length ||
+            !this.passwordChecks.uppercase ||
+            !this.passwordChecks.digit ||
+            !this.passwordChecks.special
+          ) {
             this.errors.password =
               "Password must contain at least 8 characters with a minimum of 1 uppercase letter, 1 digit and 1 special character.";
           }
 
-          if (this.form.password !== this.form.confirmPassword) {
+          // Better confirm password validation
+          if (!this.form.confirmPassword) {
+            this.errors.confirmPassword = "Please confirm your password.";
+          } else if (this.form.password !== this.form.confirmPassword) {
             this.errors.confirmPassword = "Passwords do not match.";
+          }
+
+          // Role validation
+          if (!this.form.role) {
+            this.errors.role = "Please select a role.";
           }
 
           if (!this.form.terms) {
@@ -290,14 +577,16 @@
 
           if (Object.keys(this.errors).length === 0) {
             try {
+              // Start loading state
+              this.loading = true;
               const response = await fetch("http://127.0.0.1:8000/api/signup/", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                  name: this.form.name,
-                  email: this.form.email,
+                  name: this.form.name.trim().replace(/\s+/g, ' '),
+                  email: this.form.email.trim(),
                   password: this.form.password,
                   role: this.form.role
                 })
@@ -305,22 +594,42 @@
 
               const data = await response.json();
 
+              // Improved backend error handling
               if (!response.ok) {
                 if (response.status === 409) {
                   this.errors.email = "This email is already registered. Please use a different email.";
                   this.form.password = "";
                   this.form.confirmPassword = "";
+                } else if (response.status === 400) {
+                  if ((data.detail || "").toLowerCase().includes("name")) {
+                    this.errors.name = data.detail;
+                  } else if ((data.detail || "").toLowerCase().includes("email")) {
+                    this.errors.email = data.detail;
+                  } else if ((data.detail || "").toLowerCase().includes("password")) {
+                    this.errors.password = data.detail;
+                  } else if ((data.detail || "").toLowerCase().includes("role")) {
+                    this.errors.role = data.detail;
+                  } else {
+                    this.errors.email = data.detail || "Signup failed. Please try again.";
+                  }
                 } else {
-                  this.errors.email = data.detail || "Signup failed. Please try again.";
+                  this.errors.email = "Signup failed. Please try again.";
                 }
                 return;
               }
 
-              alert("Account created successfully!");
-              window.location.href = "login.html";
+              this.submitted = false;
+              this.showSuccessPopup = true;
+
+              setTimeout(() => {
+                window.location.href = "login.html";
+              }, 2000);
 
             } catch (error) {
-              alert("Cannot connect to backend server.");
+              this.errors.email = "Cannot connect to backend server.";
+            } finally {
+              // Stop loading state
+              this.loading = false;
             }
           }
         }
