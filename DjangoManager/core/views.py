@@ -27,8 +27,13 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from .models import UserProfile, LoginHistory, OtpVerification
 
+# ──────────────────────────────────────────────
+# Security Configuration
+# ──────────────────────────────────────────────
+
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
+MAX_OTP_ATTEMPTS = 5
 
 AI_API_URL = "http://127.0.0.1:5000/api"
 
@@ -350,8 +355,15 @@ def login(request):
     email = (payload.get("email") or "").strip().lower()
     password = payload.get("password") or ""
 
+    # Check required login fields
     if not email or not password:
         return JsonResponse({"detail": "Email and password are required"}, status=400)
+
+    # Validate email format before attempting authentication
+    try:
+        validate_email(email)
+    except ValidationError:
+        return JsonResponse({"detail": "Invalid email format"}, status=400)
 
     profile = None
     try:
@@ -375,7 +387,11 @@ def login(request):
         _record_login_attempt(profile, request, LoginHistory.Status.LOCKED, LoginHistory.Purpose.LOGIN)
         return JsonResponse({"detail": "Account is temporarily locked. Try again later."}, status=423)
 
-    user = authenticate(username=email, password=password)
+    # Handle unexpected authentication/server errors gracefully
+    try:
+        user = authenticate(username=email, password=password)
+    except Exception:
+        return JsonResponse({"detail": "Login failed. Please try again."}, status=500)
 
     if user is None:
         if profile:
@@ -392,16 +408,24 @@ def login(request):
                     {"detail": f"Too many attempts. Account locked for {LOCKOUT_MINUTES} minutes."},
                     status=423
                 )
+
             _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.LOGIN)
 
         return JsonResponse({"detail": "Invalid credentials"}, status=401)
-
+    
     profile = UserProfile.objects.get(auth_user=user)
 
     # First login — require OTP verification
     if not profile.is_verified:
         raw_otp = _generate_and_store_otp(profile, OtpVerification.Purpose.FIRST_LOGIN)
-        _send_otp_email(profile.auth_user.email, raw_otp)
+    
+        # Stop if OTP email sending failed
+        if not _send_otp_email(profile.auth_user.email, raw_otp):
+            return JsonResponse(
+                {"detail": "Failed to send verification code. Please try again."},
+                status=500
+            )
+
         _record_login_attempt(profile, request, LoginHistory.Status.PENDING_OTP, LoginHistory.Purpose.FIRST_LOGIN_OTP)
 
         return JsonResponse(
@@ -412,7 +436,14 @@ def login(request):
     # 2FA enabled — require OTP
     if profile.otp_is_enabled:
         raw_otp = _generate_and_store_otp(profile, OtpVerification.Purpose.LOGIN_2FA)
-        _send_otp_email(profile.auth_user.email, raw_otp)
+
+        # Stop if OTP email sending failed
+        if not _send_otp_email(profile.auth_user.email, raw_otp):
+            return JsonResponse(
+                {"detail": "Failed to send verification code. Please try again."},
+                status=500
+            )
+
         _record_login_attempt(profile, request, LoginHistory.Status.PENDING_OTP, LoginHistory.Purpose.LOGIN_2FA_OTP)
 
         return JsonResponse(
@@ -467,7 +498,7 @@ def _generate_and_store_otp(profile: UserProfile, purpose: str) -> str:
     return raw_otp
 
 
-def _send_otp_email(email: str, otp: str) -> None:
+def _send_otp_email(email: str, otp: str) -> bool:
     """Send OTP to user via AWS SES (configured as Django email backend)."""
     try:
         send_mail(
@@ -480,9 +511,11 @@ def _send_otp_email(email: str, otp: str) -> None:
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],
         )
+        return True
     except Exception as e:
         # Log but don't crash — OTP is still stored in DB
         print(f"ERROR sending OTP email to {email}: {e}")
+        return False
 
 
 # ──────────────────────────────────────────────
@@ -507,17 +540,26 @@ def verify_otp(request):
 
     if not email or not otp:
         return JsonResponse({"detail": "Email and OTP are required"}, status=400)
+    
+    # Validate email format before OTP verification
+    try:
+        validate_email(email)
+    except ValidationError:
+        return JsonResponse({"detail": "Invalid email format"}, status=400)    
 
     if not otp.isdigit() or len(otp) != 6:
-        return JsonResponse({"detail": "OTP must be exactly 6 digits"}, status=400)
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
+    
+    # Reusable invalid OTP response to reduce repetition
+    invalid_otp_response = JsonResponse({"detail": "Invalid or expired verification code"}, status=401)    
 
     try:
         profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
     except ObjectDoesNotExist:
-        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+        return invalid_otp_response
 
     if profile.deleted_at is not None:
-        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+        return invalid_otp_response
 
     if profile.is_verified and not profile.otp_is_enabled:
         _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.OTP_SUBMISSION)
@@ -534,6 +576,15 @@ def verify_otp(request):
         .first()
     )
 
+    # Limit OTP brute-force attempts
+    if otp_row and otp_row.attempt_count >= MAX_OTP_ATTEMPTS:
+        otp_row.used_at = timezone.now()
+        otp_row.save(update_fields=["used_at"])
+        return JsonResponse(
+            {"detail": "Too many verification attempts. Please login again to request a new code."},
+            status=401
+        )
+
     if otp_row:
         otp_purpose = (
             LoginHistory.Purpose.FIRST_LOGIN_OTP
@@ -549,18 +600,20 @@ def verify_otp(request):
 
     if not otp_row:
         _record_login_attempt(profile, request, LoginHistory.Status.FAILED, otp_purpose)
-        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+        return invalid_otp_response
 
     if otp_row.expires_at <= timezone.now():
         otp_row.used_at = timezone.now()
         otp_row.save(update_fields=["used_at"])
         _record_login_attempt(profile, request, LoginHistory.Status.FAILED, otp_purpose)
-        return JsonResponse({"detail": "OTP expired. Please login again."}, status=401)
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
 
     incoming_hash = hashlib.sha256(otp.encode()).hexdigest()
     if incoming_hash != otp_row.otp_hash:
+        otp_row.attempt_count += 1
+        otp_row.save(update_fields=["attempt_count"])    
         _record_login_attempt(profile, request, LoginHistory.Status.FAILED, otp_purpose)
-        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+        return invalid_otp_response
 
     # Mark OTP used
     otp_row.used_at = timezone.now()
@@ -616,7 +669,10 @@ def request_password_reset(request):
         return JsonResponse({"detail": "If the email exists, an OTP will be sent."}, status=200)
 
     raw_otp = _generate_and_store_otp(profile, OtpVerification.Purpose.RESET_PASSWORD)
-    _send_otp_email(profile.auth_user.email, raw_otp)
+    
+    # Stop if OTP email sending failed
+    if not _send_otp_email(profile.auth_user.email, raw_otp):
+        return JsonResponse({"detail": "Failed to send verification code. Please try again."}, status=500)
 
     return JsonResponse({"detail": "If the email exists, an OTP will be sent."}, status=200)
 
@@ -637,15 +693,15 @@ def verify_reset_otp(request):
     if not email or not otp:
         return JsonResponse({"detail": "Email and OTP are required"}, status=400)
     if not otp.isdigit() or len(otp) != 6:
-        return JsonResponse({"detail": "OTP must be exactly 6 digits"}, status=400)
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
 
     try:
         profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
     except ObjectDoesNotExist:
-        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
 
     if profile.deleted_at is not None:
-        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
 
     otp_row = (
         OtpVerification.objects
@@ -656,7 +712,7 @@ def verify_reset_otp(request):
 
     if not otp_row:
         _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.RESET_PASSWORD_OTP)
-        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
 
     if otp_row.expires_at <= timezone.now():
         otp_row.used_at = timezone.now()
@@ -667,7 +723,7 @@ def verify_reset_otp(request):
     incoming_hash = hashlib.sha256(otp.encode()).hexdigest()
     if incoming_hash != otp_row.otp_hash:
         _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.RESET_PASSWORD_OTP)
-        return JsonResponse({"detail": "Invalid OTP"}, status=401)
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
 
     otp_row.used_at = timezone.now()
     otp_row.save(update_fields=["used_at"])

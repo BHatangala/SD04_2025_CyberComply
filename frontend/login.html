@@ -8,6 +8,8 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
     <style>
         body {
@@ -19,6 +21,7 @@
             background-color: #0F3456;
             border: 1px solid #2563EB;
             color: #E2E8F0;
+            border-radius: 6px;
             transition: all 0.3s ease;
         }
 
@@ -32,12 +35,20 @@
             background-color: #BEE3F8;
             color: #000;
             font-weight: 600;
-            transition: opacity 0.3s ease;
+            border-radius: 8px;
+            transition: all 0.25s ease;
         }
 
         .custom-btn:hover {
-            opacity: 0.9;
+            background-color: #d6f1ff;
+            transform: translateY(-1px);
         }
+
+        /* Disabled login button styling */
+        .custom-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }        
 
         .right-wave {
             position: fixed;
@@ -48,6 +59,30 @@
             z-index: 0;
             pointer-events: none;
         }
+
+        /* Password wrapper for eye toggle */
+        .password-wrapper {
+            position: relative;
+        }
+
+        /* Padding for eye icon space */
+        .password-wrapper input {
+            padding-right: 50px;
+        }
+
+        /* Eye icon styling */
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #cbd5e1;
+        }
+
+        .toggle-password:hover {
+            color: white;
+        }        
     </style>
 </head>
 
@@ -67,7 +102,7 @@
                         <p class="text-gray-400 text-sm tracking-wide">Sign in to continue</p>
                     </div>
 
-                    <form @submit.prevent class="space-y-6 text-left w-3/4 mx-auto" novalidate>
+                    <form @submit.prevent="handleLogin" class="space-y-6 text-left w-3/4 mx-auto" novalidate>
 
                         <transition name="fade">
                             <div v-if="message.text" :class="[
@@ -79,23 +114,31 @@
                         </transition>
 
                         <div class="space-y-2">
-                            <label class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Email</label>
-                            <input v-model="form.email" type="email" placeholder="hello@reallygreatsite.com"
-                                class="custom-input w-full p-3 text-sm placeholder-gray-400">
+                            <label for="email" class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Email</label>
+                            <input id="email" v-model="form.email" type="email" placeholder="hello@reallygreatsite.com" class="custom-input w-full p-3 text-sm placeholder-gray-400" autofocus>
                         </div>
 
                         <div class="space-y-2">
-                            <label
-                                class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Password</label>
-                            <input v-model="form.password" type="password" placeholder="******"
-                                class="custom-input w-full p-3 text-sm placeholder-gray-400">
+                            <label for="password" class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Password</label>
+                            <div class="password-wrapper">
+                                <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" placeholder="******" class="custom-input w-full p-3 text-sm placeholder-gray-400">
+
+                                <span class="toggle-password" @click="showPassword = !showPassword">
+                                    <i :class="showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+                                </span>  
+                            </div>                              
                         </div>
 
                         <div class="pt-2 space-y-4 text-center">
-                            <button @click.prevent="handleLogin"
-                                class="custom-btn w-full py-3 uppercase tracking-wider text-sm shadow-lg">
-                                Log In
+                            <!-- Loading state for login button -->
+                            <button
+                                type="submit"
+                                :disabled="loading"
+                                class="custom-btn w-full py-3 uppercase tracking-wider text-sm shadow-lg"
+                            >
+                                {{ loading ? "Signing In..." : "Log In" }}
                             </button>
+
                             <div>
                                 <a href="forgot_password.html"
                                     class="text-sm text-white font-medium hover:text-blue-300 transition-colors tracking-wide">
@@ -125,6 +168,7 @@
 
                     <!-- Shared OTP component handles input, validation & verify button -->
                     <div class="w-3/4 mx-auto space-y-4">
+
                         <otp-verification :email="form.email" @verified="handleOtpVerified">
                         </otp-verification>
 
@@ -160,6 +204,12 @@
                 const step = ref(1); // 1: credentials | 2: otp
                 const message = reactive({ text: '', type: '' });
 
+                // Password visibility toggle
+                const showPassword = ref(false);
+
+                // Loading state for login button
+                const loading = ref(false);                
+
                 const setMessage = (type, text) => {
                     message.type = type;
                     message.text = text;
@@ -167,16 +217,22 @@
 
                 // Step 1: Login (email+password)
                 const handleLogin = async () => {
+                    if (loading.value) return; // prevent double login
                     message.text = '';
 
+                    loading.value = true;
+
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
                     if (!form.email || !emailRegex.test(form.email)) {
                         setMessage('error', 'Please enter a valid email address.');
+                        loading.value = false;
                         return;
                     }
 
                     if (!form.password) {
                         setMessage('error', 'Please enter your password.');
+                        loading.value = false;
                         return;
                     }
 
@@ -185,35 +241,56 @@
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                                email: form.email,
+                                email: form.email.trim(),
                                 password: form.password
                             })
                         });
 
                         const data = await response.json();
 
+                        // Backend error handling
                         if (!response.ok) {
-                            setMessage("error", data.detail || "Login failed.");
+
+                            if (response.status === 401) {
+                                setMessage("error", "Invalid email or password.");
+                                form.password = "";
+                            }
+                            else if (response.status === 423) {
+                                setMessage("error", data.detail);
+                            }
+                            else if (response.status === 400) {
+                                setMessage("error", data.detail);
+                            }
+                            else {
+                                setMessage("error", "Login failed. Please try again.");
+                            }
+
+                            loading.value = false;
                             return;
                         }
 
-                        // If OTP required → go to step 2
                         if (data.requires_otp) {
                             step.value = 2;
                             setMessage("success", data.detail || `OTP sent to ${form.email}`);
+                            loading.value = false;
                             return;
                         }
 
-                        // If OTP not required → direct login
                         setMessage("success", "Login successful! Redirecting...");
+
                         setTimeout(() => {
                             window.location.href = "home.html";
                         }, 1000);
 
-                    } catch (err) {
+                    }
+                    catch (err) {
                         setMessage("error", "Cannot connect to backend server.");
                     }
-                };
+                    finally {
+                        // Stop loading
+                        loading.value = false;
+                    }
+                }
 
                 // Step 2: OTP success handler (called by otp component)
                 const handleOtpVerified = () => {
@@ -223,7 +300,16 @@
                     }, 1000);
                 };
 
-                return { form, step, message, handleLogin, handleOtpVerified };
+                 return {
+                    form,
+                    step,
+                    message,
+                    handleLogin,
+                    handleOtpVerified,
+
+                    loading,
+                    showPassword
+                }
             }
         });
 

@@ -97,6 +97,9 @@ class OtpVerification(models.Model):
     user = models.ForeignKey(UserProfile, on_delete=models.PROTECT, related_name="otps")
 
     otp_hash = models.CharField(max_length=255)
+
+    attempt_count = models.IntegerField(default=0)
+    
     purpose = models.CharField(max_length=30, choices=Purpose.choices)
 
     created_at = models.DateTimeField(auto_now_add=True)

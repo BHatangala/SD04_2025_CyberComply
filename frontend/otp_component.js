@@ -74,6 +74,8 @@ const OtpVerification = {
                     placeholder="******"
                     class="otp-input"
                     :disabled="loading"
+                    @input="sanitizeOtp"
+                    @paste="handlePaste"
                     @keyup.enter="verify"
                 />
             </div>
@@ -96,7 +98,23 @@ const OtpVerification = {
     },
 
     methods: {
+
+        // Keep OTP numeric and max 6 digits while typing
+        sanitizeOtp() {
+            this.otp = this.otp.replace(/\D/g, '').slice(0, 6);
+        },
+
+        // Allow clean paste from email and keep only 6 digits
+        handlePaste(event) {
+            event.preventDefault();
+            const pastedText = (event.clipboardData || window.clipboardData).getData('text');
+            this.otp = pastedText.replace(/\D/g, '').slice(0, 6);
+        },
+
         async verify() {
+
+            // Prevent multiple verification requests
+            if (this.loading) return;
             this.message = { text: '', type: '' };
 
             // ── Client-side validation ──
@@ -104,8 +122,10 @@ const OtpVerification = {
                 this.setMessage('error', 'Please enter the OTP.');
                 return;
             }
+            // Do not reveal OTP format rules
             if (!/^\d{6}$/.test(this.otp)) {
-                this.setMessage('error', 'OTP must be exactly 6 digits.');
+                this.otp = "";
+                this.setMessage('error', 'Invalid or expired verification code.');
                 return;
             }
 
@@ -126,15 +146,22 @@ const OtpVerification = {
                     })
                 });
 
-                const data = await response.json();
+                // Safely parse backend response
+                let data = {};
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    data = {};
+                }
 
+                // Show only safe backend OTP messages; fallback to a generic message
                 if (!response.ok) {
-                    throw new Error(data.detail || "Invalid OTP.");
+                    throw new Error(data.detail || "Invalid or expired verification code.");
                 }
 
                 // Safety check if backend didn't return token in reset mode
                 if (this.mode === "reset" && !data.reset_token) {
-                    throw new Error("Reset token not received. Please try again.");
+                    throw new Error("Verification failed. Please try again.");
                 }
 
                 // Clear OTP after success
@@ -147,8 +174,10 @@ const OtpVerification = {
                     this.$emit("verified");
                 }
 
+            // Clear OTP after failure and keep error generic    
             } catch (err) {
-                this.setMessage('error', err.message || 'Verification failed. Please try again.');
+                this.otp = "";
+                this.setMessage('error', err.message || 'Invalid or expired verification code.');
             } finally {
                 this.loading = false;
             }
