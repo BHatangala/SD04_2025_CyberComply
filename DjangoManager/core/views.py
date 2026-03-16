@@ -659,6 +659,11 @@ def request_password_reset(request):
 
     if not email:
         return JsonResponse({"detail": "Email is required"}, status=400)
+    
+    try:
+        validate_email(email)
+    except ValidationError:
+        return JsonResponse({"detail": "Please enter a valid email address."}, status=400)
 
     try:
         profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
@@ -667,6 +672,13 @@ def request_password_reset(request):
 
     if profile.deleted_at is not None:
         return JsonResponse({"detail": "If the email exists, an OTP will be sent."}, status=200)
+
+    # Invalidate previous reset OTPs
+    OtpVerification.objects.filter(
+        user=profile,
+        purpose=OtpVerification.Purpose.RESET_PASSWORD,
+        used_at__isnull=True
+    ).update(used_at=timezone.now())
 
     raw_otp = _generate_and_store_otp(profile, OtpVerification.Purpose.RESET_PASSWORD)
     
@@ -700,8 +712,14 @@ def verify_reset_otp(request):
 
     if not email or not otp:
         return JsonResponse({"detail": "Email and OTP are required"}, status=400)
+    
     if not otp.isdigit() or len(otp) != 6:
         return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
+
+    try:
+        validate_email(email)
+    except ValidationError:
+        return JsonResponse({"detail": "Please enter a valid email address."}, status=400)
 
     try:
         profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
@@ -713,10 +731,23 @@ def verify_reset_otp(request):
 
     otp_row = (
         OtpVerification.objects
-        .filter(user=profile, purpose=OtpVerification.Purpose.RESET_PASSWORD, used_at__isnull=True)
+        .filter(
+            user=profile,
+            purpose=OtpVerification.Purpose.RESET_PASSWORD,
+            used_at__isnull=True
+        )
         .order_by("-created_at")
         .first()
-    )
+    )  
+
+    # Limit OTP brute-force attempts
+    if otp_row and otp_row.attempt_count >= MAX_OTP_ATTEMPTS:
+        otp_row.used_at = timezone.now()
+        otp_row.save(update_fields=["used_at"])
+        return JsonResponse(
+            {"detail": "Too many verification attempts. Please request a new code."},
+            status=401
+        )
 
     if not otp_row:
         _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.RESET_PASSWORD_OTP)
@@ -726,10 +757,12 @@ def verify_reset_otp(request):
         otp_row.used_at = timezone.now()
         otp_row.save(update_fields=["used_at"])
         _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.RESET_PASSWORD_OTP)
-        return JsonResponse({"detail": "OTP expired. Please request a new one."}, status=401)
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
 
     incoming_hash = hashlib.sha256(otp.encode()).hexdigest()
     if incoming_hash != otp_row.otp_hash:
+        otp_row.attempt_count += 1
+        otp_row.save(update_fields=["attempt_count"])
         _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.RESET_PASSWORD_OTP)
         return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
 
@@ -738,7 +771,10 @@ def verify_reset_otp(request):
 
     _record_login_attempt(profile, request, LoginHistory.Status.SUCCESS, LoginHistory.Purpose.RESET_PASSWORD_OTP)
 
-    reset_token = signing.dumps({"uid": str(profile.user_id)}, salt="pwd-reset")
+    reset_token = signing.dumps(
+        {"uid": str(profile.user_id), "purpose": "password_reset"},
+        salt="pwd-reset"
+    )
     return JsonResponse({"detail": "OTP verified.", "reset_token": reset_token}, status=200)
 
 
@@ -756,13 +792,23 @@ def reset_password(request):
     new_password = payload.get("new_password") or ""
 
     if not reset_token or not new_password:
-        return JsonResponse({"detail": "reset_token and new_password are required"}, status=400)
+        return JsonResponse({"detail": "Reset Token and new password are required"}, status=400)
+
+    # Validate password strength
+    try:
+        validate_password(new_password)
+    except ValidationError as e:
+        return JsonResponse({"detail": e.messages[0]}, status=400)
 
     try:
         data = signing.loads(reset_token, salt="pwd-reset", max_age=600)  # 10 mins
     except SignatureExpired:
         return JsonResponse({"detail": "Reset token expired. Please request OTP again."}, status=401)
     except BadSignature:
+        return JsonResponse({"detail": "Invalid reset token"}, status=401)
+
+    # Ensure token purpose is correct
+    if data.get("purpose") != "password_reset":
         return JsonResponse({"detail": "Invalid reset token"}, status=401)
 
     user_id = data.get("uid")
@@ -778,8 +824,32 @@ def reset_password(request):
         return JsonResponse({"detail": "Invalid reset token"}, status=401)
 
     auth_user = profile.auth_user
+
+    # Prevent password reuse (new password same as current)
+    if auth_user.check_password(new_password):
+        return JsonResponse(
+            {"detail": "Your new password cannot be the same as your current password."},
+            status=400
+        )
+
+    # Set new password
     auth_user.set_password(new_password)
     auth_user.save(update_fields=["password"])
+
+    # Log successful password reset
+    _record_login_attempt(
+        profile,
+        request,
+        LoginHistory.Status.SUCCESS,
+        LoginHistory.Purpose.RESET_PASSWORD
+    )
+
+    # Invalidate any remaining reset OTPs
+    OtpVerification.objects.filter(
+        user=profile,
+        purpose=OtpVerification.Purpose.RESET_PASSWORD,
+        used_at__isnull=True
+    ).update(used_at=timezone.now())
 
     profile.failed_login_count = 0
     profile.locked_until = None

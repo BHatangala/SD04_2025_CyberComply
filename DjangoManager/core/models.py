@@ -99,7 +99,7 @@ class OtpVerification(models.Model):
     otp_hash = models.CharField(max_length=255)
 
     attempt_count = models.IntegerField(default=0)
-    
+
     purpose = models.CharField(max_length=30, choices=Purpose.choices)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -128,6 +128,7 @@ class LoginHistory(models.Model):
         FIRST_LOGIN_OTP = "FIRST_LOGIN_OTP", "FIRST_LOGIN_OTP"
         LOGIN_2FA_OTP = "LOGIN_2FA_OTP", "LOGIN_2FA_OTP"
         RESET_PASSWORD_OTP = "RESET_PASSWORD_OTP", "RESET_PASSWORD_OTP"
+        RESET_PASSWORD = "RESET_PASSWORD", "RESET_PASSWORD"
         OTP_SUBMISSION = "OTP_SUBMISSION", "OTP_SUBMISSION" # Fallback purpose used when no active OTP record exists
 
     login_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
