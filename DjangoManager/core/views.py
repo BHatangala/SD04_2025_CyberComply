@@ -385,7 +385,7 @@ def login(request):
     # Block locked accounts
     if profile and profile.locked_until and profile.locked_until > timezone.now():
         _record_login_attempt(profile, request, LoginHistory.Status.LOCKED, LoginHistory.Purpose.LOGIN)
-        return JsonResponse({"detail": "Account is temporarily locked. Try again later."}, status=423)
+        return JsonResponse({"detail": "Account is temporarily locked. Please try again in 15 minutes."}, status=423)
 
     # Handle unexpected authentication/server errors gracefully
     try:
@@ -429,7 +429,7 @@ def login(request):
         _record_login_attempt(profile, request, LoginHistory.Status.PENDING_OTP, LoginHistory.Purpose.FIRST_LOGIN_OTP)
 
         return JsonResponse(
-            {"requires_otp": True, "detail": "OTP sent to your email (first login verification)."},
+            {"requires_otp": True, "detail": "A verification code has been sent to your email."},
             status=200
         )
 
@@ -447,7 +447,7 @@ def login(request):
         _record_login_attempt(profile, request, LoginHistory.Status.PENDING_OTP, LoginHistory.Purpose.LOGIN_2FA_OTP)
 
         return JsonResponse(
-            {"requires_otp": True, "detail": "OTP sent to your email."},
+            {"requires_otp": True, "detail": "A verification code has been sent to your email."},
             status=200
         )
 

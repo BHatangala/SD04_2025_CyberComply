@@ -305,14 +305,26 @@
 
                     loading.value = true;
 
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                     const trimmedEmail = form.email.trim();
 
-                    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
-                        setMessage('error', 'Please enter a valid email address.');
+                    if (!trimmedEmail && !form.password) {
+                        setMessage('error', 'Please enter a your email and password.');
                         loading.value = false;
                         return;
                     }
+
+                    if (!trimmedEmail) {
+                        setMessage('error', 'Please enter your email address.')
+                        loading.value = false;
+                        return;
+                    }
+
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(trimmedEmail)) {
+                        setMessage('error', 'Please enter a valid email address.');
+                        loading.value = false;
+                        return;
+                    }    
 
                     if (!form.password) {
                         setMessage('error', 'Please enter your password.');
@@ -363,6 +375,10 @@
                             return;
                         }
 
+                        sessionStorage.setItem("userFullName", data.full_name);
+                        sessionStorage.setItem("userEmail", data.email);
+                        sessionStorage.setItem("userRole", data.role);
+
                         message.text = "";
                         showSuccessPopup.value = true;
 
@@ -381,11 +397,17 @@
                 }
 
                 // Step 2: OTP success handler (called by otp component)
-                const handleOtpVerified = () => {
-                    setMessage("success", "Login successful! Redirecting...");
+                const handleOtpVerified = async (data) => {
+                    sessionStorage.setItem("userFullName", data.full_name);
+                    sessionStorage.setItem("userEmail", data.email);
+                    sessionStorage.setItem("userRole", data.role);
+
+                    showSuccessPopup.value = false;
+                    setMessage("success", "Login successful! Redirecting to home...");
+
                     setTimeout(() => {
                         window.location.href = "home.html";
-                    }, 1000);
+                    }, 1500);
                 };
 
                  return {

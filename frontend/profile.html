@@ -6,8 +6,6 @@
     <title>CyberComply - Profile</title>
     <!-- Vue.js 3 CDN -->
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
-    <!-- Custom OTP Component -->
-    <script src="otp_component.js"></script>
     <style>
         * {
             margin: 0;
@@ -449,43 +447,6 @@
             user-select: none;
         }
 
-        /* === MODAL STYLES === */
-        .otp-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.75);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 200;
-            backdrop-filter: blur(4px);
-        }
-
-        .otp-modal {
-            background: #234561;
-            color: #f0f4ff;
-            padding: 24px 20px;
-            width: 100%;
-            border-radius: 10px;
-            text-align: center;
-            border: 1px solid #90a0b5;
-            box-shadow: 0 18px 40px rgba(0,0,0,0.35);          
-        }
-
-        .otp-modal h2,
-        .otp-modal h3 {
-            margin: 0 0 10px;
-            font-size: 22px;
-            color: #ffffff;
-        }
-
-        .otp-modal p {
-            margin: 0 0 18px;
-            font-size: 14px;
-            color: #e6eef7;
-            line-height: 1.5;
-        }
-
         /* Password row alignment */
         .password-field {
             align-items: start;
@@ -531,6 +492,7 @@
                 margin-left: 0;  /* Don't push content on smaller screens */
             }
         }
+
     </style>
 </head>
 <body>
@@ -664,6 +626,7 @@
                         type="checkbox" 
                         id="enable-2fa" 
                         v-model="enableTwoFactor"
+                        @change="updateTwoFactorSetting"
                     >
                     <label for="enable-2fa">Enable two-factor authentication</label>
                 </div>
@@ -674,43 +637,6 @@
                     <button class="action-button delete" @click="deleteAccount">DELETE ACCOUNT</button>
                 </div>
             </div>
-        </div>
-
-        <!-- Delete Account OTP + Success Modal -->
-        <div v-if="step === 'otp' || step === 'success'" class="otp-overlay">
-
-            <div class="otp-modal">
-
-                <!-- OTP Verification View -->
-                <div v-if="step === 'otp'">
-
-                    <h2>Verify Account Deletion</h2>
-                    <p><br>An OTP has been sent to your registered email.</p>
-
-                    <transition name="fade">
-                        <div v-if="message.text"
-                            class="message-banner"
-                            :class="message.type">
-                            {{ message.text }}
-                        </div>
-                    </transition>
-
-                    <otp-verification 
-                        :email="email"
-                        @verified="handleDeleteVerified">
-                    </otp-verification>
-
-                </div>
-
-                <!-- Success Confirmation View -->
-                <div v-if="step === 'success'" class="success-step">
-
-                    <h3 class="success-title">Account Deleted Successfully</h3>
-
-                </div>
-
-            </div>
-
         </div>
 
         <!-- Webpage Background Element -->
@@ -729,15 +655,12 @@
         const app = createApp({
         data() {
             return {
-                // UI State
-                step: 'profile', // profile | otp | success
-                message: { text: '', type: '' }, // Notification messages
                 sidebarOpen: false, // Sidebar visibility state
                 
                 // User Data
-                fullName: sessionStorage.getItem('userFullName') || 'User',
-                email: sessionStorage.getItem('userEmail') || 'James@gmail.com',
-                role: sessionStorage.getItem('userRole') || 'General User',
+                fullName: sessionStorage.getItem('userFullName') || '',
+                email: sessionStorage.getItem('userEmail') || '',
+                role: sessionStorage.getItem('userRole') || '',
                 
                 searchActive: false, // Search input visibility
                 searchQuery: '', // Current search query
@@ -751,7 +674,6 @@
                 filteredLast30Days: [],
 
                 enableTwoFactor: false, // 2FA preference
-                showOtpModal: false // Modal State
             }
         },
 
@@ -763,8 +685,8 @@
                 this.filteredLast7Days = [...this.last7Days];
                 this.filteredLast30Days = [...this.last30Days];
 
-                // Assigns User Role
-                this.assignRoleFromEmail();
+                // Fetch latest profile details from backend
+                this.fetchProfile()
             },
             
             methods: {
@@ -776,6 +698,68 @@
                 openReport(reportName) {
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
+
+                async fetchProfile() {
+                    const email = sessionStorage.getItem('userEmail');
+
+                    console.log('Profile page session email:', email);
+
+                    if (!email) {
+                        alert('No logged-in user found. Please login again.');
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`http://127.0.0.1:8000/api/profile/?email=${encodeURIComponent(email)}`);
+                        const data = await response.json();
+
+                        console.log('Profile API response:', data);
+
+                        if (!response.ok) {
+                            alert(data.detail || 'Failed to fetch profile');
+                            return;
+                        }
+
+                        this.fullName = data.full_name;
+                        this.email = data.email;
+                        this.role = data.role;
+                        this.enableTwoFactor = data.otp_is_enabled;
+                    } catch (error) {
+                        console.error('Error fetching profile:', error);
+                        alert('Something went wrong while loading profile details.');
+                    }
+                },
+
+                async updateTwoFactorSetting() {
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/api/profile/twofa/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                email: this.email,
+                                otp_is_enabled: this.enableTwoFactor
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            alert(data.detail || 'Failed to update two-factor authentication setting.');
+                            this.enableTwoFactor = !this.enableTwoFactor;
+                            return;
+                        }
+
+                        console.log(data.detail);
+                    } catch (error) {
+                        console.error('Error updating 2FA setting:', error);
+                        alert('Something went wrong while updating two-factor authentication.');
+                        this.enableTwoFactor = !this.enableTwoFactor;
+                    }
+                },
+
                 // Handles user logout
                 async logout() {
                     //Delete all uploaded files from S3 before logging out
@@ -783,7 +767,7 @@
     
                     if (fileNames.length > 0) {
                         try {
-                            await fetch('http://127.0.0.1:8000/api/delete-all-files/', {
+                            await fetch('http://127.0.0.1:8000/api/delete-file/', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ file_names: fileNames })
@@ -806,25 +790,34 @@
                 },
                 // Initiation of account deletion process
                 // Shows OTP verification modal
-                deleteAccount() {
-                    this.step = 'otp';
-                    this.message = {
-                        text: '',
-                        type: 'success'
-                    };
+                async deleteAccount() {
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/api/request-delete-account/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                email: this.email
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            alert(data.detail || 'Failed to send delete account OTP.');
+                            return;
+                        }
+
+                        sessionStorage.setItem("deleteAccountMessage", "A verification code has been sent to your email.");
+                        window.location.href = 'delete_account_verify.html';
+
+                    } catch (error) {
+                        console.error('Error requesting delete account OTP:', error);
+                        alert('Something went wrong while requesting the verification code.');
+                    }
                 },
-                // Handles successful OTP verification for account deletion
-                handleDeleteVerified() {
-
-                    // simulate account deletion
-                    localStorage.clear();
-
-                    this.step = 'success';
-
-                    setTimeout(() => {
-                        window.location.href = 'welcome.html';
-                    }, 2200);
-                },
+                
                 // Toggles search input visibility
                 // Resets search query when hiding
                 toggleSearch() {
@@ -853,23 +846,8 @@
                         );
                     }
                 },
-                // Assigns user role
-                assignRoleFromEmail() {
-                    const storedRole = sessionStorage.getItem('userRole');
-                    const storedEmail = sessionStorage.getItem('userEmail');
-
-                    // Example rule — change to your real logic later
-                    if (storedRole) {
-                        this.role = storedRole;
-                    }
-
-                    if (storedEmail) {
-                        this.email = storedEmail;
-                    }
-                },
             }
         });
-        registerOtpComponent(app);
 
         // mount
         app.mount('#app');

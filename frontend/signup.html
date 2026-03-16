@@ -545,7 +545,7 @@
           this.showSuccessPopup = false;
           this.submitted = true;
 
-          const trimmedEmail = this.form.email.trim();
+          const trimmedEmail = this.form.email.trim().toLowerCase();
 
           // Full name validation
           const nameError = this.validateFullName(this.form.name);

@@ -132,10 +132,15 @@ const OtpVerification = {
             this.loading = true;
 
             try {
-                const endpoint =
-                    this.mode === "reset"
-                        ? "http://127.0.0.1:8000/api/verify-reset-otp/"
-                        : "http://127.0.0.1:8000/api/verify-otp/";
+                let endpoint = "";
+
+                if (this.mode === "reset") {
+                    endpoint = "http://127.0.0.1:8000/api/verify-reset-otp/";
+                } else if (this.mode === "delete") {
+                    endpoint = "http://127.0.0.1:8000/api/verify-delete-account-otp/";
+                } else {
+                    endpoint = "http://127.0.0.1:8000/api/verify-otp/";
+                }
 
                 const response = await fetch(endpoint, {
                     method: "POST",
@@ -164,14 +169,21 @@ const OtpVerification = {
                     throw new Error("Verification failed. Please try again.");
                 }
 
+                // Safety check if backend didn't return token in delete mode
+                if (this.mode === "delete" && !data.delete_token) {
+                    throw new Error("Verification failed. Please try again.");
+                }
+                
                 // Clear OTP after success
                 this.otp = "";
 
                 // If reset mode, send token back
                 if (this.mode === "reset") {
                     this.$emit("verified", data.reset_token);
+                } else if (this.mode === "delete") {
+                    this.$emit("verified", data.delete_token);    
                 } else {
-                    this.$emit("verified");
+                    this.$emit("verified", data);
                 }
 
             // Clear OTP after failure and keep error generic    
