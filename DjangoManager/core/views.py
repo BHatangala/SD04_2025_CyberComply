@@ -792,7 +792,7 @@ def reset_password(request):
     new_password = payload.get("new_password") or ""
 
     if not reset_token or not new_password:
-        return JsonResponse({"detail": "Reset Token and new password are required"}, status=400)
+        return JsonResponse({"detail": "Reset token and new password are required"}, status=400)
 
     # Validate password strength
     try:
@@ -856,3 +856,361 @@ def reset_password(request):
     profile.save(update_fields=["failed_login_count", "locked_until"])
 
     return JsonResponse({"detail": "Password reset successful"}, status=200)
+
+# ──────────────────────────────────────────────
+# Profile — Get user profile details
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def get_profile(request):
+    if request.method != "GET":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    email = (request.GET.get("email") or "").strip().lower()
+
+    if not email:
+        return JsonResponse({"detail": "Email is required"}, status=400)
+
+    # Validate email format
+    try:
+        validate_email(email)
+    except ValidationError:
+        return JsonResponse({"detail": "Please enter a valid email address."}, status=400)
+
+    # Fetch user profile
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
+    except ObjectDoesNotExist:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    # Prevent access to deleted accounts
+    if profile.deleted_at is not None:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    # Return profile data to frontend
+    return JsonResponse(
+        {
+            "full_name": profile.full_name,
+            "email": profile.auth_user.email,
+            "role": profile.get_role_display(),
+            "otp_is_enabled": profile.otp_is_enabled
+        },
+        status=200
+    )
+
+
+# ──────────────────────────────────────────────
+# Profile — Update 2FA setting
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def update_twofa(request):
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    email = (payload.get("email") or "").strip().lower()
+    otp_is_enabled = payload.get("otp_is_enabled")
+
+    if not email or otp_is_enabled is None:
+        return JsonResponse({"detail": "Email and otp_is_enabled are required"}, status=400)
+
+    # Validate email format
+    try:
+        validate_email(email)
+    except ValidationError:
+        return JsonResponse({"detail": "Please enter a valid email address."}, status=400)
+
+    # Fetch user profile
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
+    except ObjectDoesNotExist:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    if profile.deleted_at is not None:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    # Update 2FA preference
+    profile.otp_is_enabled = bool(otp_is_enabled)
+    profile.updated_at = timezone.now()
+    profile.save(update_fields=["otp_is_enabled", "updated_at"])
+
+    _record_login_attempt(
+        profile,
+        request,
+        LoginHistory.Status.SUCCESS,
+        LoginHistory.Purpose.UPDATE_2FA
+    )
+
+    return JsonResponse(
+        {
+            "detail": "Two-factor authentication setting updated successfully.",
+            "otp_is_enabled": profile.otp_is_enabled
+        },
+        status=200
+    )
+
+
+# ──────────────────────────────────────────────
+# Profile — Request delete account OTP
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def request_delete_account(request):
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    email = (payload.get("email") or "").strip().lower()
+
+    if not email:
+        return JsonResponse({"detail": "Email is required"}, status=400)
+
+    # Validate email format
+    try:
+        validate_email(email)
+    except ValidationError:
+        return JsonResponse({"detail": "Please enter a valid email address."}, status=400)
+
+    # Return generic response if account does not exist
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
+    except ObjectDoesNotExist:
+        return JsonResponse({"detail": "If the account exists, a verification code will be sent."}, status=200)
+
+    if profile.deleted_at is not None:
+        return JsonResponse({"detail": "If the account exists, a verification code will be sent."}, status=200)
+
+    # Invalidate previous delete-account OTPs
+    OtpVerification.objects.filter(
+        user=profile,
+        purpose=OtpVerification.Purpose.DELETE_ACCOUNT,
+        used_at__isnull=True
+    ).update(used_at=timezone.now())
+
+    # Generate and send new OTP
+    raw_otp = _generate_and_store_otp(profile, OtpVerification.Purpose.DELETE_ACCOUNT)
+
+    _record_login_attempt(
+        profile,
+        request,
+        LoginHistory.Status.PENDING_OTP,
+        LoginHistory.Purpose.DELETE_ACCOUNT_OTP
+    )
+
+    if not _send_otp_email(profile.auth_user.email, raw_otp):
+        return JsonResponse(
+            {"detail": "Failed to send verification code. Please try again."},
+            status=500
+        )
+
+    return JsonResponse({"detail": "If the account exists, a verification code will be sent."}, status=200)
+
+
+# ──────────────────────────────────────────────
+# Profile — Verify delete account OTP
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def verify_delete_account_otp(request):
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    email = (payload.get("email") or "").strip().lower()
+    otp = (payload.get("otp") or "").strip()
+
+    if not email or not otp:
+        return JsonResponse({"detail": "Email and OTP are required"}, status=400)
+
+    if not otp.isdigit() or len(otp) != 6:
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
+
+    # Validate email format
+    try:
+        validate_email(email)
+    except ValidationError:
+        return JsonResponse({"detail": "Please enter a valid email address."}, status=400)
+
+    # Fetch user profile
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
+    except ObjectDoesNotExist:
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
+
+    if profile.deleted_at is not None:
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
+
+    # Get latest unused delete-account OTP
+    otp_row = (
+        OtpVerification.objects
+        .filter(
+            user=profile,
+            purpose=OtpVerification.Purpose.DELETE_ACCOUNT,
+            used_at__isnull=True
+        )
+        .order_by("-created_at")
+        .first()
+    )
+
+    if not otp_row:
+
+        _record_login_attempt(
+            profile,
+            request,
+            LoginHistory.Status.FAILED,
+            LoginHistory.Purpose.DELETE_ACCOUNT_OTP
+        )
+
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
+
+    # Limit brute-force attempts
+    if otp_row.attempt_count >= MAX_OTP_ATTEMPTS:
+        otp_row.used_at = timezone.now()
+        otp_row.save(update_fields=["used_at"])
+
+        _record_login_attempt(
+            profile,
+            request,
+            LoginHistory.Status.FAILED,
+            LoginHistory.Purpose.DELETE_ACCOUNT_OTP
+        )
+
+        return JsonResponse(
+            {"detail": "Too many verification attempts. Please request a new code."},
+            status=401
+        )
+
+    # Check OTP expiration
+    if otp_row.expires_at <= timezone.now():
+        otp_row.used_at = timezone.now()
+        otp_row.save(update_fields=["used_at"])
+
+        _record_login_attempt(
+            profile,
+            request,
+            LoginHistory.Status.FAILED,
+            LoginHistory.Purpose.DELETE_ACCOUNT_OTP
+        )
+
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
+
+    # Compare hashed OTP
+    incoming_hash = hashlib.sha256(otp.encode()).hexdigest()
+    if incoming_hash != otp_row.otp_hash:
+        otp_row.attempt_count += 1
+        otp_row.save(update_fields=["attempt_count"])
+
+        _record_login_attempt(
+            profile,
+            request,
+            LoginHistory.Status.FAILED,
+            LoginHistory.Purpose.DELETE_ACCOUNT_OTP
+        )
+
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
+
+    # Mark OTP used
+    otp_row.used_at = timezone.now()
+    otp_row.save(update_fields=["used_at"])
+
+    _record_login_attempt(
+        profile,
+        request,
+        LoginHistory.Status.SUCCESS,
+        LoginHistory.Purpose.DELETE_ACCOUNT_OTP
+    )
+
+    # Generate secure signed delete token
+    delete_token = signing.dumps(
+        {"uid": str(profile.user_id), "purpose": "delete_account"},
+        salt="delete-account"
+    )
+
+    return JsonResponse(
+        {"detail": "OTP verified.", "delete_token": delete_token},
+        status=200
+    )
+
+
+# ──────────────────────────────────────────────
+# Profile — Delete account
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def delete_account(request):
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    delete_token = (payload.get("delete_token") or "").strip()
+
+    if not delete_token:
+        return JsonResponse({"detail": "delete_token is required"}, status=400)
+
+    # Validate signed delete token
+    try:
+        data = signing.loads(delete_token, salt="delete-account", max_age=600)
+    except SignatureExpired:
+        return JsonResponse({"detail": "Delete token expired. Please request OTP again."}, status=401)
+    except BadSignature:
+        return JsonResponse({"detail": "Invalid delete token"}, status=401)
+
+    if data.get("purpose") != "delete_account":
+        return JsonResponse({"detail": "Invalid delete token"}, status=401)
+
+    user_id = data.get("uid")
+    if not user_id:
+        return JsonResponse({"detail": "Invalid delete token"}, status=401)
+
+    # Fetch user profile
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(user_id=user_id)
+    except ObjectDoesNotExist:
+        return JsonResponse({"detail": "Invalid delete token"}, status=401)
+
+    if profile.deleted_at is not None:
+        return JsonResponse({"detail": "Account already deleted"}, status=400)
+
+    # Soft delete account
+    profile.deleted_at = timezone.now()
+    profile.otp_is_enabled = False
+    profile.locked_until = None
+    profile.failed_login_count = 0
+    profile.updated_at = timezone.now()
+    profile.save(update_fields=[
+        "deleted_at",
+        "otp_is_enabled",
+        "locked_until",
+        "failed_login_count",
+        "updated_at"
+    ])
+
+    # Disable account login immediately
+    profile.auth_user.is_active = False
+    profile.auth_user.save(update_fields=["is_active"])
+
+    # Invalidate remaining delete-account OTPs
+    OtpVerification.objects.filter(
+        user=profile,
+        purpose=OtpVerification.Purpose.DELETE_ACCOUNT,
+        used_at__isnull=True
+    ).update(used_at=timezone.now())
+
+    return JsonResponse({"detail": "Account deleted successfully"}, status=200)

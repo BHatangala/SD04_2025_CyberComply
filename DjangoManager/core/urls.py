@@ -28,4 +28,19 @@ urlpatterns = [
     # Password reset execution endpoint
     path("api/reset-password/", views.reset_password, name="reset_password"),
 
+    # Fetch user profile details endpoint
+    path("api/profile/", views.get_profile, name="get_profile"),
+
+    # Update 2FA preference endpoint
+    path("api/profile/twofa/", views.update_twofa, name="update_twofa"),
+
+    # Request delete account OTP endpoint
+    path("api/request-delete-account/", views.request_delete_account, name="request_delete_account"),
+
+    # Verify delete account OTP endpoint
+    path("api/verify-delete-account-otp/", views.verify_delete_account_otp, name="verify_delete_account_otp"),
+
+    # Delete user account endpoint
+    path("api/delete-account/", views.delete_account, name="delete_account"),
+
 ]

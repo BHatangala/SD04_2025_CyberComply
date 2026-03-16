@@ -129,6 +129,8 @@ class LoginHistory(models.Model):
         LOGIN_2FA_OTP = "LOGIN_2FA_OTP", "LOGIN_2FA_OTP"
         RESET_PASSWORD_OTP = "RESET_PASSWORD_OTP", "RESET_PASSWORD_OTP"
         RESET_PASSWORD = "RESET_PASSWORD", "RESET_PASSWORD"
+        DELETE_ACCOUNT_OTP = "DELETE_ACCOUNT_OTP", "DELETE_ACCOUNT_OTP"
+        UPDATE_2FA = "UPDATE_2FA", "UPDATE_2FA"
         OTP_SUBMISSION = "OTP_SUBMISSION", "OTP_SUBMISSION" # Fallback purpose used when no active OTP record exists
 
     login_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
