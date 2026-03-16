@@ -32,15 +32,20 @@
         }
 
         .custom-btn {
-            background-color: #BEE3F8;
-            color: #000;
-            font-weight: 600;
-            border-radius: 8px;
-            transition: all 0.25s ease;
+            margin-top: 20px;
+            width: 100%;
+            padding: 10px;
+            background-color: #a2b8c8;
+            border: none;
+            color: #123456;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
         }
 
         .custom-btn:hover {
-            background-color: #d6f1ff;
+            opacity: 0.95;
             transform: translateY(-1px);
         }
 
@@ -48,6 +53,7 @@
         .custom-btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
+            transform: none;
         }        
 
         .right-wave {
@@ -65,11 +71,6 @@
             position: relative;
         }
 
-        /* Padding for eye icon space */
-        .password-wrapper input {
-            padding-right: 50px;
-        }
-
         /* Eye icon styling */
         .toggle-password {
             position: absolute;
@@ -77,12 +78,86 @@
             top: 50%;
             transform: translateY(-50%);
             cursor: pointer;
+            font-size: 16px;
             color: #cbd5e1;
         }
 
         .toggle-password:hover {
-            color: white;
-        }        
+            color: #ffffff;
+        }  
+        
+        /* Click effect */
+        .toggle-password:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        /* Keyboard focus (accessibility) */
+        .toggle-password:focus {
+            outline: none;
+            color: #a9c7ff;
+        }
+
+        .password-wrapper input {
+            padding-right: 55px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            animation: fadeIn 0.25s ease;
+        }
+
+        .success-modal-content {
+            line-height: 1.6;
+            background: #234561;
+            color: #f0f4ff;
+            padding: 24px 20px;
+            width: 100%;
+            max-width: 360px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #90a0b5;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+            animation: popIn 0.25s ease;
+        }
+
+        .success-modal-content h3 {
+            margin: 0 0 10px;
+            font-size: 22px;
+            color: #ffffff;
+        }
+
+        .success-modal-content p {
+            margin: 0;
+            font-size: 14px;
+            color: #e6eef7;
+            line-height: 1.5;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes popIn {
+            from {
+            transform: scale(0.9);
+            opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
     </style>
 </head>
 
@@ -115,13 +190,13 @@
 
                         <div class="space-y-2">
                             <label for="email" class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Email</label>
-                            <input id="email" v-model="form.email" type="email" placeholder="hello@reallygreatsite.com" class="custom-input w-full p-3 text-sm placeholder-gray-400" autofocus>
+                            <input id="email" v-model="form.email" type="email" placeholder="Enter your email address" class="custom-input w-full p-3 text-sm placeholder-gray-400">
                         </div>
 
                         <div class="space-y-2">
                             <label for="password" class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Password</label>
                             <div class="password-wrapper">
-                                <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" placeholder="******" class="custom-input w-full p-3 text-sm placeholder-gray-400">
+                                <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" placeholder="Enter your password" class="custom-input w-full p-3 text-sm placeholder-gray-400">
 
                                 <span class="toggle-password" @click="showPassword = !showPassword">
                                     <i :class="showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
@@ -134,7 +209,7 @@
                             <button
                                 type="submit"
                                 :disabled="loading"
-                                class="custom-btn w-full py-3 uppercase tracking-wider text-sm shadow-lg"
+                                class="custom-btn"
                             >
                                 {{ loading ? "Signing In..." : "Log In" }}
                             </button>
@@ -159,7 +234,7 @@
                     <!-- Page-level success banner (e.g. "OTP sent to ...") -->
                     <transition name="fade">
                         <div v-if="message.text" :class="[
-                            'text-sm p-3 mb-4 rounded text-center shadow-lg border w-3/4 mx-auto',
+                            'text-sm p-3 mb-6 rounded text-center shadow-lg border w-3/4 mx-auto',
                             message.type === 'error' ? 'bg-gray-200 text-red-600 border-red-400' : 'bg-green-600 text-white border-green-400'
                         ]">
                             {{ message.text }}
@@ -167,7 +242,7 @@
                     </transition>
 
                     <!-- Shared OTP component handles input, validation & verify button -->
-                    <div class="w-3/4 mx-auto space-y-4">
+                    <div class="w-3/4 mx-auto space-y-6">
 
                         <otp-verification :email="form.email" @verified="handleOtpVerified">
                         </otp-verification>
@@ -181,6 +256,13 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+        <!-- Login Success Popup -->
+        <div v-if="showSuccessPopup" class="modal">
+            <div class="success-modal-content">
+                <h3>Login Successful</h3>
+                <p>Your login was successful. Redirecting to home...</p>
             </div>
         </div>
     </div>
@@ -203,6 +285,7 @@
 
                 const step = ref(1); // 1: credentials | 2: otp
                 const message = reactive({ text: '', type: '' });
+                const showSuccessPopup = ref(false);
 
                 // Password visibility toggle
                 const showPassword = ref(false);
@@ -223,8 +306,9 @@
                     loading.value = true;
 
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    const trimmedEmail = form.email.trim();
 
-                    if (!form.email || !emailRegex.test(form.email)) {
+                    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
                         setMessage('error', 'Please enter a valid email address.');
                         loading.value = false;
                         return;
@@ -241,7 +325,7 @@
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                                email: form.email.trim(),
+                                email: trimmedEmail,
                                 password: form.password
                             })
                         });
@@ -261,6 +345,9 @@
                             else if (response.status === 400) {
                                 setMessage("error", data.detail);
                             }
+                            else if (response.status === 500) {
+                                setMessage("error", data.detail || "Login failed. Please try again.");
+                            }    
                             else {
                                 setMessage("error", "Login failed. Please try again.");
                             }
@@ -271,16 +358,17 @@
 
                         if (data.requires_otp) {
                             step.value = 2;
-                            setMessage("success", data.detail || `OTP sent to ${form.email}`);
+                            setMessage("success", data.detail || `OTP sent to ${trimmedEmail}`);
                             loading.value = false;
                             return;
                         }
 
-                        setMessage("success", "Login successful! Redirecting...");
+                        message.text = "";
+                        showSuccessPopup.value = true;
 
                         setTimeout(() => {
                             window.location.href = "home.html";
-                        }, 1000);
+                        }, 1500);
 
                     }
                     catch (err) {
@@ -308,7 +396,8 @@
                     handleOtpVerified,
 
                     loading,
-                    showPassword
+                    showPassword,
+                    showSuccessPopup
                 }
             }
         });

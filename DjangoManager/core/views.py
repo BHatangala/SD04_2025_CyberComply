@@ -289,7 +289,7 @@ def signup(request):
     try:
         validate_email(email)
     except ValidationError:
-        return JsonResponse({"detail": "Invalid email format"}, status=400)
+        return JsonResponse({"detail": "Please enter a valid email address."}, status=400)
     
     try:
         validate_password(password)
@@ -363,7 +363,7 @@ def login(request):
     try:
         validate_email(email)
     except ValidationError:
-        return JsonResponse({"detail": "Invalid email format"}, status=400)
+        return JsonResponse({"detail": "Please enter a valid email address."}, status=400)
 
     profile = None
     try:
@@ -380,7 +380,7 @@ def login(request):
     # Block soft-deleted users
     if profile and profile.deleted_at is not None:
         _record_login_attempt(profile, request, LoginHistory.Status.LOCKED, LoginHistory.Purpose.LOGIN)
-        return JsonResponse({"detail": "Invalid credentials"}, status=401)
+        return JsonResponse({"detail": "Invalid email or password"}, status=401)
 
     # Block locked accounts
     if profile and profile.locked_until and profile.locked_until > timezone.now():
@@ -411,7 +411,7 @@ def login(request):
 
             _record_login_attempt(profile, request, LoginHistory.Status.FAILED, LoginHistory.Purpose.LOGIN)
 
-        return JsonResponse({"detail": "Invalid credentials"}, status=401)
+        return JsonResponse({"detail": "Invalid email or password"}, status=401)
     
     profile = UserProfile.objects.get(auth_user=user)
 
@@ -461,7 +461,7 @@ def login(request):
 
     return JsonResponse(
         {
-            "detail": "Login success",
+            "detail": "Login successful",
             "email": user.email,
             "role": profile.role,
             "full_name": profile.full_name,
@@ -545,7 +545,7 @@ def verify_otp(request):
     try:
         validate_email(email)
     except ValidationError:
-        return JsonResponse({"detail": "Invalid email format"}, status=400)    
+        return JsonResponse({"detail": "Please enter a valid email address."}, status=400)    
 
     if not otp.isdigit() or len(otp) != 6:
         return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
@@ -581,7 +581,7 @@ def verify_otp(request):
         otp_row.used_at = timezone.now()
         otp_row.save(update_fields=["used_at"])
         return JsonResponse(
-            {"detail": "Too many verification attempts. Please login again to request a new code."},
+            {"detail": "Too many verification attempts. Please login again to request a new verification code."},
             status=401
         )
 
@@ -632,7 +632,7 @@ def verify_otp(request):
 
     return JsonResponse(
         {
-            "detail": "Login success",
+            "detail": "Login successful",
             "email": profile.auth_user.email,
             "role": profile.role,
             "full_name": profile.full_name,
@@ -670,6 +670,14 @@ def request_password_reset(request):
 
     raw_otp = _generate_and_store_otp(profile, OtpVerification.Purpose.RESET_PASSWORD)
     
+    # Log password reset OTP request in login history
+    _record_login_attempt(
+        profile,
+        request,
+        LoginHistory.Status.PENDING_OTP,
+        LoginHistory.Purpose.RESET_PASSWORD_OTP
+    )
+
     # Stop if OTP email sending failed
     if not _send_otp_email(profile.auth_user.email, raw_otp):
         return JsonResponse({"detail": "Failed to send verification code. Please try again."}, status=500)

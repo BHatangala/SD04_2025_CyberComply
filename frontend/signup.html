@@ -38,12 +38,18 @@
 
     input, select {
       width: 100%;
-      padding: 10px;
-      background-color: #234561;
-      border: 1px solid #90a0b5;
-      color: #fff;
-      border-radius: 4px;
+      padding: 12px;
+      background-color: #0F3456;
+      border: 1px solid #2563EB;
+      color: #E2E8F0;
+      border-radius: 6px;
       margin-top: 5px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+
+    input::placeholder {
+      color: #94a3b8;
     }
 
     .note {
@@ -201,8 +207,8 @@
     input:focus,
     select:focus {
       outline: none;
-      border-color: #a9c7ff;
-      box-shadow: 0 0 0 2px rgba(169, 199, 255, 0.18);
+      border-color: #60A5FA;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
     }
 
     /* Button hover effect */
@@ -282,7 +288,7 @@
 
     <div class="form-group">
       <label for="email">EMAIL</label>
-      <input id="email" type="email" v-model="form.email" placeholder="Enter your email">
+      <input id="email" type="email" v-model="form.email" placeholder="Enter your email address">
       <div class="note error" v-if="errors.email">{{ errors.email }}</div>
     </div>
 
@@ -533,9 +539,13 @@
         },
 
         async submitForm() {
+          if (this.loading) return;
+
           this.errors = {};
           this.showSuccessPopup = false;
           this.submitted = true;
+
+          const trimmedEmail = this.form.email.trim();
 
           // Full name validation
           const nameError = this.validateFullName(this.form.name);
@@ -543,8 +553,8 @@
             this.errors.name = nameError;
           }
 
-          if (!this.validateEmail(this.form.email.trim())) {
-            this.errors.email = "Invalid email format.";
+          if (!this.validateEmail(trimmedEmail)) {
+            this.errors.email = "Please enter a valid email address.";
           }
 
           if (!this.form.password) {
@@ -586,7 +596,7 @@
                 },
                 body: JSON.stringify({
                   name: this.form.name.trim().replace(/\s+/g, ' '),
-                  email: this.form.email.trim(),
+                  email: trimmedEmail,
                   password: this.form.password,
                   role: this.form.role
                 })
@@ -612,6 +622,8 @@
                   } else {
                     this.errors.email = data.detail || "Signup failed. Please try again.";
                   }
+                } else if (response.status === 500) {
+                  this.errors.email = data.detail || "Signup failed. Please try again.";
                 } else {
                   this.errors.email = "Signup failed. Please try again.";
                 }
