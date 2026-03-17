@@ -7,7 +7,7 @@ from django.db.models.deletion import ProtectedError
 import hashlib
 
 # Database Model Unit Tests.
-from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory
+from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document
 
 class CoreModelsTest(TestCase):
     def setUp(self):
@@ -95,6 +95,29 @@ class CoreModelsTest(TestCase):
             purpose=LoginHistory.Purpose.LOGIN,
             ip_address="112.134.45.201",
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36"
+        )
+
+        # Create sample document records
+        self.doc1 = Document.objects.create(
+            user=self.profile1,
+            org=self.org1,
+            dept=self.dept1,
+            original_filename="privacy_policy.pdf",
+            file_type="PDF",
+            size_bytes=204800,
+            s3_key="docs/privacy_policy_v1.pdf",
+            status=Document.Status.UPLOADED
+        )
+
+        self.doc2 = Document.objects.create(
+            user=self.profile2,
+            org=self.org2,
+            dept=self.dept2,
+            original_filename="employee_data.docx",
+            file_type="DOCX",
+            size_bytes=102400,
+            s3_key="docs/employee_data_v1.docx",
+            status=Document.Status.COMPLETED
         )
 
     # -----------------------------------------------------
@@ -428,3 +451,96 @@ class CoreModelsTest(TestCase):
         self.assertEqual(Department.objects.filter(org_id=org2_id).count(), 0)
 
 
+    # -----------------------------------------------------
+    # Document tests
+    # -----------------------------------------------------
+    def test_document_create_and_count(self):
+        # Verify that two document records were created successfully
+        self.assertEqual(Document.objects.count(), 2)
+
+    def test_document_fk_relationships(self):
+        # Verify that document is correctly linked to user, organization, and department
+        self.assertEqual(self.doc1.user, self.profile1)
+        self.assertEqual(self.doc1.org, self.org1)
+        self.assertEqual(self.doc1.dept, self.dept1)
+
+    def test_document_file_type_choices_validation(self):
+        # Verify invalid file types are rejected
+        doc = Document(
+            user=self.profile1,
+            org=self.org1,
+            dept=self.dept1,
+            original_filename="invalid.exe",
+            file_type="EXE",
+            s3_key="invalid.exe"
+        )
+        with self.assertRaises(Exception):
+            doc.full_clean()
+
+    def test_document_status_choices_validation(self):
+        # Verify invalid status values are rejected
+        doc = Document(
+            user=self.profile1,
+            org=self.org1,
+            dept=self.dept1,
+            original_filename="test.pdf",
+            file_type="PDF",
+            s3_key="test.pdf",
+            status="INVALID_STATUS"
+        )
+        with self.assertRaises(Exception):
+            doc.full_clean()
+
+    def test_document_uploaded_at_auto(self):
+        # Verify uploaded_at is automatically populated
+        self.assertIsNotNone(self.doc1.uploaded_at)
+
+    def test_document_optional_fields(self):
+        # Verify optional fields behave correctly
+        doc = Document.objects.create(
+            user=self.profile1,
+            org=self.org1,
+            dept=self.dept1,
+            original_filename="optional.txt",
+            file_type="TXT",
+            s3_key="optional.txt",
+            size_bytes=None
+        )
+        self.assertIsNone(doc.size_bytes)
+
+    def test_document_soft_delete(self):
+        # Verify deleted_at can be set for soft deletion
+        delete_time = timezone.now()
+        self.doc1.deleted_at = delete_time
+        self.doc1.save()
+        self.doc1.refresh_from_db()
+        self.assertIsNotNone(self.doc1.deleted_at)
+
+    def test_document_str(self):
+        # Verify string representation returns filename
+        self.assertEqual(str(self.doc1), "privacy_policy.pdf")
+
+    def test_cascade_delete_user_deletes_documents(self):
+        # Simulate soft delete on user profile
+        delete_time = timezone.now()
+        self.profile1.deleted_at = delete_time
+        self.profile1.save()
+
+        # Simulate application logic: soft delete related documents
+        Document.objects.filter(user=self.profile1, deleted_at__isnull=True).update(deleted_at=delete_time)
+
+        # Verify all related documents are soft deleted
+        docs = Document.objects.filter(user=self.profile1)
+        self.assertTrue(all(doc.deleted_at is not None for doc in docs))
+
+    def test_cascade_delete_org_deletes_documents(self):
+        # Verify deleting an organization cascades to delete related documents
+        org_id = self.org1.org_id
+        self.org1.delete()
+        self.assertEqual(Document.objects.filter(org_id=org_id).count(), 0)
+
+    def test_cascade_delete_dept_deletes_documents(self):
+        # Verify deleting a department cascades to delete related documents
+        dept_id = self.dept1.dept_id
+        self.dept1.delete()
+        self.assertEqual(Document.objects.filter(dept_id=dept_id).count(), 0)

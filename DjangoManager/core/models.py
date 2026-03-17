@@ -149,3 +149,60 @@ class LoginHistory(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.status}"
+    
+# =========================
+# Table: document
+# =========================
+class Document(models.Model):
+    class Status(models.TextChoices):
+        UPLOADED = "UPLOADED", "Uploaded"
+        PROCESSING = "PROCESSING", "Processing"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+        DELETED = "DELETED", "Deleted"
+
+    document_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    user = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name="documents"
+    )
+
+    org = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="documents"
+    )
+
+    dept = models.ForeignKey(
+        Department,
+        on_delete=models.CASCADE,
+        related_name="documents"
+    )
+
+    original_filename = models.CharField(max_length=255)
+
+    file_type = models.CharField(
+        max_length=20,
+        choices=[("PDF", "PDF"), ("DOCX", "DOCX"), ("TXT", "TXT")]
+    )
+
+    size_bytes = models.BigIntegerField(null=True, blank=True)
+
+    s3_key = models.CharField(max_length=255)
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.UPLOADED
+    )
+
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "document"
+
+    def __str__(self):
+        return self.original_filename
