@@ -211,7 +211,7 @@
                 width: 60%;
             }
 
-            .wave-right-right {
+            .wave-right-wrap {
                 width: 50%;
             }
         }
@@ -252,9 +252,11 @@
         createApp({
             methods: {
                 signUp() {
+                    sessionStorage.setItem("navDirection", "left"); 
                     window.location.href = 'signup.html';   //Redirect to signup page.
                 },
                 login() {
+                    sessionStorage.setItem("navDirection", "left"); 
                     window.location.href = 'login.html';    //Redirect to login page.
                 }
             }

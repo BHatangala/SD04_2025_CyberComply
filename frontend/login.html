@@ -157,11 +157,56 @@
                 opacity: 1;
             }
         }
-        
+
+        /* Page entry animations */
+        html.pre-enter-left #app,
+        html.pre-enter-right #app {
+            opacity: 0;
+        }
+
+        html.pre-enter-right #app {
+            animation: slideFromRight 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        html.pre-enter-left #app {
+            animation: slideFromLeft 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        @keyframes slideFromRight {
+            from {
+                opacity: 0;
+                transform: translateX(22px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideFromLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-22px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
     </style>
+    <script>
+        (function () {
+            const direction = sessionStorage.getItem("navDirection");
+            if (direction === "left") {
+                document.documentElement.classList.add("pre-enter-left");
+            } else if (direction === "right") {
+                document.documentElement.classList.add("pre-enter-right");
+            }
+        })();
+    </script>
 </head>
 
-<body class="h-screen w-full flex flex-col text-white overflow-hidden relative">
+<body id="pageBody" class="h-screen w-full flex flex-col text-white overflow-hidden relative">
 
     <div id="app" class="h-full w-full flex flex-col relative z-10">
 
@@ -426,6 +471,9 @@
 
         registerOtpComponent(app);
         app.mount('#app');
+    </script>
+    <script>
+        sessionStorage.removeItem("navDirection");
     </script>
 </body>
 </html>
