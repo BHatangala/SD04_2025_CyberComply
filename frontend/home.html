@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+
+    <!-- Google Identity Services (OAuth 2.0) + Google API client (Picker) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+
     <style>
         * {
             margin: 0;
@@ -380,23 +385,83 @@
             text-transform: uppercase;
         }
 
-        /* ── Error Message ── */
-        .error-message {
+        /* ── Upload Failure Block ── */
+        /* Replaces the old single .error-message div.
+           Shows per-file failure reasons + persistent upload rules. */
+        .upload-failure-block {
             max-width: 800px;
-            margin: 10px auto;
-            padding: 12px 20px;
-            background-color: rgba(244, 67, 54, 0.1);
-            border-left: 4px solid #f44336;
-            border-radius: 8px;
-            color: #ff6b6b;
-            font-size: 14px;
+            margin: 12px auto 0;
+            background: rgba(244, 67, 54, 0.15);
+            border: 1px solid rgba(244, 67, 54, 0.4);
+            border-radius: 12px;
+            overflow: hidden;
             animation: slideIn 0.3s ease-out;
+        }
+
+        .upload-failure-messages {
+            padding: 12px 18px 10px;
+            border-bottom: 1px solid rgba(244, 67, 54, 0.15);
+        }
+
+        .upload-failure-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            color: #ff6b6b;
+            font-size: 13px;
+            line-height: 1.5;
+            padding: 3px 0;
+        }
+
+        .upload-failure-item::before {
+            content: "✕";
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+            margin-top: 2px;
+            color: #f44336;
+        }
+
+        .upload-rules {
+            padding: 10px 18px 14px;
+        }
+
+        .upload-rules-heading {
+            font-size: 11px;
+            color: #8b9dc3;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .upload-rules-grid {
+            display: flex;
+            gap: 32px;
+        }
+
+        .upload-rules-col {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .upload-rule {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #6b7a99;
+        }
+
+        .upload-rule::before {
+            content: "–";
+            color: #4a5a7a;
+            font-size: 10px;
         }
 
         /* ── File List ── */
         .upload-status {
             max-width: 800px;
-            margin: 20px auto;
+            margin: 20px auto 0;
         }
 
         .file-item {
@@ -631,6 +696,79 @@
             color: #4caf50;
         }
 
+        .status-error {
+            background: rgba(244, 67, 54, 0.12);
+            color: #ff6b6b;
+        }
+
+        /* ── Analyse Row ── */
+        .analyse-row {
+            max-width: 800px;
+            margin: 20px auto 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 16px 0 4px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .analyse-hint {
+            font-size: 12px;
+            color: #ffc107;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex: 1;
+        }
+
+        .analyse-hint.hidden {
+            visibility: hidden;
+        }
+
+        .analyse-hint svg {
+            width: 14px;
+            height: 14px;
+            fill: #ffc107;
+            flex-shrink: 0;
+        }
+
+        .analyse-btn {
+            background: #4a8fe7;
+            color: #ffffff;
+            border: none;
+            padding: 13px 40px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+            white-space: nowrap;
+            box-shadow: 0 4px 14px rgba(74, 143, 231, 0.35);
+            flex-shrink: 0;
+        }
+
+        .analyse-btn:hover:not(:disabled) {
+            background: #6ba3ff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(74, 143, 231, 0.5);
+        }
+
+        .analyse-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .analyse-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         /* ── Integration Alert Modal ── */
         .modal-overlay {
             position: fixed;
@@ -733,7 +871,7 @@
             left: 0;
             width: 55%;
             z-index: 0;
-            opacity: 0.7;
+            opacity: 0.5;
             pointer-events: none;
         }
 
@@ -882,7 +1020,7 @@
                 <div class="upload-sources">
 
                     <!-- Google Drive -->
-                    <div class="source-btn" @click.stop="showIntegrationModal('Google Drive')">
+                    <div class="source-btn" @click.stop="initGoogleDrivePicker()">
                         <div class="source-icon">
                             <svg viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
                                 <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
@@ -931,8 +1069,33 @@
                 @change="handleFileSelect"
             >
 
-            <!-- Error Messages -->
-            <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+            <!--
+                ── Upload Failure Block ──
+                Shown whenever one or more upload attempts failed.
+                Lists each failure reason, then shows the standing upload rules
+                so the user knows what to fix before retrying.
+            -->
+            <div class="upload-failure-block" v-if="errorMessages.length > 0">
+                <div class="upload-failure-messages">
+                    <div class="upload-failure-item" v-for="(msg, i) in errorMessages" :key="i">
+                        {{ msg }}
+                    </div>
+                </div>
+                <div class="upload-rules">
+                    <p class="upload-rules-heading">When uploading files please ensure:</p>
+                    <div class="upload-rules-grid">
+                        <div class="upload-rules-col">
+                            <span class="upload-rule">No password-protected files</span>
+                            <span class="upload-rule">No malware or flagged content</span>
+                            <span class="upload-rule">Max file size: 50 MB per file</span>
+                        </div>
+                        <div class="upload-rules-col">
+                            <span class="upload-rule">Supported formats: PDF, DOCX, TXT</span>
+                            <span class="upload-rule">Up to 10 files at a time</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- ── File List ── -->
             <div class="upload-status" v-if="uploadedFiles.length > 0">
@@ -962,6 +1125,7 @@
                         Department Pill — ADMIN ONLY
                         TODO: Wrap with v-if="isAdmin" once database/auth is integrated.
                               isAdmin should be derived from the authenticated user's role.
+                              In general user mode this pill is hidden — no dept assignment needed.
                     -->
                     <div
                         class="dept-pill"
@@ -999,16 +1163,56 @@
                             'status-uploading':  file.status === 'uploading',
                             'status-uploaded':   file.status === 'uploaded',
                             'status-analysing':  file.status === 'analysing',
-                            'status-analysed':   file.status === 'analysed'
+                            'status-analysed':   file.status === 'analysed',
+                            'status-error':      file.status === 'error'
                         }"
                     >
                         <span v-if="file.status === 'uploading'">UPLOADING…</span>
                         <span v-else-if="file.status === 'uploaded'">UPLOADED</span>
                         <span v-else-if="file.status === 'analysing'">ANALYSING…</span>
                         <span v-else-if="file.status === 'analysed'">✓ ANALYSED</span>
+                        <span v-else-if="file.status === 'error'">ERROR</span>
                     </div>
 
                 </div>
+            </div>
+
+            <!--
+                ── Analyse Row ──
+                Shown only when at least one file is present.
+
+                Admin mode (isAdmin = true, TODO: derive from auth):
+                  - Button is disabled while ANY file is still uploading OR
+                    any uploaded/ready file has no department assigned.
+                  - A hint message explains what's blocking the button.
+
+                General user mode (isAdmin = false):
+                  - Button is disabled only while files are still uploading.
+                  - No department requirement.
+            -->
+            <div class="analyse-row" v-if="uploadedFiles.length > 0">
+
+                <!-- Hint — only visible in admin mode when departments are missing -->
+                <div
+                    class="analyse-hint"
+                    :class="{ hidden: !isAdmin || !hasMissingDepartments }"
+                >
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                    Assign a department to all files before analysing
+                </div>
+
+                <!-- Spacer to keep button right-aligned when hint is not shown -->
+                <div v-if="!isAdmin" style="flex:1;"></div>
+
+                <button
+                    class="analyse-btn"
+                    :disabled="!canAnalyse"
+                    @click="startAnalysis"
+                >
+                    ANALYSE
+                </button>
             </div>
         </div>
     </div>
@@ -1037,6 +1241,9 @@
 </div>
 
 <script>
+    const GOOGLE_CLIENT_ID = '813213515196-8jl2875doj2uci86dgipqv7j95p96e1i.apps.googleusercontent.com';
+    const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+
     const { createApp } = Vue;
 
     createApp({
@@ -1051,30 +1258,77 @@
                 filteredLast7Days: [],
                 filteredLast30Days: [],
 
+                // ── Admin / role flag ──
+                // TODO: Replace with actual role from auth/database once implemented.
+                //       true  = admin user   → department assignment required before analyse
+                //       false = general user → no department required
+                isAdmin: true,
+
                 // ── Admin fields ──
-                // TODO: Replace with isAdmin flag from auth/database once implemented.
                 companyName: '',
 
                 // ── Upload ──
                 isDragging: false,
                 uploadedFiles: [],
-                errorMessage: '',
+
+                // errorMessages replaces the old single errorMessage string.
+                // Each failed upload appends its own reason here so multiple
+                // concurrent failures are all visible at once.
+                errorMessages: [],
 
                 // ── Department options ──
                 departments: ['HR & Admin', 'Finance', 'IT', 'Operations'],
+
+                // ── Analysis state ──
+                isAnalysing: false,
+                analysisProgressText: '',
 
                 // ── Integration modal ──
                 modalVisible: false,
                 modalServiceName: '',
 
                 // ── API endpoints ──
-                // Primary: SSE streaming endpoint from the AI branch.
-                // Handles the full pipeline: upload → S3 store → analyse → result.
+                // Phase 1 (device upload): validate → scan → S3. No AI call.
+                uploadEndpoint: 'http://127.0.0.1:8000/ai/upload/',
+                // Phase 2a (single file): SSE stream → AI → result.
                 analyzeEndpoint: 'http://127.0.0.1:8000/ai/analyze/',
-                // Secondary: S3 file deletion endpoint from the AWS branch.
-                // Called when the user removes a file that has already been uploaded.
-                deleteEndpoint: 'http://127.0.0.1:8000/api/delete-file/'
+                // Phase 2b (multiple files): batch JSON → AI → result.
+                analyzeBatchEndpoint: 'http://127.0.0.1:8000/ai/analyze-batch/',
+                // S3 file deletion (called by × button).
+                deleteEndpoint: 'http://127.0.0.1:8000/api/delete-file/',
+                // Google Drive: receives file_id + access_token, downloads on backend.
+                // Phase 1 only — stops at uploaded, same as device upload.
+                driveUploadEndpoint: 'http://127.0.0.1:8000/ai/upload-from-drive/',
+
+                // ── Google Drive state ──
+                googleAccessToken: null,   // OAuth token, held only for current session
+                pickerApiLoaded: false     // tracks whether gapi picker is ready
             };
+        },
+
+        computed: {
+            // True if any file is still in the uploading state
+            hasUploadingFiles() {
+                return this.uploadedFiles.some(f => f.status === 'uploading');
+            },
+
+            // True if admin mode and any ready file is missing a department
+            hasMissingDepartments() {
+                return this.uploadedFiles
+                    .filter(f => f.status !== 'uploading' && f.status !== 'error')
+                    .some(f => !f.department);
+            },
+
+            // Master gate for the Analyse button
+            canAnalyse() {
+                if (this.isAnalysing) return false;
+                if (this.hasUploadingFiles) return false;
+                if (this.uploadedFiles.length === 0) return false;
+                const readyFiles = this.uploadedFiles.filter(f => f.status === 'uploaded');
+                if (readyFiles.length === 0) return false;
+                if (this.isAdmin && this.hasMissingDepartments) return false;
+                return true;
+            }
         },
 
         mounted() {
@@ -1132,64 +1386,127 @@
 
             // ── Validate files and add them to the queue ──
             processFiles(files) {
-                this.errorMessage = '';
+                // Clear previous error messages each time the user picks new files
+                this.errorMessages = [];
 
                 if (this.uploadedFiles.length + files.length > 10) {
-                    this.errorMessage = `Maximum 10 files allowed. You currently have ${this.uploadedFiles.length} file(s) uploaded.`;
+                    this.errorMessages.push(`Maximum 10 files allowed. You currently have ${this.uploadedFiles.length} file(s) uploaded.`);
                     return;
                 }
 
                 for (const file of files) {
                     if (file.size > 50 * 1024 * 1024) {
-                        this.errorMessage = `"${file.name}" exceeds the 50 MB limit.`;
+                        this.errorMessages.push(`"${file.name}" exceeds the 50 MB limit.`);
                         continue;
                     }
                     const validExts = ['.pdf', '.docx', '.txt'];
                     if (!validExts.some(ext => file.name.toLowerCase().endsWith(ext))) {
-                        this.errorMessage = `"${file.name}" is not supported. Only PDF, DOCX, and TXT files are allowed.`;
+                        this.errorMessages.push(`"${file.name}" is not supported. Only PDF, DOCX, and TXT files are allowed.`);
                         continue;
                     }
 
-                    // Push a reactive file object immediately so the UI shows
-                    // the UPLOADING state and progress bar right away.
                     const fileObj = {
                         name:       file.name,
                         size:       file.size,
-                        status:     'uploading', // uploading | uploaded | analysing | analysed
+                        status:     'uploading', // uploading | uploaded | analysing | analysed | error
                         department: '',
                         deptOpen:   false,
-                        rawFile:    file          // keep the actual File for FormData
+                        rawFile:    file,
+                        source:     'device'
                     };
 
                     this.uploadedFiles.push(fileObj);
 
-                    // Do NOT await — multiple files upload concurrently
+                    // Phase 1: upload to Django/S3 only — AI is not called here.
                     this.uploadToDjango(fileObj);
                 }
             },
 
-            // ── Core upload method: SSE streaming (AI branch) + S3 session tracking (AWS branch) ──
+            // ── Phase 1: Upload device file to Django (S3 store only, no AI) ──
             async uploadToDjango(fileObj) {
-
-                // Re-resolve the index each time we mutate, because other files
-                // may be added or removed while this async function is running.
                 const getIndex = () => this.uploadedFiles.indexOf(fileObj);
-
-                // Helper: safely update the status of this specific file.
-                const updateStatus = (newStatus) => {
-                    const i = getIndex();
-                    if (i === -1) return; // user removed the file mid-upload — do nothing
-                    // Object.assign keeps Vue 3's reactivity intact on array items.
-                    Object.assign(this.uploadedFiles[i], { status: newStatus });
-                    console.log(`📊 [${fileObj.name}] → ${newStatus}`);
-                };
 
                 const formData = new FormData();
                 formData.append('document',     fileObj.rawFile);
                 formData.append('company_name', this.companyName || '');
                 formData.append('department',   fileObj.department || '');
 
-                console.log(`🚀 Uploading: ${fileObj.name}`);
+                console.log(`Uploading (phase 1): ${fileObj.name}`);
+
+                try {
+                    const response = await fetch(this.uploadEndpoint, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || `Server returned HTTP ${response.status}`);
+                    }
+
+                    const i = getIndex();
+                    if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'uploaded' });
+                    console.log(`Phase 1 complete: ${fileObj.name} → S3`);
+
+                    const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                    if (!tracked.includes(fileObj.name)) {
+                        tracked.push(fileObj.name);
+                        sessionStorage.setItem('uploadedFileNames', JSON.stringify(tracked));
+                    }
+
+                } catch (error) {
+                    console.error(`Upload failed for ${fileObj.name}:`, error);
+
+                    // Auto-remove the file card — nothing reached S3 so there's
+                    // nothing to clean up and no point leaving a stuck card.
+                    const i = getIndex();
+                    if (i !== -1) this.uploadedFiles.splice(i, 1);
+
+                    // Append a clear failure reason to the hints block.
+                    // Network-level failures produce a generic "Failed to fetch" message
+                    // from the browser; map that to something more actionable.
+                    const reason = error.message.toLowerCase().includes('failed to fetch')
+                        ? `Could not reach the server while uploading "${fileObj.name}". Please check your connection and try again.`
+                        : `"${fileObj.name}" was rejected — ${error.message}`;
+                    this.errorMessages.push(reason);
+                }
+            },
+
+            // ── Phase 2: Analyse button clicked ──
+            // Routes to single-file SSE or multi-file batch depending on ready file count.
+            async startAnalysis() {
+                if (!this.canAnalyse) return;
+
+                const readyFiles = this.uploadedFiles.filter(f => f.status === 'uploaded');
+
+                this.isAnalysing = true;
+                this.errorMessages = [];
+
+                if (readyFiles.length === 1) {
+                    await this.analyseSingle(readyFiles[0]);
+                } else {
+                    await this.analyseBatch(readyFiles);
+                }
+            },
+
+            // ── Phase 2a: Single file — SSE stream ──
+            async analyseSingle(fileObj) {
+                const getIndex    = () => this.uploadedFiles.indexOf(fileObj);
+                const updateStatus = (newStatus) => {
+                    const i = getIndex();
+                    if (i === -1) return;
+                    Object.assign(this.uploadedFiles[i], { status: newStatus });
+                };
+
+                this.analysisProgressText = `Sending "${fileObj.name}" to AI…`;
+
+                const formData = new FormData();
+                formData.append('file_name',    fileObj.name);
+                formData.append('company_name', this.companyName || '');
+                formData.append('department',   fileObj.department || '');
+
+                console.log(`Analysing (single): ${fileObj.name}`);
 
                 try {
                     const response = await fetch(this.analyzeEndpoint, {
@@ -1201,9 +1518,6 @@
                         throw new Error(`Server returned HTTP ${response.status}`);
                     }
 
-                    // ── Read the SSE stream ──
-                    // Django streams `data: {...}\n\n` events as each pipeline stage completes.
-                    // We buffer across chunk boundaries so we never try to parse a split event.
                     const reader  = response.body.getReader();
                     const decoder = new TextDecoder();
                     let   buffer  = '';
@@ -1213,47 +1527,26 @@
                         if (done) break;
 
                         buffer += decoder.decode(value, { stream: true });
-
-                        // SSE events are delimited by double newlines.
-                        // Split on \n\n and keep any incomplete trailing fragment in the buffer.
                         const events = buffer.split('\n\n');
-                        buffer = events.pop(); // last element may be incomplete
+                        buffer = events.pop();
 
                         for (const event of events) {
-                            // Find the "data:" line within this event block
-                            const dataLine = event
-                                .split('\n')
-                                .find(line => line.startsWith('data: '));
-
+                            const dataLine = event.split('\n').find(l => l.startsWith('data: '));
                             if (!dataLine) continue;
 
                             try {
-                                const payload = JSON.parse(dataLine.slice(6)); // strip "data: "
+                                const payload = JSON.parse(dataLine.slice(6));
                                 console.log(`📡 [${fileObj.name}] SSE:`, payload.status);
 
                                 switch (payload.status) {
-
-                                    case 'uploaded':
-                                        updateStatus('uploaded');
-                                        // Track in sessionStorage for S3 cleanup on session end
-                                        // (AWS branch pattern — remove when DB layer is ready)
-                                        {
-                                            const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
-                                            if (!tracked.includes(fileObj.name)) {
-                                                tracked.push(fileObj.name);
-                                                sessionStorage.setItem('uploadedFileNames', JSON.stringify(tracked));
-                                            }
-                                        }
-                                        break;
-
                                     case 'analysing':
                                         updateStatus('analysing');
+                                        this.analysisProgressText = `Analysing "${fileObj.name}"…`;
                                         break;
-
                                     case 'analysed':
                                         updateStatus('analysed');
-                                        // Persist the result for the report page.
-                                        // TODO: Replace with a PostgreSQL-backed API call
+                                        this.analysisProgressText = 'Analysis complete. Redirecting…';
+                                        // TODO: Replace localStorage with a PostgreSQL-backed API call
                                         //       once the database layer is implemented.
                                         localStorage.setItem('latestAnalysisResult', JSON.stringify({
                                             ...payload.result,
@@ -1263,38 +1556,97 @@
                                                 timestamp: new Date().toISOString()
                                             }
                                         }));
-                                        // Brief pause so the user sees "✓ ANALYSED" before redirect
                                         setTimeout(() => {
                                             window.location.href = 'document_analysis.html';
                                         }, 1500);
                                         break;
-
                                     case 'error':
                                         updateStatus('error');
-                                        this.errorMessage = payload.message || `Error processing "${fileObj.name}".`;
+                                        this.errorMessages.push(payload.message || `Error processing "${fileObj.name}".`);
+                                        this.isAnalysing = false;
                                         break;
                                 }
-
                             } catch (parseError) {
-                                // Incomplete or non-JSON fragment — safe to skip
                                 console.warn(`Could not parse SSE line for ${fileObj.name}:`, dataLine);
                             }
                         }
                     }
 
                 } catch (error) {
-                    console.error(`❌ Upload failed for ${fileObj.name}:`, error);
+                    console.error(`Analysis failed for ${fileObj.name}:`, error);
                     const i = getIndex();
-                    if (i !== -1) {
-                        Object.assign(this.uploadedFiles[i], { status: 'error' });
+                    if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'error' });
+                    this.errorMessages.push(`Failed to analyse "${fileObj.name}": ${error.message}`);
+                    this.isAnalysing = false;
+                }
+            },
+
+            // ── Phase 2b: Multiple files — batch JSON request ──
+            async analyseBatch(files) {
+                this.analysisProgressText = `Sending ${files.length} files to AI for batch analysis…`;
+
+                files.forEach(fileObj => {
+                    const i = this.uploadedFiles.indexOf(fileObj);
+                    if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'analysing' });
+                });
+
+                const payload = {
+                    company_name: this.companyName || '',
+                    files: files.map(f => ({
+                        file_name:  f.name,
+                        department: f.department || ''
+                    }))
+                };
+
+                console.log(`Analysing (batch): ${files.map(f => f.name).join(', ')}`);
+
+                try {
+                    const response = await fetch(this.analyzeBatchEndpoint, {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body:    JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || `Server returned HTTP ${response.status}`);
                     }
-                    this.errorMessage = `Failed to upload "${fileObj.name}": ${error.message}`;
+
+                    files.forEach(fileObj => {
+                        const i = this.uploadedFiles.indexOf(fileObj);
+                        if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'analysed' });
+                    });
+
+                    this.analysisProgressText = 'Batch analysis complete. Redirecting…';
+
+                    // TODO: Replace localStorage with a PostgreSQL-backed API call
+                    //       once the database layer is implemented.
+                    localStorage.setItem('latestAnalysisResult', JSON.stringify({
+                        ...data.result,
+                        _meta: {
+                            filenames:  files.map(f => f.name),
+                            company:    this.companyName || 'Unknown Organisation',
+                            timestamp:  new Date().toISOString()
+                        }
+                    }));
+
+                    setTimeout(() => {
+                        window.location.href = 'document_analysis.html';
+                    }, 1500);
+
+                } catch (error) {
+                    console.error('Batch analysis failed:', error);
+                    files.forEach(fileObj => {
+                        const i = this.uploadedFiles.indexOf(fileObj);
+                        if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'error' });
+                    });
+                    this.errorMessages.push(`Batch analysis failed: ${error.message}`);
+                    this.isAnalysing = false;
                 }
             },
 
             // ── Remove File (× button) ──
-            // Removes the file from the UI immediately, then calls the S3 delete
-            // endpoint if the file has already been received by the server.
             async removeFile(index) {
                 const file = this.uploadedFiles[index];
 
@@ -1302,7 +1654,6 @@
                 this.uploadedFiles.splice(index, 1);
 
                 // Only hit the delete endpoint if the file made it past the uploading phase.
-                // (No point deleting something that never reached S3.)
                 if (file.status !== 'uploading') {
                     try {
                         await fetch(this.deleteEndpoint, {
@@ -1312,7 +1663,6 @@
                         });
                         console.log(`🗑️ Deleted from S3: ${file.name}`);
 
-                        // Keep sessionStorage tracking list in sync
                         const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
                         sessionStorage.setItem(
                             'uploadedFileNames',
@@ -1320,7 +1670,6 @@
                         );
 
                     } catch (error) {
-                        // Non-critical — the UI has already updated, just log the failure
                         console.error(`Failed to delete "${file.name}" from S3:`, error);
                     }
                 }
@@ -1338,6 +1687,197 @@
             },
             closeAllDropdowns() {
                 this.uploadedFiles.forEach(f => f.deptOpen = false);
+            },
+
+            // ── Google Drive Integration ──
+
+            // Step 1 — Called when user clicks the Google Drive button.
+            initGoogleDrivePicker() {
+                if (typeof google === 'undefined' || !google.accounts) {
+                    this.errorMessages = ['Google API is still loading. Please try again in a moment.'];
+                    return;
+                }
+
+                const tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CLIENT_ID,
+                    scope: GOOGLE_DRIVE_SCOPE,
+                    callback: (tokenResponse) => {
+                        if (tokenResponse.error) {
+                            this.errorMessages = [`Google authorisation failed: ${tokenResponse.error}`];
+                            return;
+                        }
+                        this.googleAccessToken = tokenResponse.access_token;
+                        this.loadPickerApi();
+                    }
+                });
+
+                tokenClient.requestAccessToken({ prompt: 'consent' });
+            },
+
+            // Step 2 — Load the Google Picker API library, then open the picker.
+            loadPickerApi() {
+                if (this.pickerApiLoaded) {
+                    this.openGooglePicker();
+                    return;
+                }
+                gapi.load('picker', {
+                    callback: () => {
+                        this.pickerApiLoaded = true;
+                        this.openGooglePicker();
+                    }
+                });
+            },
+
+            // Step 3 — Build and display the Google Picker UI.
+            openGooglePicker() {
+                const picker = new google.picker.PickerBuilder()
+                    .addView(google.picker.ViewId.DOCS)
+                    .addView(
+                        new google.picker.DocsView()
+                            .setMimeTypes('application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain')
+                    )
+                    .setOAuthToken(this.googleAccessToken)
+                    .setDeveloperKey('')
+                    .setCallback((data) => this.onPickerSelected(data))
+                    .setTitle('Select a file from Google Drive')
+                    .build();
+
+                picker.setVisible(true);
+            },
+
+            // Step 4 — Picker callback: called when user picks a file or cancels.
+            onPickerSelected(data) {
+                if (data.action !== google.picker.Action.PICKED) return;
+
+                const driveFile = data.docs[0];
+                const fileId   = driveFile.id;
+                const fileName = driveFile.name;
+                const mimeType = driveFile.mimeType;
+                const fileSize = driveFile.sizeBytes || 0;
+
+                console.log(`📂 Google Drive file selected: ${fileName} (${fileId})`);
+
+                const validMimes = [
+                    'application/pdf',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'text/plain'
+                ];
+                if (!validMimes.includes(mimeType)) {
+                    this.errorMessages.push(`"${fileName}" is not supported. Only PDF, DOCX, and TXT files are allowed.`);
+                    return;
+                }
+                if (fileSize > 50 * 1024 * 1024) {
+                    this.errorMessages.push(`"${fileName}" exceeds the 50 MB limit.`);
+                    return;
+                }
+                if (this.uploadedFiles.length >= 10) {
+                    this.errorMessages.push('Maximum 10 files allowed.');
+                    return;
+                }
+
+                const fileObj = {
+                    name:       fileName,
+                    size:       fileSize,
+                    status:     'uploading',
+                    department: '',
+                    deptOpen:   false,
+                    rawFile:    null,
+                    source:     'google'
+                };
+                this.uploadedFiles.push(fileObj);
+
+                // Phase 1 only — sends to backend to download from Drive, scan, store in S3.
+                // AI analysis is triggered separately via the Analyse button.
+                this.uploadFromDrive(fileObj, fileId, this.googleAccessToken);
+
+                // Clear the token from memory after use (security best practice)
+                this.googleAccessToken = null;
+            },
+
+            // Step 5 — POST file_id + access_token to Django backend.
+            //          Django downloads the file from Drive, scans it, and stores in S3.
+            //          Stops at 'uploaded' — AI analysis is NOT triggered here.
+            async uploadFromDrive(fileObj, fileId, accessToken) {
+                const getIndex = () => this.uploadedFiles.indexOf(fileObj);
+
+                console.log(`Uploading from Google Drive (phase 1): ${fileObj.name}`);
+
+                try {
+                    const response = await fetch(this.driveUploadEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            file_id:      fileId,
+                            access_token: accessToken,
+                            file_name:    fileObj.name,
+                            company_name: this.companyName || '',
+                            department:   fileObj.department || ''
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error || `Server returned HTTP ${response.status}`);
+                    }
+
+                    // Read the SSE stream — only care about 'uploaded' and 'error'.
+                    const reader  = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let   buffer  = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const events = buffer.split('\n\n');
+                        buffer = events.pop();
+
+                        for (const event of events) {
+                            const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+                            if (!dataLine) continue;
+
+                            try {
+                                const payload = JSON.parse(dataLine.slice(6));
+                                console.log(`📡 [${fileObj.name}] SSE:`, payload.status);
+
+                                switch (payload.status) {
+                                    case 'uploaded': {
+                                        const i = getIndex();
+                                        if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'uploaded' });
+                                        const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                                        if (!tracked.includes(fileObj.name)) {
+                                            tracked.push(fileObj.name);
+                                            sessionStorage.setItem('uploadedFileNames', JSON.stringify(tracked));
+                                        }
+                                        break;
+                                    }
+                                    case 'error': {
+                                        // Auto-remove card and surface the rejection reason
+                                        const i = getIndex();
+                                        if (i !== -1) this.uploadedFiles.splice(i, 1);
+                                        this.errorMessages.push(
+                                            payload.message || `Error uploading "${fileObj.name}" from Google Drive.`
+                                        );
+                                        break;
+                                    }
+                                }
+                            } catch (parseError) {
+                                console.warn(`Could not parse SSE line for ${fileObj.name}:`, dataLine);
+                            }
+                        }
+                    }
+
+                } catch (error) {
+                    console.error(`Drive upload failed for ${fileObj.name}:`, error);
+                    // Auto-remove card and show reason
+                    const i = getIndex();
+                    if (i !== -1) this.uploadedFiles.splice(i, 1);
+                    const reason = error.message.toLowerCase().includes('failed to fetch')
+                        ? `Could not reach the server while uploading "${fileObj.name}" from Google Drive. Please check your connection and try again.`
+                        : `"${fileObj.name}" (Google Drive) was rejected — ${error.message}`;
+                    this.errorMessages.push(reason);
+                }
             },
 
             // ── Integration Modal ──
