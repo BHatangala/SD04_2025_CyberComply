@@ -6,6 +6,7 @@
     <title>CyberComply - Profile</title>
     <!-- Vue.js 3 CDN -->
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         * {
             margin: 0;
@@ -275,8 +276,8 @@
 
         .profile-field {
             display: grid;
-            grid-template-columns: 160px 20px 1fr;
-            align-items: baseline;
+            grid-template-columns: 160px 20px 1fr 30px;
+            align-items: center;
             margin-bottom: 24px;
         }
 
@@ -304,6 +305,67 @@
         .profile-field span {
             color: #f0f4ff;
             font-size: 15px;
+        }
+
+        .edit-icon {
+            cursor: pointer;
+            color: #8b9dc3;
+            font-size: 18px;
+            transition: color 0.3s;
+            justify-self: end;
+        }
+
+        .edit-icon:hover { color: #4a8fe7; }
+        
+        .profile-input {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid #4a8fe7;
+            border-radius: 4px;
+            color: #fff;
+            padding: 8px 12px;
+            font-size: 15px;
+            width: 100%;
+            outline: none;
+        }
+
+        .profile-input:focus {
+            border-color: #8fb5ff;
+            box-shadow: 0 0 10px rgba(74,143,231,0.3);
+        }
+
+        .save-container {
+            display: flex;
+            justify-content: flex-end;
+            margin: 30px 0 20px;
+        }
+
+        .save-button {
+            background: #4a8fe7;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .save-button:hover:not(:disabled) { background: #5d9ef0; transform: translateY(-2px); }
+        .save-button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .save-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         /* Profile action buttons */
@@ -449,7 +511,7 @@
 
         /* Password row alignment */
         .password-field {
-            align-items: start;
+            align-items: center;
         }
 
         .password-inline {
@@ -592,32 +654,47 @@
 
             <!-- Profile Information Container -->
             <div class="profile-container">
+                <!-- Name -->
                 <div class="profile-field">
                     <label>Name</label>
-                        <span class="profile-colon">:</span>
-                        <span class="profile-value">{{ fullName }}</span>
+                    <span class="profile-colon">:</span>
+                    <div v-if="editingField !== 'name'" class="profile-value">{{ fullName }}</div>
+                    <input v-else type="text" v-model="editedFullName" class="profile-input"
+                           @keyup.enter="saveField('name')" @blur="saveField('name')" ref="nameInput">
+                    <span class="edit-icon" @click="startEditing('name')" v-if="editingField !== 'name'">✎</span>
                 </div>
+                <!-- Email -->
                 <div class="profile-field">
                     <label>Email</label>
-                        <span class="profile-colon">:</span>
-                        <span class="profile-value">{{ email }}</span>
+                    <span class="profile-colon">:</span>
+                    <div v-if="editingField !== 'email'" class="profile-value">{{ email }}</div>
+                    <input v-else type="email" v-model="editedEmail" class="profile-input"
+                           @keyup.enter="saveField('email')" @blur="saveField('email')" ref="emailInput">
+                    <span class="edit-icon" @click="startEditing('email')" v-if="editingField !== 'email'">✎</span>
                 </div>
+                <!-- Password -->
                 <div class="profile-field password-field">
                     <label>Password</label>
                     <span class="profile-colon">:</span>
-
                     <div class="password-inline">
                         <span class="password-mask">**************</span>
-                        <button class="change-password-btn" @click="goToResetPassword">
-                            Change Password
-                        </button>
+                        <span class="edit-icon" @click="goToResetPassword" title="Change Password">✎</span>
                     </div>
                 </div>
 
+                <!-- Role -->
                 <div class="profile-field">
                     <label>Role</label>
-                        <span class="profile-colon">:</span>
-                        <span class="profile-value">{{ role }}</span>
+                    <span class="profile-colon">:</span>
+                    <span class="profile-value">{{ roleDisplay }}</span>
+                </div>
+
+                <!-- Save button (only when changes exist) -->
+                <div class="save-container" v-if="hasChanges">
+                    <button class="save-button" @click="confirmSave" :disabled="isSaving">
+                        <span v-if="isSaving" class="save-spinner"></span>
+                        {{ isSaving ? 'SAVING...' : 'SAVE CHANGES' }}
+                    </button>
                 </div>
 
                 <!-- 2FA Authentication Toggle Checkbox -->
@@ -658,9 +735,16 @@
                 sidebarOpen: false, // Sidebar visibility state
                 
                 // User Data
-                fullName: sessionStorage.getItem('userFullName') || '',
-                email: sessionStorage.getItem('userEmail') || '',
-                role: sessionStorage.getItem('userRole') || '',
+                fullName: '',
+                email: '',
+                role: '',
+                originalFullName: '',
+                originalEmail: '',
+                editedFullName: '',
+                editedEmail: '',
+                editingField: null,
+                hasChanges: false,
+                isSaving: false,
                 
                 searchActive: false, // Search input visibility
                 searchQuery: '', // Current search query
@@ -680,13 +764,26 @@
         /*
         Lifecycle hook - component mounted
         */
-        mounted() {
+        computed: {
+                roleDisplay() {
+                    return this.role === 'ADMINISTRATIVE_USER' ? 'Administrative User' : 'General User';
+                }
+            },
+        watch: {
+                editedFullName(newVal) {
+                    this.hasChanges = newVal !== this.originalFullName;
+                },
+                editedEmail(newVal) {
+                    this.hasChanges = newVal !== this.originalEmail;
+                }
+            },
+        async mounted() {
                 // Initialize filtered lists
                 this.filteredLast7Days = [...this.last7Days];
                 this.filteredLast30Days = [...this.last30Days];
 
                 // Fetch latest profile details from backend
-                this.fetchProfile()
+                await this.loadUserProfile();
             },
             
             methods: {
@@ -699,35 +796,122 @@
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
 
-                async fetchProfile() {
+                async loadUserProfile() {
                     const email = sessionStorage.getItem('userEmail');
-
-                    console.log('Profile page session email:', email);
-
                     if (!email) {
-                        alert('No logged-in user found. Please login again.');
-                        window.location.href = 'login.html';
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Not logged in',
+                            text: 'Redirecting to login...',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                        setTimeout(() => window.location.href = 'login.html', 2000);
                         return;
                     }
 
                     try {
-                        const response = await fetch(`http://127.0.0.1:8000/api/profile/?email=${encodeURIComponent(email)}`);
-                        const data = await response.json();
+                        const res = await fetch(`http://127.0.0.1:8000/api/profile/?email=${encodeURIComponent(email)}`);
+                        if (!res.ok) throw new Error('Failed to load profile');
+                        const data = await res.json();
 
-                        console.log('Profile API response:', data);
-
-                        if (!response.ok) {
-                            alert(data.detail || 'Failed to fetch profile');
-                            return;
-                        }
-
-                        this.fullName = data.full_name;
-                        this.email = data.email;
+                        this.fullName = this.originalFullName = data.full_name;
+                        this.email = this.originalEmail = data.email;
                         this.role = data.role;
                         this.enableTwoFactor = data.otp_is_enabled;
-                    } catch (error) {
-                        console.error('Error fetching profile:', error);
-                        alert('Something went wrong while loading profile details.');
+
+                        this.editedFullName = data.full_name;
+                        this.editedEmail = data.email;
+
+                        sessionStorage.setItem('userFullName', data.full_name);
+                        sessionStorage.setItem('userEmail', data.email);
+                    } catch (err) {
+                        console.error('Profile load failed:', err);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Failed to load profile',
+                            text: 'Please try again or contact support.',
+                            timer: 4000,
+                            showConfirmButton: false
+                        });
+                    }
+                },
+
+                startEditing(field) {
+                    this.editingField = field;
+                    this.$nextTick(() => {
+                        const input = this.$refs[field + 'Input'];
+                        if (input) input.focus();
+                    });
+                },
+
+                saveField(field) {
+                    this.editingField = null;
+                },
+
+                async confirmSave() {
+                    if (this.editedFullName.trim().length < 3) {
+                        return Swal.fire({
+                            icon: 'error',
+                            title: 'Invalid Name',
+                            text: 'Name must be at least 3 characters'
+                        });
+                    }
+                    if (this.editedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.editedEmail)) {
+                        return Swal.fire({
+                            icon: 'error',
+                            title: 'Invalid Email',
+                            text: 'Please enter a valid email address'
+                        });
+                    }
+
+                    const isEmailChange = this.editedEmail !== this.originalEmail;
+
+                    const result = await Swal.fire({
+                        title: isEmailChange ? 'Change Email?' : 'Save Changes?',
+                        text: isEmailChange 
+                            ? 'A verification code will be sent to the new email address.' 
+                            : 'Save profile changes?',
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonColor: '#4a8fe7',
+                        confirmButtonText: 'Yes'
+                    });
+
+                    if (result.isConfirmed) {
+                        if (isEmailChange) {
+                            sessionStorage.setItem('pendingNewEmail', this.editedEmail.trim().toLowerCase());
+                            window.location.href = 'email_change_verify.html';
+                        } else {
+                            await this.saveNameOnly();
+                        }
+                    }
+                },
+
+                async saveNameOnly() {
+                    this.isSaving = true;
+                    try {
+                        const res = await fetch('http://127.0.0.1:8000/api/profile/', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ full_name: this.editedFullName.trim() })
+                        });
+                        if (!res.ok) throw new Error('Update failed');
+                        const data = await res.json();
+
+                        this.fullName = this.originalFullName = data.full_name;
+                        sessionStorage.setItem('userFullName', data.full_name);
+                        this.hasChanges = false;
+                        this.editingField = null;
+                        Swal.fire({ icon: 'success', title: 'Saved!', timer: 1500, showConfirmButton: false });
+                    } catch (err) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Failed',
+                            text: err.message || 'Could not save changes'
+                        });
+                    } finally {
+                        this.isSaving = false;
                     }
                 },
 
