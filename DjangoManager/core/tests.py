@@ -13,15 +13,15 @@ class CoreModelsTest(TestCase):
     def setUp(self):
         self.now = timezone.now()
 
-        # Organizations
+         # Create sample organizations for relationship and constraint testing
         self.org1 = Organization.objects.create(org_name="Lanka FinTech (Pvt) Ltd")
         self.org2 = Organization.objects.create(org_name="Serendib Health Systems PLC")
 
-        # Departments
+        # Create sample departments under different organizations
         self.dept1 = Department.objects.create(org=self.org1, dept_name="Information Technology")
         self.dept2 = Department.objects.create(org=self.org2, dept_name="Human Resources")
 
-        # Auth Users
+        # Create Django authentication users
         self.auth1 = User.objects.create_user(
             username="n.perera",
             email="n.perera@lankafintech.lk",
@@ -33,7 +33,7 @@ class CoreModelsTest(TestCase):
             password="SecurePass123!B"
         )
 
-        # User Profiles
+        # Create user profiles linked to the authentication users
         self.profile1 = UserProfile.objects.create(
             auth_user=self.auth1,
             org=self.org1,
@@ -60,7 +60,7 @@ class CoreModelsTest(TestCase):
             deleted_at=None
         )
 
-        # OTP Records
+        # Create hashed OTP sample values for OTP verification records
         raw_otp1 = "123456"
         raw_otp2 = "654321"
 
@@ -80,7 +80,7 @@ class CoreModelsTest(TestCase):
             used_at=None
         )
 
-        # Login History
+        # Create login history records for audit trail testing
         self.login1 = LoginHistory.objects.create(
             user=self.profile1,
             status=LoginHistory.Status.SUCCESS,
@@ -102,34 +102,38 @@ class CoreModelsTest(TestCase):
     # -----------------------------------------------------
 
     def test_organization_create_and_count(self):
-        # Organization rows should exist
+        # Verify that two organization records were created successfully
         self.assertEqual(Organization.objects.count(), 2)
 
     def test_organization_unique_org_name(self):
-        # org_name must be unique
+        # Verify that duplicate organization names are rejected by the unique constraint
         with transaction.atomic():
             with self.assertRaises(IntegrityError):
                 Organization.objects.create(org_name="Lanka FinTech (Pvt) Ltd")
 
     def test_organization_created_at_auto(self):
-        # created_at should auto-set
+        # Verify that created_at is automatically populated when an organization is created
         self.assertIsNotNone(self.org1.created_at)
+
+    def test_organization_str(self):
+        # Verify that the string representation returns the organization name
+        self.assertEqual(str(self.org1), "Lanka FinTech (Pvt) Ltd")        
 
     # -----------------------------------------------------
     # Department tests
     # -----------------------------------------------------
 
     def test_department_create_and_count(self):
-        # Department rows should exist
+        # Verify that two department records were created successfully
         self.assertEqual(Department.objects.count(), 2)
 
     def test_department_unique_per_org(self):
-        # Same dept in same org must fail
+        # Verify that duplicate department names are not allowed within the same organization
         with transaction.atomic():
             with self.assertRaises(IntegrityError):
                 Department.objects.create(org=self.org1, dept_name="Information Technology")
 
-        # Same dept name in different org must pass
+        # Verify that the same department name is allowed under a different organization
         Department.objects.create(org=self.org2, dept_name="Information Technology")
         self.assertEqual(
             Department.objects.filter(dept_name="Information Technology").count(),
@@ -137,23 +141,27 @@ class CoreModelsTest(TestCase):
         )
 
     def test_department_fk_relationship(self):
-        # Department must belong to correct organization
+        # Verify that the department is correctly linked to its organization
         self.assertEqual(self.dept1.org, self.org1)
 
     def test_department_created_at_auto(self):
-        # created_at should auto-set
+        # Verify that created_at is automatically populated when a department is created
         self.assertIsNotNone(self.dept1.created_at)
+
+    def test_department_str(self):
+        # Verify that the string representation includes organization and department name
+        self.assertEqual(str(self.dept1), "Lanka FinTech (Pvt) Ltd - Information Technology")        
 
     # -----------------------------------------------------
     # UserProfile tests
     # -----------------------------------------------------
 
     def test_userprofile_create_and_count(self):
-        # UserProfile rows should exist
+        # Verify that two user profile records were created successfully
         self.assertEqual(UserProfile.objects.count(), 2)
 
     def test_userprofile_one_to_one_unique(self):
-        # One auth_user can only have one profile
+        # Verify that one Django auth user cannot have more than one user profile
         with transaction.atomic():
             with self.assertRaises(IntegrityError):
                 UserProfile.objects.create(
@@ -163,7 +171,7 @@ class CoreModelsTest(TestCase):
                 )
 
     def test_userprofile_defaults(self):
-        # Default values should behave correctly
+        ## Verify that important profile fields contain valid default or assigned values
         p = self.profile2
         self.assertIn(p.role, [UserProfile.Role.ADMIN, UserProfile.Role.GENERAL])
         self.assertIsNotNone(p.is_verified)
@@ -171,49 +179,75 @@ class CoreModelsTest(TestCase):
         self.assertIsNotNone(p.failed_login_count)
 
     def test_userprofile_nullable_fields(self):
-        # locked_until, last_login_at, deleted_at can be NULL
+        # Verify that nullable fields behave correctly when values are present or absent
         p = self.profile1
         self.assertIsNone(p.locked_until)
         self.assertIsNotNone(p.last_login_at)
         self.assertIsNone(p.deleted_at)
 
     def test_userprofile_timestamps_auto(self):
-        # created_at and updated_at should auto-set
+        # Verify that created_at and updated_at are automatically populated
         self.assertIsNotNone(self.profile1.created_at)
         self.assertIsNotNone(self.profile1.updated_at)
 
     def test_userprofile_org_set_null_on_delete(self):
-        # Deleting org should set profile.org to NULL (SET_NULL)
+        # Verify that deleting an organization sets the related profile organization to NULL
         self.org1.delete()
         self.profile1.refresh_from_db()
         self.assertIsNone(self.profile1.org)
+
+    def test_userprofile_str_returns_full_name(self):
+        # Verify that the string representation returns full_name when it exists
+        self.assertEqual(str(self.profile1), "Nimal Perera")
+
+    def test_userprofile_str_falls_back_to_username(self):
+        # Verify that the string representation falls back to the auth username when full_name is empty
+        auth_user = User.objects.create_user(
+            username="temp.user",
+            email="temp.user@example.com",
+            password="SecurePass123!C"
+        )
+        profile = UserProfile.objects.create(
+            auth_user=auth_user,
+            full_name="",
+            role=UserProfile.Role.GENERAL
+        )
+        self.assertEqual(str(profile), "temp.user")
+
+    def test_userprofile_deleted_at_can_be_set(self):
+        # Verify that the soft delete timestamp can be assigned and stored correctly
+        deleted_time = timezone.now()
+        self.profile1.deleted_at = deleted_time
+        self.profile1.save()
+        self.profile1.refresh_from_db()
+        self.assertIsNotNone(self.profile1.deleted_at)        
 
     # -----------------------------------------------------
     # OTP Verification tests
     # -----------------------------------------------------
 
     def test_otp_create_and_count(self):
-        # OTP rows should exist
+        # Verify that two OTP verification records were created successfully
         self.assertEqual(OtpVerification.objects.count(), 2)
 
     def test_otp_fk_relationship(self):
-        # OTP must belong to correct user profile
+        # Verify that the OTP record is correctly linked to the related user profile
         self.assertEqual(self.otp1.user, self.profile1)
 
     def test_otp_used_at_nullable(self):
-        # used_at can be NULL when OTP not used yet
+        # Verify that used_at can remain NULL for an unused OTP
         self.assertIsNone(self.otp2.used_at)
 
     def test_otp_expiry_logic(self):
-        # expires_at should be in the future for a fresh OTP
+        # Verify that a newly created OTP has a future expiry time
         self.assertTrue(self.otp2.expires_at > self.now)
 
     def test_otp_created_at_auto(self):
-        # created_at should auto-set
+        # Verify that created_at is automatically populated when an OTP is created
         self.assertIsNotNone(self.otp1.created_at)
 
     def test_otp_invalid_purpose_rejected_by_validation(self):
-        # Purpose should be one of the defined choices (model validation)
+        # Verify that invalid OTP purpose values are rejected during model validation
         otp = OtpVerification(
             user=self.profile1,
             otp_hash="x",
@@ -223,24 +257,58 @@ class CoreModelsTest(TestCase):
         with self.assertRaises(Exception):
             otp.full_clean()
 
+    def test_otp_str(self):
+        # Verify that the string representation includes the profile and OTP purpose
+        self.assertEqual(str(self.otp1), f"{self.profile1} - {self.otp1.purpose}")
+
+    def test_otp_first_login_purpose_allowed(self):
+        # Verify that FIRST_LOGIN is accepted as a valid OTP purpose
+        otp = OtpVerification.objects.create(
+            user=self.profile1,
+            otp_hash=hashlib.sha256("111111".encode()).hexdigest(),
+            purpose=OtpVerification.Purpose.FIRST_LOGIN,
+            expires_at=self.now + timedelta(minutes=5)
+        )
+        self.assertEqual(otp.purpose, OtpVerification.Purpose.FIRST_LOGIN)
+
+    def test_otp_delete_account_purpose_allowed(self):
+        # Verify that DELETE_ACCOUNT is accepted as a valid OTP purpose
+        otp = OtpVerification.objects.create(
+            user=self.profile1,
+            otp_hash=hashlib.sha256("222222".encode()).hexdigest(),
+            purpose=OtpVerification.Purpose.DELETE_ACCOUNT,
+            expires_at=self.now + timedelta(minutes=5)
+        )
+        self.assertEqual(otp.purpose, OtpVerification.Purpose.DELETE_ACCOUNT)
+
+    def test_otp_admin_request_verify_purpose_allowed(self):
+        # Verify that ADMIN_REQUEST_VERIFY is accepted as a valid OTP purpose
+        otp = OtpVerification.objects.create(
+            user=self.profile1,
+            otp_hash=hashlib.sha256("333333".encode()).hexdigest(),
+            purpose=OtpVerification.Purpose.ADMIN_REQUEST_VERIFY,
+            expires_at=self.now + timedelta(minutes=5)
+        )
+        self.assertEqual(otp.purpose, OtpVerification.Purpose.ADMIN_REQUEST_VERIFY)           
+
     # -----------------------------------------------------
     # LoginHistory tests
     # -----------------------------------------------------
 
     def test_login_history_create_and_count(self):
-        # Login history rows should exist
+        # Verify that two login history records were created successfully
         self.assertEqual(LoginHistory.objects.count(), 2)
 
     def test_login_attempt_time_auto(self):
-        # attempt_time should auto-set
+        # Verify that attempt_time is automatically populated when a login history record is created
         self.assertIsNotNone(self.login1.attempt_time)
 
     def test_login_fk_relationship(self):
-        # Login history must belong to correct profile
+        # Verify that the login history record is correctly linked to the related user profile
         self.assertEqual(self.login2.user, self.profile2)
 
     def test_login_status_choices_validation(self):
-        # Status should be one of the defined choices (model validation)
+        # Verify that invalid login status values are rejected during model validation
         log = LoginHistory(
             user=self.profile1,
             status="NOT_VALID",
@@ -252,7 +320,7 @@ class CoreModelsTest(TestCase):
             log.full_clean()
 
     def test_login_optional_fields(self):
-        # ip_address and user_agent are allowed to be NULL
+        # Verify that ip_address and user_agent are allowed to be NULL
         log = LoginHistory.objects.create(
             user=self.profile1,
             status=LoginHistory.Status.SUCCESS,
@@ -264,7 +332,7 @@ class CoreModelsTest(TestCase):
         self.assertIsNone(log.user_agent)
 
     def test_login_pending_otp_status_allowed(self):
-        # PENDING_OTP should be allowed as a valid login status
+        # Verify that PENDING_OTP is accepted as a valid login history status
         log = LoginHistory.objects.create(
             user=self.profile1,
             status=LoginHistory.Status.PENDING_OTP,
@@ -272,19 +340,89 @@ class CoreModelsTest(TestCase):
             ip_address="127.0.0.1",
             user_agent="Test"
         )
-        self.assertEqual(log.status, LoginHistory.Status.PENDING_OTP)        
+        self.assertEqual(log.status, LoginHistory.Status.PENDING_OTP) 
+
+    def test_login_locked_status_allowed(self):
+        # Verify that LOCKED is accepted as a valid login history status
+        log = LoginHistory.objects.create(
+            user=self.profile1,
+            status=LoginHistory.Status.LOCKED,
+            purpose=LoginHistory.Purpose.LOGIN,
+            ip_address="127.0.0.1",
+            user_agent="Test Browser"
+        )
+        self.assertEqual(log.status, LoginHistory.Status.LOCKED)
+
+    def test_loginhistory_str(self):
+        # Verify that the string representation includes the profile and login status
+        self.assertEqual(str(self.login1), f"{self.profile1} - {self.login1.status}")
+
+    def test_login_login_2fa_otp_purpose_allowed(self):
+        # Verify that LOGIN_2FA_OTP is accepted as a valid login history purpose
+        log = LoginHistory.objects.create(
+            user=self.profile1,
+            status=LoginHistory.Status.PENDING_OTP,
+            purpose=LoginHistory.Purpose.LOGIN_2FA_OTP,
+            ip_address="127.0.0.1",
+            user_agent="Test Browser"
+        )
+        self.assertEqual(log.purpose, LoginHistory.Purpose.LOGIN_2FA_OTP)
+
+    def test_login_reset_password_otp_purpose_allowed(self):
+        # Verify that RESET_PASSWORD_OTP is accepted as a valid login history purpose
+        log = LoginHistory.objects.create(
+            user=self.profile1,
+            status=LoginHistory.Status.PENDING_OTP,
+            purpose=LoginHistory.Purpose.RESET_PASSWORD_OTP,
+            ip_address="127.0.0.1",
+            user_agent="Test Browser"
+        )
+        self.assertEqual(log.purpose, LoginHistory.Purpose.RESET_PASSWORD_OTP)
+
+    def test_login_delete_account_otp_purpose_allowed(self):
+        # Verify that DELETE_ACCOUNT_OTP is accepted as a valid login history purpose
+        log = LoginHistory.objects.create(
+            user=self.profile1,
+            status=LoginHistory.Status.PENDING_OTP,
+            purpose=LoginHistory.Purpose.DELETE_ACCOUNT_OTP,
+            ip_address="127.0.0.1",
+            user_agent="Test Browser"
+        )
+        self.assertEqual(log.purpose, LoginHistory.Purpose.DELETE_ACCOUNT_OTP)
+
+    def test_login_update_2fa_purpose_allowed(self):
+        # Verify that UPDATE_2FA is accepted as a valid login history purpose
+        log = LoginHistory.objects.create(
+            user=self.profile1,
+            status=LoginHistory.Status.SUCCESS,
+            purpose=LoginHistory.Purpose.UPDATE_2FA,
+            ip_address="127.0.0.1",
+            user_agent="Test Browser"
+        )
+        self.assertEqual(log.purpose, LoginHistory.Purpose.UPDATE_2FA)
+
+    def test_login_otp_submission_purpose_allowed(self):
+        # Verify that OTP_SUBMISSION is accepted as a valid fallback login history purpose
+        log = LoginHistory.objects.create(
+            user=self.profile1,
+            status=LoginHistory.Status.FAILED,
+            purpose=LoginHistory.Purpose.OTP_SUBMISSION,
+            ip_address="127.0.0.1",
+            user_agent="Test Browser"
+        )
+        self.assertEqual(log.purpose, LoginHistory.Purpose.OTP_SUBMISSION)               
 
     # -----------------------------------------------------
     # Delete cascade behavior tests
     # -----------------------------------------------------
 
     def test_protect_delete_userprofile_when_audit_records_exist(self):
-        # Deleting a profile should be blocked because OTP/LoginHistory must remain
+        # Verify that deleting a user profile is blocked when protected OTP or audit records exist
         with self.assertRaises(ProtectedError):
             self.profile1.delete()
 
     def test_cascade_delete_org_deletes_departments(self):
-        # Deleting org should delete related departments (CASCADE)
+        # Verify that deleting an organization also deletes its related departments through CASCADE
         org2_id = self.org2.org_id
         self.org2.delete()
         self.assertEqual(Department.objects.filter(org_id=org2_id).count(), 0)
