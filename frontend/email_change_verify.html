@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify New Email</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <style>
+        body { background-color: #101726; }
+        .right-wave { position: fixed; bottom: 0; right: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+        /* Fade transition for message banner */
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex flex-col text-white overflow-hidden relative">
+
+    <div id="app" class="h-full w-full flex flex-col relative z-10">
+        <div class="flex-1 flex items-center justify-center px-4">
+            <div class="w-full max-w-md text-center space-y-8">
+
+                <div class="space-y-2 mb-8">
+                    <h1 class="text-5xl font-medium tracking-tight">Verify New Email</h1>
+                    <p class="text-gray-400 text-sm tracking-wide">
+                        Enter the OTP sent to your new email address
+                    </p>
+                </div>
+
+                <transition name="fade">
+                    <div v-if="message.text" :class="[
+                        'text-sm p-3 mb-6 rounded text-center shadow-lg border w-3/4 mx-auto',
+                        message.type === 'error'
+                            ? 'bg-red-600 text-white border-red-400'
+                            : 'bg-green-600 text-white border-green-400'
+                    ]">
+                        {{ message.text }}
+                    </div>
+                </transition>
+
+                <otp-verification
+                    :email="newEmail"
+                    mode="email_change"
+                    :disabled="isVerifying"
+                    @verified="handleEmailChangeVerified">
+                </otp-verification>
+
+                <a href="profile.html" class="text-xs text-gray-400 hover:text-white">← Back to Profile</a>
+            </div>
+        </div>
+    </div>
+
+    <img src="img2.png" alt="Decorative Wave" class="right-wave">
+
+    <script src="otp_component.js"></script>
+
+    <script>
+        const { createApp, ref } = Vue;
+        const app = createApp({
+            setup() {
+                const newEmail = ref(sessionStorage.getItem('pendingNewEmail') || '');
+                const isVerifying = ref(false);
+                const message = reactive({ text: '', type: '' });
+
+                if (!newEmail.value) {
+                    Swal.fire({icon:'error', title:'No pending email change'}).then(() => window.location.href = 'profile.html');
+                    return;
+                }
+
+                const handleEmailChangeVerified = async (token) => {
+                    isVerifying.value = true;
+                    message.text = '';
+
+                    try {
+                        const res = await fetch('http://127.0.0.1:8000/api/verify-email-change/', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ verification_token: token, new_email: newEmail.value })
+                        });
+
+                        const data = await res.json();
+
+                        if (res.ok) {
+                            sessionStorage.setItem('userEmail', newEmail.value);
+                            sessionStorage.removeItem('pendingNewEmail'); // Clean up
+
+                            message.text = 'Email successfully updated!';
+                            message.type = 'success';
+
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Email Updated!',
+                                timer: 2000,
+                                showConfirmButton: false
+                            }).then(() => {
+                                window.location.href = 'profile.html';
+                            });
+                        } else {
+                            message.text = data.detail || 'Invalid or expired code';
+                            message.type = 'error';
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Verification Failed',
+                                text: data.detail || 'Invalid code'
+                            });
+                        }
+                    } catch(e) {
+                        message.text = 'Network error - please try again';
+                        message.type = 'error';
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Failed',
+                            text: 'Network error - please try again'
+                        });
+                    } finally {
+                        isVerifying.value = false;
+                    }
+                };
+
+                return { 
+                    newEmail, 
+                    isVerifying, 
+                    message, 
+                    handleEmailChangeVerified 
+                };
+            }
+        });
+        registerOtpComponent(app);
+        app.mount('#app');
+    </script>
+</body>
+</html>
