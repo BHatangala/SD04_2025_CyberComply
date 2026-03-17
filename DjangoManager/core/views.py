@@ -984,10 +984,10 @@ def request_delete_account(request):
     try:
         profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
     except ObjectDoesNotExist:
-        return JsonResponse({"detail": "If the account exists, a verification code will be sent."}, status=200)
+        return JsonResponse({"detail": "A verification code has been sent to your email."}, status=200)
 
     if profile.deleted_at is not None:
-        return JsonResponse({"detail": "If the account exists, a verification code will be sent."}, status=200)
+        return JsonResponse({"detail": "A verification code has been sent to your email."}, status=200)
 
     # Invalidate previous delete-account OTPs
     OtpVerification.objects.filter(
@@ -1012,7 +1012,7 @@ def request_delete_account(request):
             status=500
         )
 
-    return JsonResponse({"detail": "If the account exists, a verification code will be sent."}, status=200)
+    return JsonResponse({"detail": "A verification code has been sent to your email."}, status=200)
 
 
 # ──────────────────────────────────────────────
@@ -1202,9 +1202,12 @@ def delete_account(request):
         "updated_at"
     ])
 
-    # Disable account login immediately
+    # Disable account login immediately and free original email for future reuse
+    deleted_suffix = timezone.now().strftime("%Y%m%d%H%M%S")
+    profile.auth_user.username = f"deleted_{profile.user_id}_{deleted_suffix}"
+    profile.auth_user.email = f"deleted_{profile.user_id}_{deleted_suffix}@deleted.local"
     profile.auth_user.is_active = False
-    profile.auth_user.save(update_fields=["is_active"])
+    profile.auth_user.save(update_fields=["username", "email", "is_active"])
 
     # Invalidate remaining delete-account OTPs
     OtpVerification.objects.filter(

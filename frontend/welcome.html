@@ -39,17 +39,18 @@
         .login-btn {
             background: transparent;
             border: none;
-            color: #ffffff;
+            color: #a9c7ff;
             cursor: pointer;
             font-size: 16px;
-            letter-spacing: 1px;
-            font-weight: 500;
+            letter-spacing: 2px;
+            font-weight: 600;
             padding: 8px 16px;
-            transition: all 0.3s ease;
+            transition: all 0.25s ease;
         }
 
         .login-btn:hover {
-            color: #e0e0e0;
+            color: #ffffff;
+            text-shadow: 0 0 8px rgba(169, 199, 255, 0.8);
         }
 
         .container {
@@ -59,12 +60,25 @@
             text-align: center;
             position: relative;
             z-index: 2;
+            animation: fadeUp 0.9s ease;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(25px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .welcome-text {
             font-size: 24px;
             margin-bottom: 30px;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
+            color: #d7e3f5;
         }
 
         .brand-name {
@@ -72,45 +86,119 @@
             font-weight: bold;
             letter-spacing: 4px;
             margin-bottom: 100px;
+            transition: all 0.3s ease;
+        }
+
+        .brand-name:hover {
+            text-shadow: 0 0 18px rgba(169, 199, 255, 0.6);
         }
 
         .account-text {
             font-size: 18px;
-            word-spacing: 4px;
-            margin-bottom: 40px;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            color: #d0d8e5;
         }
 
         .signup-btn {
-            background-color: #ffffff;
-            color: #0c1420;
+            background-color: #a2b8c8;
+            color: #123456;
             border: none;
-            padding: 15px 60px;
+            padding: 15px 70px;
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
+            border-radius: 10px;
+            transition: all 0.25s ease;
+            letter-spacing: 1px;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
         }
 
         .signup-btn:hover {
-            background-color: #e0e0e0;
+            background-color: #c2e1f9;
+            letter-spacing: 1px;
+            transform: translateY(-4px); 
+            box-shadow: 0 10px 24px rgba(169,199,255,0.35);
         }
 
-        .wave-left {
+        .signup-btn:active {
+            transform: translateY(-1px); /* presses slightly */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+        }
+
+        .wave-left-wrap {
             position: absolute;
-            bottom: 0;
+            bottom: -20px;
             left: 0;
             width: 85%;
             z-index: 1;
-            opacity: 1;
+            animation: floatLeft 7s ease-in-out infinite;
         }
 
-        .wave-right {
+        .wave-right-wrap {
             position: absolute;
-            bottom: 0;
+            bottom: -20px;
             right: 0;
             width: 65%;
             z-index: 1;
-            opacity: 1;
+            animation: floatRight 9s ease-in-out infinite;
+        }
+
+        .wave-left,
+        .wave-right {
+            width: 100%;
+            display: block;
+            position: relative;
+            z-index: 2;
+        }
+
+        .wave-left-glow,
+        .wave-right-glow {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            filter: blur(35px);
+            opacity: 0.25;
+            animation: breatheGlow 4.5s ease-in-out infinite;
+        }
+
+        .wave-left-glow {
+            background: radial-gradient(
+                ellipse at 30% 75%,
+                rgba(255, 190, 150, 0.55) 0%,
+                rgba(255, 210, 180, 0.28) 28%,
+                rgba(255, 210, 180, 0.10) 48%,
+                transparent 70%
+            );
+        }
+
+        .wave-right-glow {
+            background: radial-gradient(
+                ellipse at 70% 78%,
+                rgba(160, 205, 255, 0.55) 0%,
+                rgba(190, 225, 255, 0.28) 28%,
+                rgba(190, 225, 255, 0.10) 48%,
+                transparent 70%
+            );
+        }
+
+        @keyframes floatLeft {
+            0% { transform: translateY(0px) translateX(0px) scale(1);}
+            50% { transform: translateY(-8px) translateX(8px) scale(1.02); }
+            100% { transform: translateY(0px) translateX(0px) scale(1); }
+        }
+
+        @keyframes floatRight {
+            0% { transform: translateY(0px) translateX(0px) scale(1); }
+            50% { transform: translateY(-10px) translateX(-10px) scale(1.02); }
+            100% { transform: translateY(0px) translateX(0px) scale(1); }
+        }
+
+        @keyframes breatheGlow {
+            0% {opacity: 0.25; transform: scale(0.98);}
+            50% {opacity: 0.55; transform: scale(1.02);}
+            100% {opacity: 0.25;    transform: scale(0.99);}
         }
 
         @media (max-width: 768px) {
@@ -119,14 +207,15 @@
                 margin-bottom: 60px;
             }
 
-            .wave-left {
+            .wave-left-wrap {
                 width: 60%;
             }
 
-            .wave-right {
+            .wave-right-right {
                 width: 50%;
             }
         }
+
     </style>
 </head>
 <body>
@@ -146,8 +235,15 @@
         </div>
 
         <!-- Wave designs -->
-        <img src="img1.png" alt="Wave design left" class="wave-left">
-        <img src="img2.png" alt="Wave design right" class="wave-right">
+        <div class="wave-left-wrap">
+            <div class="wave-left-glow"></div>
+            <img src="img1.png" alt="Wave design left" class="wave-left">
+        </div>
+
+        <div class="wave-right-wrap">
+            <div class="wave-right-glow"></div>
+            <img src="img2.png" alt="Wave design right" class="wave-right">
+        </div>
     </div>
 
     <script>
