@@ -14,7 +14,7 @@ from datetime import timedelta
 from django.core import signing
 from django.core.signing import BadSignature, SignatureExpired
 from django.conf import settings
-from django.core.mail import send_mail
+from .email_service import send_otp_email
 import random
 import hashlib
 import json, time
@@ -420,7 +420,7 @@ def login(request):
         raw_otp = _generate_and_store_otp(profile, OtpVerification.Purpose.FIRST_LOGIN)
     
         # Stop if OTP email sending failed
-        if not _send_otp_email(profile.auth_user.email, raw_otp):
+        if not send_otp_email(profile.auth_user.email, raw_otp, purpose="verification"):
             return JsonResponse(
                 {"detail": "Failed to send verification code. Please try again."},
                 status=500
@@ -438,7 +438,7 @@ def login(request):
         raw_otp = _generate_and_store_otp(profile, OtpVerification.Purpose.LOGIN_2FA)
 
         # Stop if OTP email sending failed
-        if not _send_otp_email(profile.auth_user.email, raw_otp):
+        if not send_otp_email(profile.auth_user.email, raw_otp, purpose="login"):
             return JsonResponse(
                 {"detail": "Failed to send verification code. Please try again."},
                 status=500
@@ -498,24 +498,24 @@ def _generate_and_store_otp(profile: UserProfile, purpose: str) -> str:
     return raw_otp
 
 
-def _send_otp_email(email: str, otp: str) -> bool:
-    """Send OTP to user via AWS SES (configured as Django email backend)."""
-    try:
-        send_mail(
-            subject='Your CyberComply Verification Code',
-            message=(
-                f'Your OTP verification code is: {otp}\n\n'
-                f'This code is valid for 5 minutes.\n\n'
-                f'If you did not request this, please ignore this email.'
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-        )
-        return True
-    except Exception as e:
+# def _send_otp_email(email: str, otp: str) -> bool:
+#    """Send OTP to user via AWS SES (configured as Django email backend)."""
+#    try:
+#        send_mail(
+#            subject='Your CyberComply Verification Code',
+#            message=(
+#                f'Your OTP verification code is: {otp}\n\n'
+#                f'This code is valid for 5 minutes.\n\n'
+#                f'If you did not request this, please ignore this email.'
+#            ),
+#            from_email=settings.DEFAULT_FROM_EMAIL,
+#            recipient_list=[email],
+#        )
+#        return True
+#    except Exception as e:
         # Log but don't crash — OTP is still stored in DB
-        print(f"ERROR sending OTP email to {email}: {e}")
-        return False
+#        print(f"ERROR sending OTP email to {email}: {e}")
+#        return False
 
 
 # ──────────────────────────────────────────────
@@ -668,10 +668,10 @@ def request_password_reset(request):
     try:
         profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=email)
     except ObjectDoesNotExist:
-        return JsonResponse({"detail": "If the email exists, an OTP will be sent."}, status=200)
+        return JsonResponse({"detail": "A verification code has been sent to your email."}, status=200)
 
     if profile.deleted_at is not None:
-        return JsonResponse({"detail": "If the email exists, an OTP will be sent."}, status=200)
+        return JsonResponse({"detail": "A verification code has been sent to your email."}, status=200)
 
     # Invalidate previous reset OTPs
     OtpVerification.objects.filter(
@@ -691,10 +691,10 @@ def request_password_reset(request):
     )
 
     # Stop if OTP email sending failed
-    if not _send_otp_email(profile.auth_user.email, raw_otp):
+    if not send_otp_email(profile.auth_user.email, raw_otp, purpose="password_reset"):
         return JsonResponse({"detail": "Failed to send verification code. Please try again."}, status=500)
 
-    return JsonResponse({"detail": "If the email exists, an OTP will be sent."}, status=200)
+    return JsonResponse({"detail": "A verification code has been sent to your email."}, status=200)
 
 
 @csrf_exempt
@@ -1006,7 +1006,7 @@ def request_delete_account(request):
         LoginHistory.Purpose.DELETE_ACCOUNT_OTP
     )
 
-    if not _send_otp_email(profile.auth_user.email, raw_otp):
+    if not send_otp_email(profile.auth_user.email, raw_otp, purpose="delete_account"):
         return JsonResponse(
             {"detail": "Failed to send verification code. Please try again."},
             status=500
