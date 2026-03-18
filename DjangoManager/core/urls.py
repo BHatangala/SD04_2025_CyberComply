@@ -60,4 +60,7 @@ urlpatterns = [
     # Delete user account endpoint
     path("api/delete-account/", views.delete_account, name="delete_account"),
 
+    # Issue a signed session token after successful login
+    path("api/session-token/", views.issue_session_token, name="issue_session_token"),
+
 ]

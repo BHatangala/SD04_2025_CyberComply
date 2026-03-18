@@ -987,10 +987,10 @@
 
         <!--
             Organisation Name — ADMIN ONLY
-            TODO: Add v-if="isAdmin" once database/auth is integrated.
-                  isAdmin should be derived from the authenticated user's role.
+            Visible only for ADMINISTRATIVE_USER role.
+            Admin must type the organisation name for every upload session.
         -->
-        <div class="org-row">
+        <div class="org-row" v-if="isAdmin">
             <div class="org-label">ORGANISATION</div>
             <input
                 class="org-input"
@@ -1123,11 +1123,11 @@
 
                     <!--
                         Department Pill — ADMIN ONLY
-                        TODO: Wrap with v-if="isAdmin" once database/auth is integrated.
-                              isAdmin should be derived from the authenticated user's role.
-                              In general user mode this pill is hidden — no dept assignment needed.
+                        Only shown for ADMINISTRATIVE_USER role.
+                        General users have no dept assignment — pill is hidden entirely.
                     -->
                     <div
+                        v-if="isAdmin"
                         class="dept-pill"
                         :class="{ unassigned: !file.department }"
                         @click.stop="toggleDeptDropdown(index)"
@@ -1259,10 +1259,10 @@
                 filteredLast30Days: [],
 
                 // ── Admin / role flag ──
-                // TODO: Replace with actual role from auth/database once implemented.
-                //       true  = admin user   → department assignment required before analyse
-                //       false = general user → no department required
-                isAdmin: true,
+                // Derived from sessionStorage on mounted() — set by login.html after auth.
+                // true  = ADMINISTRATIVE_USER → org name + dept required before analyse
+                // false = GENERAL_USER        → no org/dept shown or required
+                isAdmin: false,  // initialised false; overwritten in mounted()
 
                 // ── Admin fields ──
                 companyName: '',
@@ -1294,11 +1294,18 @@
                 analyzeEndpoint: 'http://127.0.0.1:8000/ai/analyze/',
                 // Phase 2b (multiple files): batch JSON → AI → result.
                 analyzeBatchEndpoint: 'http://127.0.0.1:8000/ai/analyze-batch/',
-                // S3 file deletion (called by × button).
+                // S3 file deletion + DB soft-delete (called by × button).
                 deleteEndpoint: 'http://127.0.0.1:8000/api/delete-file/',
                 // Google Drive: receives file_id + access_token, downloads on backend.
                 // Phase 1 only — stops at uploaded, same as device upload.
                 driveUploadEndpoint: 'http://127.0.0.1:8000/ai/upload-from-drive/',
+                // Issues a signed session token after login.
+                sessionTokenEndpoint: 'http://127.0.0.1:8000/ai/api/session-token/',
+
+                // ── Session / Auth state ──
+                sessionToken: null,        // signed token from api/session-token/
+                userEmail: null,           // stored after login
+                userRole: null,            // 'ADMINISTRATIVE_USER' or 'GENERAL_USER'
 
                 // ── Google Drive state ──
                 googleAccessToken: null,   // OAuth token, held only for current session
@@ -1331,10 +1338,40 @@
             }
         },
 
-        mounted() {
+        async mounted() {
             this.filteredLast7Days  = [...this.last7Days];
             this.filteredLast30Days = [...this.last30Days];
             document.addEventListener('click', this.closeAllDropdowns);
+
+            // ── Auth guard ────────────────────────────────────────────────
+            // Reads the session token stored by login.html after successful auth.
+            // If missing or if the server-side profile check fails, redirect to login.
+            const token    = sessionStorage.getItem('authToken');
+            const email    = sessionStorage.getItem('userEmail');
+            const roleRaw  = sessionStorage.getItem('userRole');   // set by login.html
+
+            if (!token || !email) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Server-side verify: confirm the account still exists and is active
+            try {
+                const res = await fetch(
+                    `http://127.0.0.1:8000/api/profile/?email=${encodeURIComponent(email)}`
+                );
+                if (!res.ok) throw new Error('Profile check failed');
+            } catch {
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // ── Set RBAC flag ─────────────────────────────────────────────
+            // roleRaw comes directly from the login response: 'ADMINISTRATIVE_USER'
+            // or 'GENERAL_USER'. No mapping needed — compare directly.
+            this.isAdmin   = (roleRaw === 'ADMINISTRATIVE_USER');
+            this.sessionToken = token;
         },
 
         beforeUnmount() {
@@ -1412,7 +1449,8 @@
                         department: '',
                         deptOpen:   false,
                         rawFile:    file,
-                        source:     'device'
+                        source:     'device',
+                        documentId: null         // filled in by uploadToDjango on success
                     };
 
                     this.uploadedFiles.push(fileObj);
@@ -1428,26 +1466,42 @@
 
                 const formData = new FormData();
                 formData.append('document',     fileObj.rawFile);
-                formData.append('company_name', this.companyName || '');
-                formData.append('department',   fileObj.department || '');
+                // Admins supply org + dept; general users send empty strings
+                formData.append('company_name', this.isAdmin ? (this.companyName || '') : '');
+                formData.append('department',   this.isAdmin ? (fileObj.department || '') : '');
 
                 console.log(`Uploading (phase 1): ${fileObj.name}`);
 
                 try {
                     const response = await fetch(this.uploadEndpoint, {
                         method: 'POST',
+                        headers: {
+                            // JWT-ready auth header — swap internals when full JWT lands
+                            'Authorization': `Bearer ${this.sessionToken}`
+                        },
                         body: formData
                     });
 
                     const data = await response.json();
+
+                    if (response.status === 401 || response.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
 
                     if (!response.ok) {
                         throw new Error(data.error || `Server returned HTTP ${response.status}`);
                     }
 
                     const i = getIndex();
-                    if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'uploaded' });
-                    console.log(`Phase 1 complete: ${fileObj.name} → S3`);
+                    if (i !== -1) {
+                        Object.assign(this.uploadedFiles[i], {
+                            status:     'uploaded',
+                            documentId: data.document_id || null   // stored for delete
+                        });
+                    }
+                    console.log(`Phase 1 complete: ${fileObj.name} → S3 (doc: ${data.document_id})`);
 
                     const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
                     if (!tracked.includes(fileObj.name)) {
@@ -1458,14 +1512,9 @@
                 } catch (error) {
                     console.error(`Upload failed for ${fileObj.name}:`, error);
 
-                    // Auto-remove the file card — nothing reached S3 so there's
-                    // nothing to clean up and no point leaving a stuck card.
                     const i = getIndex();
                     if (i !== -1) this.uploadedFiles.splice(i, 1);
 
-                    // Append a clear failure reason to the hints block.
-                    // Network-level failures produce a generic "Failed to fetch" message
-                    // from the browser; map that to something more actionable.
                     const reason = error.message.toLowerCase().includes('failed to fetch')
                         ? `Could not reach the server while uploading "${fileObj.name}". Please check your connection and try again.`
                         : `"${fileObj.name}" was rejected — ${error.message}`;
@@ -1647,21 +1696,32 @@
             },
 
             // ── Remove File (× button) ──
+            // Removes from UI immediately, then:
+            //   - soft-deletes the Document DB record (sets deleted_at + status=DELETED)
+            //   - hard-deletes the file from S3
+            // Prefers document_id for the DB lookup; falls back to file_name.
             async removeFile(index) {
                 const file = this.uploadedFiles[index];
 
                 // Remove from UI list first for instant feedback
                 this.uploadedFiles.splice(index, 1);
 
-                // Only hit the delete endpoint if the file made it past the uploading phase.
+                // Only hit the delete endpoint if the file made it past the uploading phase
                 if (file.status !== 'uploading') {
                     try {
+                        const body = { file_name: file.name };
+                        // Prefer document_id — more reliable than filename for DB lookup
+                        if (file.documentId) body.document_id = file.documentId;
+
                         await fetch(this.deleteEndpoint, {
                             method:  'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body:    JSON.stringify({ file_name: file.name })
+                            headers: {
+                                'Content-Type':  'application/json',
+                                'Authorization': `Bearer ${this.sessionToken}`
+                            },
+                            body: JSON.stringify(body)
                         });
-                        console.log(`🗑️ Deleted from S3: ${file.name}`);
+                        console.log(`Deleted: ${file.name} (doc: ${file.documentId})`);
 
                         const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
                         sessionStorage.setItem(
@@ -1670,7 +1730,7 @@
                         );
 
                     } catch (error) {
-                        console.error(`Failed to delete "${file.name}" from S3:`, error);
+                        console.error(`Failed to delete "${file.name}":`, error);
                     }
                 }
             },
@@ -1755,7 +1815,7 @@
                 const mimeType = driveFile.mimeType;
                 const fileSize = driveFile.sizeBytes || 0;
 
-                console.log(`📂 Google Drive file selected: ${fileName} (${fileId})`);
+                console.log(`Google Drive file selected: ${fileName} (${fileId})`);
 
                 const validMimes = [
                     'application/pdf',
@@ -1782,7 +1842,8 @@
                     department: '',
                     deptOpen:   false,
                     rawFile:    null,
-                    source:     'google'
+                    source:     'google',
+                    documentId: null     // filled in from SSE 'uploaded' event
                 };
                 this.uploadedFiles.push(fileObj);
 
@@ -1805,15 +1866,25 @@
                 try {
                     const response = await fetch(this.driveUploadEndpoint, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type':  'application/json',
+                            'Authorization': `Bearer ${this.sessionToken}`
+                        },
                         body: JSON.stringify({
                             file_id:      fileId,
                             access_token: accessToken,
                             file_name:    fileObj.name,
-                            company_name: this.companyName || '',
-                            department:   fileObj.department || ''
+                            // Admins supply org + dept; general users send empty strings
+                            company_name: this.isAdmin ? (this.companyName || '') : '',
+                            department:   this.isAdmin ? (fileObj.department || '') : ''
                         })
                     });
+
+                    if (response.status === 401 || response.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
 
                     if (!response.ok) {
                         const err = await response.json().catch(() => ({}));
@@ -1839,12 +1910,17 @@
 
                             try {
                                 const payload = JSON.parse(dataLine.slice(6));
-                                console.log(`📡 [${fileObj.name}] SSE:`, payload.status);
+                                console.log(`[${fileObj.name}] SSE:`, payload.status);
 
                                 switch (payload.status) {
                                     case 'uploaded': {
                                         const i = getIndex();
-                                        if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'uploaded' });
+                                        if (i !== -1) {
+                                            Object.assign(this.uploadedFiles[i], {
+                                                status:     'uploaded',
+                                                documentId: payload.document_id || null
+                                            });
+                                        }
                                         const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
                                         if (!tracked.includes(fileObj.name)) {
                                             tracked.push(fileObj.name);
@@ -1853,7 +1929,6 @@
                                         break;
                                     }
                                     case 'error': {
-                                        // Auto-remove card and surface the rejection reason
                                         const i = getIndex();
                                         if (i !== -1) this.uploadedFiles.splice(i, 1);
                                         this.errorMessages.push(

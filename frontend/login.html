@@ -343,6 +343,31 @@
                     message.text = text;
                 };
 
+                // ── Shared helper: exchange email for a signed session token ──────
+                // Called after every successful login path (direct + OTP).
+                // Stores authToken in sessionStorage under the JWT-ready key so
+                // home.html can send it as Authorization: Bearer <token>.
+                // When full JWT is implemented, this call is replaced by the
+                // api/token/ endpoint — home.html needs no changes.
+                const SESSION_TOKEN_URL = "http://127.0.0.1:8000/ai/api/session-token/";
+
+                const fetchAndStoreSessionToken = async (email) => {
+                    try {
+                        const res = await fetch(SESSION_TOKEN_URL, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ email })
+                        });
+                        if (!res.ok) throw new Error("Token fetch failed");
+                        const tokenData = await res.json();
+                        sessionStorage.setItem("authToken", tokenData.token);
+                    } catch (err) {
+                        // Non-fatal: home.html will catch the missing token and
+                        // redirect back to login if needed.
+                        console.warn("Could not obtain session token:", err);
+                    }
+                };
+
                 // Step 1: Login (email+password)
                 const handleLogin = async () => {
                     if (loading.value) return; // prevent double login
@@ -424,6 +449,9 @@
                         sessionStorage.setItem("userEmail", data.email);
                         sessionStorage.setItem("userRole", data.role);
 
+                        // Obtain signed session token for home.html API calls
+                        await fetchAndStoreSessionToken(trimmedEmail);
+
                         message.text = "";
                         showSuccessPopup.value = true;
 
@@ -446,6 +474,9 @@
                     sessionStorage.setItem("userFullName", data.full_name);
                     sessionStorage.setItem("userEmail", data.email);
                     sessionStorage.setItem("userRole", data.role);
+
+                    // Obtain signed session token for home.html API calls
+                    await fetchAndStoreSessionToken(data.email);
 
                     showSuccessPopup.value = false;
                     setMessage("success", "Login successful! Redirecting to home...");

@@ -26,7 +26,7 @@ import boto3
 import re
 from botocore.exceptions import BotoCoreError, ClientError
 
-from .models import UserProfile, LoginHistory, OtpVerification
+from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department
 
 # ──────────────────────────────────────────────
 # Security Configuration
@@ -102,6 +102,13 @@ def scan_file(file_path):
 
 
 def upload_to_s3(file_path, file_name):
+    """
+    Uploads a local file to S3.
+    Returns (s3_key, s3_url) on success, or (None, None) on failure.
+    Storing the key (not the URL) in the DB is preferred — the URL can always
+    be reconstructed from the key, but the key cannot safely be parsed back
+    from a URL if the bucket/region/domain ever changes.
+    """
     try:
         s3 = boto3.client(
             's3',
@@ -112,11 +119,64 @@ def upload_to_s3(file_path, file_name):
         bucket_name = settings.AWS_STORAGE_BUCKET_NAME
         s3.upload_file(file_path, bucket_name, file_name)
 
+        s3_key = file_name
         s3_url = f"https://{bucket_name}.s3.{settings.AWS_S3_REGION_NAME}.amazonaws.com/{file_name}"
-        return s3_url
+        return s3_key, s3_url
 
     except (BotoCoreError, ClientError):
-        return None
+        return None, None
+
+
+# ──────────────────────────────────────────────
+# Auth helper — resolve UserProfile from the
+# X-Session-Token header sent by home.html.
+# Returns (profile, None) on success or
+# (None, JsonResponse) on failure.
+# ──────────────────────────────────────────────
+
+def _get_profile_from_token(request) -> "tuple[UserProfile, None] | tuple[None, JsonResponse]":
+    """
+    Validates the signed session token from the Authorization: Bearer <token> header.
+    This is the JWT-ready interface — when full JWT is implemented, only the
+    signing/validation internals below change; all callers stay identical.
+
+    Returns (UserProfile, None) on success.
+    Returns (None, JsonResponse) when the token is missing, expired, or invalid.
+    """
+    auth_header = request.headers.get("Authorization", "").strip()
+    if not auth_header.startswith("Bearer "):
+        return None, JsonResponse({"detail": "Authentication required"}, status=401)
+    token = auth_header[len("Bearer "):].strip()
+    if not token:
+        return None, JsonResponse({"detail": "Authentication required"}, status=401)
+
+    try:
+        data = signing.loads(token, salt="session-token", max_age=86400)  # 24-hour TTL
+    except SignatureExpired:
+        return None, JsonResponse({"detail": "Session expired. Please log in again."}, status=401)
+    except BadSignature:
+        return None, JsonResponse({"detail": "Invalid session token"}, status=401)
+
+    user_id = data.get("uid")
+    if not user_id:
+        return None, JsonResponse({"detail": "Invalid session token"}, status=401)
+
+    try:
+        profile = (
+            UserProfile.objects
+            .select_related("auth_user", "org")
+            .get(user_id=user_id)
+        )
+    except (ObjectDoesNotExist, Exception):
+        return None, JsonResponse({"detail": "User not found"}, status=401)
+
+    if profile.deleted_at is not None:
+        return None, JsonResponse({"detail": "Account has been deleted"}, status=401)
+
+    if not profile.is_verified:
+        return None, JsonResponse({"detail": "Account not verified"}, status=403)
+
+    return profile, None
 
 
 # ──────────────────────────────────────────────
@@ -128,22 +188,70 @@ def upload_to_s3(file_path, file_name):
 @csrf_exempt
 def upload_file(request):
     """
-    Receives a single file from the frontend, runs security checks, and stores
-    it in S3. Returns plain JSON so the frontend can update the file's status
-    badge to UPLOADED.
+    Receives a single file from the frontend, runs security checks, stores
+    it in S3, and creates a Document record in the database.
 
+    Requires a valid X-Session-Token header (issued by api/session-token/).
     The AI analysis step is intentionally absent — it is triggered separately
     by the Analyse button via analyze_compliance or analyze_batch.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
 
+    # ── Auth: resolve the logged-in user ──────────────────────────────────
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None  # guaranteed: auth_error is None only when profile is set
+
     uploaded_file = request.FILES.get('document')
-    company_name  = request.POST.get('company_name', '')
-    department    = request.POST.get('department', '')
+    company_name  = request.POST.get('company_name', '').strip()
+    department    = request.POST.get('department', '').strip()
 
     if not uploaded_file:
         return JsonResponse({'error': 'No file provided'}, status=400)
+
+    # ── Resolve Organisation & Department ────────────────────────────────
+    #
+    # ADMINISTRATIVE_USER:
+    #   - company_name is typed freely in the UI per upload session.
+    #   - department is selected per file via the dept pill.
+    #   - Both are required. The org/dept are get_or_created so admins can
+    #     register new organisations on first upload without a separate step.
+    #
+    # GENERAL_USER:
+    #   - No org name field or dept pill is shown in the UI.
+    #   - We use the org already linked to their UserProfile (set by an admin).
+    #   - If their profile has no org, we still allow the upload but store
+    #     org/dept as NULL — the Document FK allows null for this case.
+    #     (If you later make org/dept mandatory for all roles, add a guard here.)
+    # ─────────────────────────────────────────────────────────────────────────
+    org  = None
+    dept = None
+
+    if profile.role == UserProfile.Role.ADMIN:
+        if not company_name:
+            return JsonResponse({'error': 'Organisation name is required.'}, status=400)
+        if not department:
+            return JsonResponse({'error': 'Department is required for each file.'}, status=400)
+
+        # get_or_create so admins can introduce new orgs on first upload
+        org, _ = Organization.objects.get_or_create(org_name=company_name)
+
+        # get_or_create dept within this org
+        dept, _ = Department.objects.get_or_create(org=org, dept_name=department)
+
+    else:
+        # General user — use profile-linked org if available (informational only)
+        org  = profile.org           # may be None — FK is nullable
+        dept = None                  # no dept concept for general users
+
+    # ── Detect file type ───────────────────────────────────────────────────
+    ext = uploaded_file.name.lower().rsplit('.', 1)[-1]
+    file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
+    file_type = file_type_map.get(ext)
+    if not file_type:
+        return JsonResponse({'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'}, status=400)
 
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         for chunk in uploaded_file.chunks():
@@ -164,22 +272,34 @@ def upload_file(request):
                 status=400
             )
 
-        s3_url = upload_to_s3(temp_path, uploaded_file.name)
-        if s3_url is None:
+        s3_key, s3_url = upload_to_s3(temp_path, uploaded_file.name)
+        if s3_key is None:
             return JsonResponse({'error': 'Failed to upload file to S3'}, status=500)
 
         # Keep the file bytes in the Django cache so analyze_compliance can
         # forward them directly to the AI without touching S3 again.
-        # TTL of 1 hour is generous — the user is expected to click Analyse
-        # within seconds/minutes of uploading.
         with open(temp_path, 'rb') as f:
             file_bytes = f.read()
         cache.set(f'file_bytes_{uploaded_file.name}', file_bytes, timeout=3600)
 
+        # ── Create Document record ─────────────────────────────────────────
+        # org and dept are None for GENERAL_USER — the model FK fields allow null.
+        document = Document.objects.create(
+            user=profile,
+            org=org,           # None for general users
+            dept=dept,         # None for general users
+            original_filename=uploaded_file.name,
+            file_type=file_type,
+            size_bytes=uploaded_file.size,
+            s3_key=s3_key,
+            status=Document.Status.UPLOADED,
+        )
+
         return JsonResponse({
-            'status':    'uploaded',
-            's3_url':    s3_url,
-            'file_name': uploaded_file.name
+            'status':      'uploaded',
+            's3_url':      s3_url,
+            'file_name':   uploaded_file.name,
+            'document_id': str(document.document_id),
         })
 
     finally:
@@ -359,8 +479,23 @@ def analyze_batch(request):
 
 @csrf_exempt
 def delete_file(request):
+    """
+    Deletes one or more files.
+    - Hard-deletes from S3 (existing behaviour).
+    - Soft-deletes the corresponding Document record(s) in the database
+      by setting deleted_at and status = DELETED.
+
+    Requires a valid X-Session-Token header.
+    Users may only soft-delete documents they own.
+    """
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    # ── Auth ──────────────────────────────────────────────────────────────
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None  # guaranteed: auth_error is None only when profile is set
 
     try:
         data = json.loads(request.body)
@@ -369,12 +504,56 @@ def delete_file(request):
 
     file_name  = data.get('file_name', '').strip()
     file_names = data.get('file_names', [])
+    # document_id(s) from the frontend — preferred over filename for DB lookup
+    document_id  = data.get('document_id', '').strip()
+    document_ids = data.get('document_ids', [])
 
     if file_name:
         file_names.append(file_name)
+    if document_id:
+        document_ids.append(document_id)
 
-    if not file_names:
-        return JsonResponse({'error': 'No file names provided'}, status=400)
+    if not file_names and not document_ids:
+        return JsonResponse({'error': 'No file names or document IDs provided'}, status=400)
+
+    # ── Soft-delete Document records ──────────────────────────────────────
+    now = timezone.now()
+
+    if document_ids:
+        # Preferred path: look up by UUID, enforce ownership
+        docs_qs = Document.objects.filter(
+            document_id__in=document_ids,
+            deleted_at__isnull=True
+        )
+        # ADMIN can delete any doc in their org; GENERAL_USER only their own
+        if profile.role != UserProfile.Role.ADMIN:
+            docs_qs = docs_qs.filter(user=profile)
+        docs_qs.update(status=Document.Status.DELETED, deleted_at=now)
+
+    elif file_names:
+        # Fallback path: look up by s3_key (= filename), enforce ownership
+        docs_qs = Document.objects.filter(
+            s3_key__in=file_names,
+            deleted_at__isnull=True
+        )
+        if profile.role != UserProfile.Role.ADMIN:
+            docs_qs = docs_qs.filter(user=profile)
+        docs_qs.update(status=Document.Status.DELETED, deleted_at=now)
+
+    # ── Hard-delete from S3 ───────────────────────────────────────────────
+    # Determine the actual S3 keys to delete.
+    # If document_ids were provided, retrieve their s3_keys.
+    keys_to_delete = list(file_names)  # already have these
+    if document_ids and not file_names:
+        # Fetch s3_keys for the soft-deleted documents (already marked deleted above)
+        keys_to_delete = list(
+            Document.objects.filter(
+                document_id__in=document_ids
+            ).values_list('s3_key', flat=True)
+        )
+
+    if not keys_to_delete:
+        return JsonResponse({'status': 'Document record(s) soft-deleted (no S3 keys to remove)'})
 
     try:
         s3 = boto3.client(
@@ -383,15 +562,17 @@ def delete_file(request):
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
             region_name=settings.AWS_S3_REGION_NAME
         )
-        objects = [{'Key': name} for name in file_names]
+        objects = [{'Key': k} for k in keys_to_delete]
         s3.delete_objects(
             Bucket=settings.AWS_STORAGE_BUCKET_NAME,
             Delete={'Objects': objects}
         )
-        return JsonResponse({'status': f'{len(file_names)} file(s) deleted from S3'})
+        return JsonResponse({'status': f'{len(keys_to_delete)} file(s) deleted'})
 
     except (BotoCoreError, ClientError) as e:
-        return JsonResponse({'error': f'Failed to delete file(s): {str(e)}'}, status=500)
+        # S3 deletion failed but DB record is already soft-deleted — report the error
+        # without rolling back the soft-delete (the record is correctly marked DELETED).
+        return JsonResponse({'error': f'DB record soft-deleted but S3 deletion failed: {str(e)}'}, status=500)
 
 
 # ──────────────────────────────────────────────
@@ -407,6 +588,12 @@ def delete_file(request):
 def upload_from_drive(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    # ── Auth: resolve the logged-in user ──────────────────────────────────
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None  # guaranteed: auth_error is None only when profile is set
 
     try:
         payload = json.loads(request.body)
@@ -428,6 +615,26 @@ def upload_from_drive(request):
             {'error': f'"{file_name}" is not supported. Only PDF, DOCX and TXT files are allowed.'},
             status=400
         )
+
+    # ── Resolve Organisation & Department (same rules as upload_file) ────
+    org  = None
+    dept = None
+
+    if profile.role == UserProfile.Role.ADMIN:
+        if not company_name:
+            return JsonResponse({'error': 'Organisation name is required.'}, status=400)
+        if not department:
+            return JsonResponse({'error': 'Department is required for each file.'}, status=400)
+        org, _  = Organization.objects.get_or_create(org_name=company_name)
+        dept, _ = Department.objects.get_or_create(org=org, dept_name=department)
+    else:
+        org  = profile.org   # may be None
+        dept = None
+
+    # ── Detect file type ───────────────────────────────────────────────────
+    ext = file_name.lower().rsplit('.', 1)[-1]
+    file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
+    file_type = file_type_map.get(ext, 'PDF')
 
     # Step 1 — Download the file from Google Drive using the OAuth token
     download_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
@@ -487,8 +694,8 @@ def upload_from_drive(request):
             )
 
         # Step 6 — Upload to S3
-        s3_url = upload_to_s3(temp_path, file_name)
-        if s3_url is None:
+        s3_key, s3_url = upload_to_s3(temp_path, file_name)
+        if s3_key is None:
             return JsonResponse({'error': 'Failed to upload file to S3'}, status=500)
 
         # Step 6b — Store file bytes in cache so analyze_compliance can forward
@@ -497,11 +704,23 @@ def upload_from_drive(request):
             file_bytes = f.read()
         cache.set(f'file_bytes_{file_name}', file_bytes, timeout=3600)
 
+        # Step 6c — Create Document record
+        document = Document.objects.create(
+            user=profile,
+            org=org,
+            dept=dept,
+            original_filename=file_name,
+            file_type=file_type,
+            size_bytes=file_size,
+            s3_key=s3_key,
+            status=Document.Status.UPLOADED,
+        )
+
         # Step 7 — Stream a single SSE 'uploaded' event back to the frontend.
         #          No AI call here — analysis is deferred to the Analyse button.
         def event_stream():
             try:
-                yield f"data: {json.dumps({'status': 'uploaded', 's3_url': s3_url})}\n\n".encode('utf-8')
+                yield f"data: {json.dumps({'status': 'uploaded', 's3_url': s3_url, 'document_id': str(document.document_id)})}\n\n".encode('utf-8')
             except Exception as e:
                 yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n".encode('utf-8')
             finally:
@@ -759,6 +978,62 @@ def login(request):
         },
         status=200
     )
+
+
+# ──────────────────────────────────────────────
+# Auth — Issue session token
+# Called by the frontend immediately after a
+# successful login (or OTP verification) to
+# exchange the user's email for a signed token
+# that home.html will store in localStorage and
+# attach to every subsequent API request.
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def issue_session_token(request):
+    """
+    POST { "email": "user@example.com" }
+    Returns { "token": "<signed-token>" }
+
+    The token is a Django-signed payload containing the user_id.
+    It is valid for 24 hours (enforced in _get_profile_from_token).
+    This endpoint should only be called after the login flow has already
+    authenticated the user — it does NOT re-check the password.
+    """
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    email = (payload.get("email") or "").strip().lower()
+    if not email:
+        return JsonResponse({"detail": "Email is required"}, status=400)
+
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(
+            auth_user__username=email
+        )
+    except ObjectDoesNotExist:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    if profile.deleted_at is not None:
+        return JsonResponse({"detail": "Account not found"}, status=404)
+
+    if not profile.is_verified:
+        return JsonResponse({"detail": "Account not verified"}, status=403)
+
+    token = signing.dumps(
+        {"uid": str(profile.user_id)},
+        salt="session-token"
+    )
+
+    return JsonResponse({
+        "token": token,
+        "role":  profile.role,
+    }, status=200)
 
 
 # ──────────────────────────────────────────────
@@ -1183,7 +1458,7 @@ def get_profile(request):
         {
             "full_name": profile.full_name,
             "email": profile.auth_user.email,
-            "role": profile.get_role_display(),
+            "role": UserProfile.Role(profile.role).label,
             "otp_is_enabled": profile.otp_is_enabled
         },
         status=200
