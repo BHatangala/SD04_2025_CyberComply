@@ -177,6 +177,7 @@
 
         const app = createApp({
             setup() {
+                const newEmail = ref(sessionStorage.getItem('pendingNewEmail') || '');
                 const otp = ref('');
                 const isVerifying = ref(false);
                 const isResending = ref(false);
@@ -239,7 +240,10 @@
                                 await fetch('http://127.0.0.1:8000/api/profile/update/', {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ full_name: pendingName })
+                                    body: JSON.stringify({ 
+                                        email: newEmail.value,
+                                        full_name: pendingName 
+                                    })
                                 });
                                 sessionStorage.setItem('userFullName', pendingName);
                             } catch (e) {
