@@ -436,6 +436,23 @@ class CoreModelsTest(TestCase):
         self.assertEqual(log.purpose, LoginHistory.Purpose.OTP_SUBMISSION)               
 
     # -----------------------------------------------------
+    # Email Update test
+    # -----------------------------------------------------
+
+    def test_login_update_email_purpose_allowed(self):
+        """
+        Verify that UPDATE_EMAIL is accepted as a valid login history purpose.
+        """
+        log = LoginHistory.objects.create(
+            user=self.profile1,
+            status=LoginHistory.Status.SUCCESS,
+            purpose=LoginHistory.Purpose.UPDATE_EMAIL,
+            ip_address="127.0.0.1",
+            user_agent="Test Browser - Email Change"
+        )
+        self.assertEqual(log.purpose, LoginHistory.Purpose.UPDATE_EMAIL)
+
+    # -----------------------------------------------------
     # Delete cascade behavior tests
     # -----------------------------------------------------
 
