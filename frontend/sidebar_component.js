@@ -325,11 +325,11 @@ const CyberComplySidebar = {
   style.textContent = `
     /* ── Sidebar panel ── */
     .sidebar {
-      position: absolute;
+      position: fixed;
       left: 0;
-      top: 60px;
+      top: 56px;
       width: 280px;
-      height: calc(100vh - 60px);
+      height: calc(100vh - 58px);
       background-color: #0d1420;
       transform: translateX(-100%);
       transition: transform 0.3s ease-in-out;

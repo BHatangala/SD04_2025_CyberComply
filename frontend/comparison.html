@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Comparison Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="sidebar_component.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -33,7 +34,10 @@
             padding: 15px 30px;
             display: flex;
             align-items: center;
-            position: relative;
+            position: fixed;       
+            top: 0;                
+            left: 0;                
+            width: 100%;            
             z-index: 100;
         }
 
@@ -155,133 +159,6 @@
             width: 30px;
             height: 30px;
             fill: #1a2845;
-        }
-
-        /* --- SIDEBAR --- */
-        .sidebar {
-            position: absolute;
-            left: 0;
-            top: 60px;
-            width: 280px;
-            bottom: 0;
-            min-height: calc(100vh - 60px);
-            background-color: #0d1420;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease-in-out;
-            z-index: 90;
-            overflow-y: auto;
-            padding: 20px 0;
-            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
-        }
-
-        .sidebar.open {
-            transform: translateX(0);
-        }
-
-        .sidebar-icon-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0px 10px 15px 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #1a2845;
-        }
-
-        .sidebar-icon {
-            width: 45px;
-            height: 45px;
-            background-color: #1a2845;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .sidebar-icon:hover {
-            background-color: #2a4a7c;
-            transform: scale(1.05);
-        }
-
-        .sidebar-icon svg {
-            width: 22px;
-            height: 22px;
-            fill: #8b9dc3;
-            transition: fill 0.3s;
-        }
-
-        .sidebar-icon:hover svg {
-            fill: #ffffff;
-        }
-
-        /* Search Input */
-        .search-container {
-            padding: 0 20px 20px;
-            display: none;
-        }
-
-        .search-container.active {
-            display: block;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 10px 15px;
-            background-color: #1a2845;
-            border: 2px solid #2a4a7c;
-            border-radius: 8px;
-            color: #ffffff;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #4a8fe7;
-        }
-
-        .sidebar-section {
-            margin-bottom: 30px;
-        }
-
-        .sidebar-header {
-            padding: 10px 20px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #6b7a99;
-            letter-spacing: 1.5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .sidebar-header svg {
-            width: 14px;
-            height: 14px;
-            fill: #6b7a99;
-        }
-
-        .sidebar-item {
-            padding: 12px 20px;
-            color: #c5d0e6;
-            cursor: pointer;
-            transition: all 0.2s;
-            border-left: 3px solid transparent;
-            font-size: 14px;
-        }
-
-        .sidebar-item:hover {
-            background-color: #1a2845;
-            border-left-color: #4a8fe7;
-            color: #ffffff;
-        }
-
-        .no-results {
-            padding: 12px 20px;
-            color: #6b7a99;
-            font-size: 12px;
-            font-style: italic;
         }
 
         /* --- MAIN CONTENT --- */
@@ -484,7 +361,7 @@
     <div id="app">
         <!-- Top Header -->
         <div class="top-header">
-            <div class="menu-icon" @click="toggleSidebar">●●●</div>
+            <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
             <div class="user-profile" @click="showProfile">
                 <svg viewBox="0 0 24 24">
                     <path
@@ -504,60 +381,10 @@
         </div>
 
         <!-- Sidebar -->
-        <div class="sidebar" :class="{ open: sidebarOpen }">
-            <div class="sidebar-icon-bar">
-                <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
-                    <svg viewBox="0 0 24 24">
-                        <path
-                            d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
-                    </svg>
-                </div>
-                <div class="sidebar-icon" @click="goToHome" title="Start new analysis">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                    </svg>
-                </div>
-            </div>
-
-            <div class="search-container" :class="{ active: searchActive }">
-                <input type="text" class="search-input" v-model="searchQuery" placeholder="Search documents..."
-                    @input="filterReports">
-            </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <svg viewBox="0 0 24 24">
-                        <path
-                            d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
-                    </svg>
-                    LAST 7 DAYS
-                </div>
-                <div v-if="filteredLast7Days.length === 0" class="no-results">No results</div>
-                <div v-else>
-                    <div v-for="report in filteredLast7Days" :key="report" class="sidebar-item"
-                        @click="openReport(report)">
-                        {{ report }}
-                    </div>
-                </div>
-            </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <svg viewBox="0 0 24 24">
-                        <path
-                            d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z" />
-                    </svg>
-                    LAST 30 DAYS
-                </div>
-                <div v-if="filteredLast30Days.length === 0" class="no-results">No results</div>
-                <div v-else>
-                    <div v-for="report in filteredLast30Days" :key="report" class="sidebar-item"
-                        @click="openReport(report)">
-                        {{ report }}
-                    </div>
-                </div>
-            </div>
-        </div>
+        <cybercomply-sidebar
+            :sidebar-open="sidebarOpen"
+            @toggle="sidebarOpen = !sidebarOpen"
+        ></cybercomply-sidebar>
 
         <!-- Main Content -->
         <div class="main-content" :class="{ shifted: sidebarOpen }">
@@ -624,50 +451,20 @@
     <script>
         const { createApp } = Vue;
 
-        createApp({
+        const app = createApp({
             data() {
                 return {
                     userRole: 'admin', // Change this to 'user' to test the button disappearing
                     sidebarOpen: true,
-                    searchActive: false,
-                    searchQuery: '',
                     selectedDepartment: 'Security',
-                    last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
-                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
-                    filteredLast7Days: [],
-                    filteredLast30Days: []
                 }
-            },
-            mounted() {
-                this.filteredLast7Days = [...this.last7Days];
-                this.filteredLast30Days = [...this.last30Days];
             },
             methods: {
                 toggleSidebar() {
                     this.sidebarOpen = !this.sidebarOpen;
                 },
-                toggleSearch() {
-                    this.searchActive = !this.searchActive;
-                    if (!this.searchActive) {
-                        this.searchQuery = '';
-                        this.filterReports();
-                    }
-                },
-                filterReports() {
-                    const query = this.searchQuery.toLowerCase();
-                    if (!query) {
-                        this.filteredLast7Days = [...this.last7Days];
-                        this.filteredLast30Days = [...this.last30Days];
-                    } else {
-                        this.filteredLast7Days = this.last7Days.filter(report => report.toLowerCase().includes(query));
-                        this.filteredLast30Days = this.last30Days.filter(report => report.toLowerCase().includes(query));
-                    }
-                },
                 showProfile() {
                     window.location.href = 'profile.html';
-                },
-                openReport(reportName) {
-                    window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
                 goBack() {
                     window.history.back();
@@ -679,7 +476,9 @@
                     window.location.href = 'comparison_dashboard_graphical.html';
                 }
             }
-        }).mount('#app');
+        });
+        registerSidebarComponent(app);
+        app.mount('#app');
     </script>
 </body>
 
