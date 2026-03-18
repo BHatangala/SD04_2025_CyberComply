@@ -48,6 +48,13 @@ urlpatterns = [
     # Fetch user profile details endpoint
     path("api/profile/", views.get_profile, name="get_profile"),
 
+    # Profile update (name change)
+    path("api/profile/update/", views.update_profile, name="update_profile"),
+
+    # Email change endpoints
+    path("api/request-email-change/", views.request_email_change, name="request_email_change"),
+    path("api/verify-email-change/", views.verify_email_change, name="verify_email_change"),
+
     # Update 2FA preference endpoint
     path("api/profile/twofa/", views.update_twofa, name="update_twofa"),
 
