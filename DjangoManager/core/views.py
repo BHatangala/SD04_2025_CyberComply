@@ -1783,3 +1783,179 @@ def delete_account(request):
     ).update(used_at=timezone.now())
 
     return JsonResponse({"detail": "Account deleted successfully"}, status=200)
+
+# ──────────────────────────────────────────────
+# Profile — Update profile (name change)
+# ──────────────────────────────────────────────
+@csrf_exempt
+@require_http_methods(["PATCH"])
+def update_profile(request):
+    """
+    PATCH /api/profile/update/
+    Body: { "email": "...", "full_name": "New Name" }
+    """
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    email = data.get("email", "").strip().lower()
+    full_name = data.get("full_name", "").strip()
+
+    if not email:
+        return JsonResponse({"detail": "Email is required"}, status=400)
+    if not full_name:
+        return JsonResponse({"detail": "full_name is required"}, status=400)
+
+    if len(full_name) < 3:
+        return JsonResponse({"detail": "Name must be at least 3 characters"}, status=400)
+
+    try:
+        profile = UserProfile.objects.get(auth_user__username=email)
+    except UserProfile.DoesNotExist:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    if profile.deleted_at:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    profile.full_name = full_name
+    profile.updated_at = timezone.now()
+    profile.save(update_fields=["full_name", "updated_at"])
+
+    return JsonResponse({
+        "detail": "Profile updated",
+        "full_name": profile.full_name
+    }, status=200)
+
+
+# ──────────────────────────────────────────────
+# Profile — Request email change (send OTP to NEW email)
+# ──────────────────────────────────────────────
+@csrf_exempt
+@require_http_methods(["POST"])
+def request_email_change(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    current_email = data.get("current_email", "").strip().lower()
+    new_email = data.get("new_email", "").strip().lower()
+    resend = data.get("resend", False)
+
+    if not current_email or not new_email:
+        return JsonResponse({"detail": "Current and new email required"}, status=400)
+
+    if current_email == new_email:
+        return JsonResponse({"detail": "New email must be different"}, status=400)
+
+    try:
+        validate_email(current_email)
+        validate_email(new_email)
+    except ValidationError:
+        return JsonResponse({"detail": "Invalid email address"}, status=400)
+
+    if User.objects.filter(username=new_email).exclude(username=current_email).exists():
+        return JsonResponse({"detail": "New email already in use"}, status=409)
+
+    try:
+        profile = UserProfile.objects.get(auth_user__username=current_email)
+    except UserProfile.DoesNotExist:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    if profile.deleted_at:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    # Generate OTP
+    raw_otp = f"{random.randint(100000, 999999)}"
+    otp_hash = hashlib.sha256(raw_otp.encode()).hexdigest()
+
+    # Store in DB (not cache — more reliable)
+    OtpVerification.objects.create(
+        user=profile,
+        otp_hash=otp_hash,
+        purpose="EMAIL_CHANGE",  # ← matches new purpose you'll add
+        expires_at=timezone.now() + timedelta(minutes=10),
+    )
+
+    # Send OTP to **new** email
+    if not send_otp_email(
+        new_email,
+        raw_otp,
+        purpose="email_change"  # ← matches your updated email_service.py
+    ):
+        return JsonResponse({"detail": "Failed to send code"}, status=500)
+
+    return JsonResponse({
+        "detail": "Verification code sent to your new email"
+    }, status=200)
+
+
+# ──────────────────────────────────────────────
+# Profile — Verify email change OTP
+# ──────────────────────────────────────────────
+@csrf_exempt
+@require_http_methods(["POST"])
+def verify_email_change(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    otp = data.get("otp", "").strip()
+    new_email = data.get("new_email", "").strip().lower()
+
+    if not otp or not new_email:
+        return JsonResponse({"detail": "OTP and new email required"}, status=400)
+
+    if not otp.isdigit() or len(otp) != 6:
+        return JsonResponse({"detail": "Invalid OTP format"}, status=400)
+
+    # Find latest unused EMAIL_CHANGE OTP for this user (we'll match by new_email later)
+    otp_row = OtpVerification.objects.filter(
+        purpose="EMAIL_CHANGE",
+        used_at__isnull=True,
+        expires_at__gt=timezone.now()
+    ).order_by("-created_at").first()
+
+    if not otp_row:
+        return JsonResponse({"detail": "No active verification code"}, status=400)
+
+    # Verify OTP hash
+    if hashlib.sha256(otp.encode()).hexdigest() != otp_row.otp_hash:
+        otp_row.attempt_count += 1
+        otp_row.save(update_fields=["attempt_count"])
+        if otp_row.attempt_count >= 5:
+            otp_row.used_at = timezone.now()
+            otp_row.save(update_fields=["used_at"])
+        return JsonResponse({"detail": "Invalid or expired code"}, status=400)
+
+    # OTP valid — update email
+    profile = otp_row.user
+    old_email = profile.auth_user.username
+
+    # Check new_email still free
+    if User.objects.filter(username=new_email).exclude(username=old_email).exists():
+        return JsonResponse({"detail": "Email taken"}, status=409)
+
+    # Update
+    profile.auth_user.username = new_email
+    profile.auth_user.email = new_email
+    profile.auth_user.save(update_fields=["username", "email"])
+
+    # Mark OTP used
+    otp_row.used_at = timezone.now()
+    otp_row.save(update_fields=["used_at"])
+
+    # Log
+    _record_login_attempt(
+        profile,
+        request,
+        LoginHistory.Status.SUCCESS,
+        LoginHistory.Purpose.UPDATE_EMAIL
+    )
+
+    return JsonResponse({
+        "detail": "Email updated successfully",
+        "new_email": new_email
+    }, status=200)
