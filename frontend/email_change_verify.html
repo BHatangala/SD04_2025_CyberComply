@@ -6,6 +6,7 @@
     <title>Verify New Email</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
     <style>
@@ -19,6 +20,30 @@
         .fade-enter-from, .fade-leave-to {
             opacity: 0;
         }
+
+        .custom-btn {
+            margin-top: 20px;
+            width: 100%;
+            padding: 10px;
+            background-color: #a2b8c8;
+            border: none;
+            color: #123456;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .custom-btn:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+        }
+
+        .custom-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
     </style>
 </head>
 <body class="h-screen w-full flex flex-col text-white overflow-hidden relative">
@@ -30,108 +55,213 @@
                 <div class="space-y-2 mb-8">
                     <h1 class="text-5xl font-medium tracking-tight">Verify New Email</h1>
                     <p class="text-gray-400 text-sm tracking-wide">
-                        Enter the OTP sent to your new email address
+                        Enter the verification code sent to<br>
+                        <span class="text-white font-semibold">{{ maskedEmail }}</span>
                     </p>
                 </div>
 
-                <transition name="fade">
-                    <div v-if="message.text" :class="[
-                        'text-sm p-3 mb-6 rounded text-center shadow-lg border w-3/4 mx-auto',
-                        message.type === 'error'
-                            ? 'bg-red-600 text-white border-red-400'
-                            : 'bg-green-600 text-white border-green-400'
-                    ]">
-                        {{ message.text }}
+                <form @submit.prevent class="space-y-6 text-left w-3/4 mx-auto" novalidate>
+                    <transition name="fade">
+                        <div v-if="message.text" :class="[
+                            'text-sm p-3 mb-6 rounded text-center shadow-lg border',
+                            message.type === 'error'
+                                ? 'bg-gray-200 text-red-600 border-red-400'
+                                : 'bg-green-600 text-white border-green-400'
+                        ]">
+                            {{ message.text }}
+                        </div>
+                    </transition>
+
+                    <div class="w-full mx-auto space-y-6">
+                        <!-- Use the standard OTP component with email_change mode -->
+                        <otp-verification
+                            :email="newEmail"
+                            mode="email_change"
+                            @verified="handleEmailChangeVerified">
+                        </otp-verification>
+
+                        <!-- Resend link -->
+                        <div class="text-center pt-2">
+                            <button 
+                                @click="resendOtp" 
+                                :disabled="isResending"
+                                class="text-xs text-gray-400 hover:text-white transition-colors tracking-wide bg-transparent border-none cursor-pointer">
+                                <i class="fas fa-redo-alt mr-1" :class="{ 'fa-spin': isResending }"></i>
+                                {{ isResending ? 'SENDING...' : 'Resend Code' }}
+                            </button>
+                        </div>
+
+                        <div class="text-center pt-2">
+                            <a href="profile.html"
+                                class="text-xs text-gray-400 hover:text-white transition-colors tracking-wide">
+                                &larr; Back to Profile
+                            </a>
+                        </div>    
                     </div>
-                </transition>
-
-                <otp-verification
-                    :email="newEmail"
-                    mode="email_change"
-                    :disabled="isVerifying"
-                    @verified="handleEmailChangeVerified">
-                </otp-verification>
-
-                <a href="profile.html" class="text-xs text-gray-400 hover:text-white">← Back to Profile</a>
+                </form>
             </div>
         </div>
     </div>
 
-    <img src="img2.png" alt="Decorative Wave" class="right-wave">
+    <img src="img2.png" alt="Decorative Wave Right" class="right-wave">
 
     <script src="otp_component.js"></script>
 
     <script>
-        const { createApp, ref } = Vue;
+        const { createApp, reactive, ref, computed } = Vue;
+
         const app = createApp({
             setup() {
                 const newEmail = ref(sessionStorage.getItem('pendingNewEmail') || '');
-                const isVerifying = ref(false);
+                const pendingName = ref(sessionStorage.getItem('pendingNameChange') || '');
+                const isResending = ref(false);
                 const message = reactive({ text: '', type: '' });
 
-                if (!newEmail.value) {
-                    Swal.fire({icon:'error', title:'No pending email change'}).then(() => window.location.href = 'profile.html');
-                    return;
+                // Mask email for display
+                const maskedEmail = computed(() => {
+                    if (!newEmail.value) return '';
+                    const parts = newEmail.value.split('@');
+                    if (parts.length !== 2) return newEmail.value;
+                    const name = parts[0];
+                    const domain = parts[1];
+                    if (name.length <= 2) return newEmail.value;
+                    return name.substring(0, 2) + '****@' + domain;
+                });
+
+                // Check if there's a welcome message from previous step
+                const pendingMessage = sessionStorage.getItem('emailChangeMessage');
+                if (pendingMessage) {
+                    message.text = pendingMessage;
+                    message.type = 'success';
+                    sessionStorage.removeItem('emailChangeMessage');
                 }
 
-                const handleEmailChangeVerified = async (token) => {
-                    isVerifying.value = true;
+                // Protect page if opened without pending email
+                if (!newEmail.value) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'No pending email change',
+                        text: 'Redirecting to profile...',
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.href = 'profile.html';
+                    });
+                }
+
+                const setMessage = (type, text) => {
+                    message.type = type;
+                    message.text = text;
+                };
+
+                const handleEmailChangeVerified = async (verificationToken) => {
                     message.text = '';
 
                     try {
-                        const res = await fetch('http://127.0.0.1:8000/api/verify-email-change/', {
+                        // First, verify the OTP and update email
+                        const response = await fetch('http://127.0.0.1:8000/api/verify-email-change/', {
                             method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ verification_token: token, new_email: newEmail.value })
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                verification_token: verificationToken,
+                                new_email: newEmail.value
+                            })
                         });
 
-                        const data = await res.json();
+                        const data = await response.json();
 
-                        if (res.ok) {
-                            sessionStorage.setItem('userEmail', newEmail.value);
-                            sessionStorage.removeItem('pendingNewEmail'); // Clean up
-
-                            message.text = 'Email successfully updated!';
-                            message.type = 'success';
-
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Email Updated!',
-                                timer: 2000,
-                                showConfirmButton: false
-                            }).then(() => {
-                                window.location.href = 'profile.html';
-                            });
-                        } else {
-                            message.text = data.detail || 'Invalid or expired code';
-                            message.type = 'error';
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Verification Failed',
-                                text: data.detail || 'Invalid code'
-                            });
+                        if (!response.ok) {
+                            setMessage('error', data.detail || 'Failed to verify email change.');
+                            return;
                         }
-                    } catch(e) {
-                        message.text = 'Network error - please try again';
-                        message.type = 'error';
+
+                        // Update email in session
+                        sessionStorage.setItem('userEmail', newEmail.value);
+                        
+                        // If there was a pending name change, apply it
+                        if (pendingName.value) {
+                            try {
+                                const nameResponse = await fetch('http://127.0.0.1:8000/api/profile/', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ 
+                                        full_name: pendingName.value
+                                    })
+                                });
+                                
+                                if (nameResponse.ok) {
+                                    const nameData = await nameResponse.json();
+                                    sessionStorage.setItem('userFullName', nameData.full_name || pendingName.value);
+                                }
+                            } catch (nameErr) {
+                                console.error('Failed to update name:', nameErr);
+                            }
+                        }
+
+                        // Clean up session storage
+                        sessionStorage.removeItem('pendingNewEmail');
+                        sessionStorage.removeItem('pendingNameChange');
+
+                        setMessage('success', 'Email successfully updated!');
+
                         Swal.fire({
-                            icon: 'error',
-                            title: 'Failed',
-                            text: 'Network error - please try again'
+                            icon: 'success',
+                            title: 'Email Updated!',
+                            text: 'Your email has been successfully changed.',
+                            timer: 2000,
+                            showConfirmButton: false
+                        }).then(() => {
+                            window.location.href = 'profile.html';
                         });
-                    } finally {
-                        isVerifying.value = false;
+
+                    } catch (error) {
+                        console.error('Error verifying email change:', error);
+                        setMessage('error', 'Something went wrong while verifying the email change.');
                     }
                 };
 
-                return { 
-                    newEmail, 
-                    isVerifying, 
-                    message, 
-                    handleEmailChangeVerified 
+                const resendOtp = async () => {
+                    isResending.value = true;
+                    message.text = '';
+
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/api/request-email-change/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                new_email: newEmail.value,
+                                resend: true
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            setMessage('error', data.detail || 'Failed to resend code.');
+                            return;
+                        }
+
+                        setMessage('success', 'New verification code sent to your email!');
+
+                    } catch (error) {
+                        console.error('Error resending OTP:', error);
+                        setMessage('error', 'Network error - please try again.');
+                    } finally {
+                        isResending.value = false;
+                    }
+                };
+
+                return {
+                    newEmail,
+                    maskedEmail,
+                    message,
+                    isResending,
+                    handleEmailChangeVerified,
+                    resendOtp
                 };
             }
         });
+
         registerOtpComponent(app);
         app.mount('#app');
     </script>

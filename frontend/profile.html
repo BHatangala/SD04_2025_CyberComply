@@ -543,6 +543,37 @@
             text-decoration: underline;
         }
 
+        .edit-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: 12px;
+        }
+
+        .cancel-btn {
+            background: transparent;
+            border: 1px solid #6b7a99;
+            color: #6b7a99;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .cancel-btn:hover {
+            background: rgba(107,122,153,0.1);
+            color: #fff;
+        }
+
+        .cancel-icon {
+            cursor: pointer;
+            color: #8b9dc3;
+            font-size: 18px;
+            transition: color 0.3s;
+        }
+        .cancel-icon:hover {
+            color: #ff6b6b;
+        }
+
         /* === RESPONSIVE DESIGN === */
         @media screen and (max-width: 1200px) {
             .sidebar {
@@ -659,19 +690,27 @@
                     <label>Name</label>
                     <span class="profile-colon">:</span>
                     <div v-if="editingField !== 'name'" class="profile-value">{{ fullName }}</div>
-                    <input v-else type="text" v-model="editedFullName" class="profile-input"
-                           @keyup.enter="saveField('name')" @blur="saveField('name')" ref="nameInput">
+                    <div v-else class="flex items-center">
+                        <input type="text" v-model="editedFullName" class="profile-input"
+                            @keyup.enter="saveField('name')" @keyup.esc="cancelEdit('name')" ref="nameInput">
+                        <span class="cancel-icon" @click="cancelEdit('name')" title="Cancel">✕</span>
+                    </div>
                     <span class="edit-icon" @click="startEditing('name')" v-if="editingField !== 'name'">✎</span>
                 </div>
+
                 <!-- Email -->
                 <div class="profile-field">
                     <label>Email</label>
                     <span class="profile-colon">:</span>
                     <div v-if="editingField !== 'email'" class="profile-value">{{ email }}</div>
-                    <input v-else type="email" v-model="editedEmail" class="profile-input"
-                           @keyup.enter="saveField('email')" @blur="saveField('email')" ref="emailInput">
+                    <div v-else class="flex items-center">
+                        <input type="email" v-model="editedEmail" class="profile-input"
+                            @keyup.enter="saveField('email')" @keyup.esc="cancelEdit('email')" ref="emailInput">
+                        <span class="cancel-icon" @click="cancelEdit('email')" title="Cancel">✕</span>
+                    </div>
                     <span class="edit-icon" @click="startEditing('email')" v-if="editingField !== 'email'">✎</span>
                 </div>
+
                 <!-- Password -->
                 <div class="profile-field password-field">
                     <label>Password</label>
@@ -742,6 +781,8 @@
                 originalEmail: '',
                 editedFullName: '',
                 editedEmail: '',
+                tempFullName: '',
+                tempEmail: '',
                 editingField: null,
                 hasChanges: false,
                 isSaving: false,
@@ -837,27 +878,28 @@
                     }
                 },
 
-                startEditing(field) {
-                    this.editingField = field;
-                    this.$nextTick(() => {
-                        const input = this.$refs[field + 'Input'];
-                        if (input) input.focus();
-                    });
-                },
-
                 saveField(field) {
                     this.editingField = null;
                 },
 
                 async confirmSave() {
-                    if (this.editedFullName.trim().length < 3) {
+                    const nameChanged = this.editedFullName.trim() !== this.originalFullName;
+                    const emailChanged = this.editedEmail.trim().toLowerCase() !== this.originalEmail;
+
+                    // If no changes at all → shouldn't happen due to v-if="hasChanges"
+                    if (!nameChanged && !emailChanged) return;
+
+                    // Validate name if changed
+                    if (nameChanged && this.editedFullName.trim().length < 3) {
                         return Swal.fire({
                             icon: 'error',
                             title: 'Invalid Name',
                             text: 'Name must be at least 3 characters'
                         });
                     }
-                    if (this.editedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.editedEmail)) {
+
+                    // Validate email if changed
+                    if (emailChanged && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.editedEmail)) {
                         return Swal.fire({
                             icon: 'error',
                             title: 'Invalid Email',
@@ -865,11 +907,9 @@
                         });
                     }
 
-                    const isEmailChange = this.editedEmail !== this.originalEmail;
-
                     const result = await Swal.fire({
-                        title: isEmailChange ? 'Change Email?' : 'Save Changes?',
-                        text: isEmailChange 
+                        title: emailChanged ? 'Change Email?' : 'Save Changes?',
+                        text: emailChanged 
                             ? 'A verification code will be sent to the new email address.' 
                             : 'Save profile changes?',
                         icon: 'question',
@@ -878,13 +918,67 @@
                         confirmButtonText: 'Yes'
                     });
 
-                    if (result.isConfirmed) {
-                        if (isEmailChange) {
-                            sessionStorage.setItem('pendingNewEmail', this.editedEmail.trim().toLowerCase());
-                            window.location.href = 'email_change_verify.html';
-                        } else {
-                            await this.saveNameOnly();
+                    if (!result.isConfirmed) return;
+
+                    this.isSaving = true;
+
+                    try {
+                        // Step 1: If name changed → save it immediately (PATCH)
+                        if (nameChanged) {
+                            const res = await fetch('http://127.0.0.1:8000/api/profile/', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ full_name: this.editedFullName.trim() })
+                            });
+                            if (!res.ok) {
+                                const err = await res.json();
+                                throw new Error(err.detail || 'Name update failed');
+                            }
+                            const data = await res.json();
+                            this.fullName = this.originalFullName = data.full_name;
+                            sessionStorage.setItem('userFullName', data.full_name);
+
+                            // Reset temp values after successful name save
+                            this.tempFullName = '';
                         }
+
+                        // Step 2: If email changed → redirect to OTP page
+                        if (emailChanged) {
+                            sessionStorage.setItem('pendingNewEmail', this.editedEmail.trim().toLowerCase());
+                            // Reset temp values before redirect
+                            this.tempEmail = '';
+                            // Show a brief loading message before redirect
+                            Swal.fire({
+                                title: 'Redirecting...',
+                                text: 'Taking you to email verification',
+                                timer: 1000,
+                                showConfirmButton: false,
+                                didOpen: () => Swal.showLoading()
+                            }).then(() => {
+                                window.location.href = 'email_change_verify.html';
+                            });
+                            return;
+                        }
+
+                        // If only name changed (or both but name first)
+                        this.hasChanges = false;
+                        this.editingField = null;
+                        this.tempFullName = '';
+                        this.tempEmail = '';
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Saved!',
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+                    } catch (err) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Failed',
+                            text: err.message || 'Could not save changes'
+                        });
+                    } finally {
+                        this.isSaving = false;
                     }
                 },
 
@@ -913,6 +1007,36 @@
                     } finally {
                         this.isSaving = false;
                     }
+                },
+
+                startEditing(field) {
+                    // Store current value as temp backup for cancel
+                    if (field === 'name') this.tempFullName = this.editedFullName;
+                    if (field === 'email') this.tempEmail = this.editedEmail;
+
+                    this.editingField = field;
+                    this.$nextTick(() => {
+                        const input = this.$refs[field + 'Input'];
+                        if (input) {
+                            input.focus();
+                            input.select(); // Highlight text for easy overwrite
+                        }
+                    });
+                },
+
+                cancelEdit(field) {
+                    // Revert to original/previous value
+                    if (field === 'name') {
+                        this.editedFullName = this.tempFullName || this.originalFullName;
+                        this.tempFullName = '';
+                    }
+                    if (field === 'email') {
+                        this.editedEmail = this.tempEmail || this.originalEmail;
+                        this.tempEmail = '';
+                    }
+
+                    this.editingField = null;
+                    this.hasChanges = false; // Reset if no real change
                 },
 
                 async updateTwoFactorSetting() {
