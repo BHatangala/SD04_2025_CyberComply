@@ -32,6 +32,12 @@ def send_otp_email(email: str, otp: str, purpose: str = "verification") -> bool:
                 "intro": "We received a request to delete your account.",
                 "instruction": "Use the verification code below to confirm account deletion.",
             },
+            "email_change": {
+                "subject": f"{app_name} Email Change Verification Code",
+                "title": "Email Change Verification Code",
+                "intro": "We received a request to change your email address.",
+                "instruction": "Use the verification code below to confirm your new email address.",
+            },
         }
 
         selected = purpose_config.get(purpose, purpose_config["verification"])
