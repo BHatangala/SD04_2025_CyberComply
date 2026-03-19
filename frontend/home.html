@@ -681,6 +681,11 @@
             color: #ff9800;
         }
 
+        .status-uploading {
+            background: rgba(74, 143, 231, 0.12);
+            color: #4a8fe7;
+        }
+
         .status-uploaded {
             background: rgba(139, 157, 195, 0.15);
             color: #8b9dc3;
@@ -1318,7 +1323,9 @@
         computed: {
             // True if any file is still in the uploading state
             hasUploadingFiles() {
-                return this.uploadedFiles.some(f => f.status === 'uploading' || f.status === 'pending');
+                return this.uploadedFiles.some(f =>
+                    f.status === 'uploading' || (f.status === 'pending' && this.isAdmin)
+                );
             },
 
             // True if admin mode and any ready file is missing a department
@@ -1447,7 +1454,7 @@
                     const fileObj = {
                         name:       file.name,
                         size:       file.size,
-                        status:     'pending', 
+                        status:     this.isAdmin ? 'pending' : 'uploading',
                         department: '',
                         deptOpen:   false,
                         rawFile:    file,
@@ -1456,6 +1463,10 @@
                     };
 
                     this.uploadedFiles.push(fileObj);
+
+                    if (!this.isAdmin) {
+                        this.uploadToDjango(fileObj);
+                    }
                 }
             },
 
