@@ -186,23 +186,15 @@ def _get_profile_from_token(request) -> "tuple[UserProfile, None] | tuple[None, 
 # ──────────────────────────────────────────────
 
 @csrf_exempt
+@csrf_exempt
 def upload_file(request):
-    """
-    Receives a single file from the frontend, runs security checks, stores
-    it in S3, and creates a Document record in the database.
-
-    Requires a valid X-Session-Token header (issued by api/session-token/).
-    The AI analysis step is intentionally absent — it is triggered separately
-    by the Analyse button via analyze_compliance or analyze_batch.
-    """
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
 
-    # ── Auth: resolve the logged-in user ──────────────────────────────────
     profile, auth_error = _get_profile_from_token(request)
     if auth_error:
         return auth_error
-    assert profile is not None  # guaranteed: auth_error is None only when profile is set
+    assert profile is not None
 
     uploaded_file = request.FILES.get('document')
     company_name  = request.POST.get('company_name', '').strip()
@@ -211,21 +203,7 @@ def upload_file(request):
     if not uploaded_file:
         return JsonResponse({'error': 'No file provided'}, status=400)
 
-    # ── Resolve Organisation & Department ────────────────────────────────
-    #
-    # ADMINISTRATIVE_USER:
-    #   - company_name is typed freely in the UI per upload session.
-    #   - department is selected per file via the dept pill.
-    #   - Both are required. The org/dept are get_or_created so admins can
-    #     register new organisations on first upload without a separate step.
-    #
-    # GENERAL_USER:
-    #   - No org name field or dept pill is shown in the UI.
-    #   - We use the org already linked to their UserProfile (set by an admin).
-    #   - If their profile has no org, we still allow the upload but store
-    #     org/dept as NULL — the Document FK allows null for this case.
-    #     (If you later make org/dept mandatory for all roles, add a guard here.)
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── Resolve Organisation & Department FIRST, before touching S3 ───────
     org  = None
     dept = None
 
@@ -233,18 +211,9 @@ def upload_file(request):
         if not company_name:
             return JsonResponse({'error': 'Organisation name is required.'}, status=400)
         if not department:
-            return JsonResponse({'error': 'Department is required for each file.'}, status=400)
-
-        # get_or_create so admins can introduce new orgs on first upload
-        org, _ = Organization.objects.get_or_create(org_name=company_name)
-
-        # get_or_create dept within this org
+            return JsonResponse({'error': 'Department is required. Please select a department before uploading.'}, status=400)
+        org, _  = Organization.objects.get_or_create(org_name=company_name)
         dept, _ = Department.objects.get_or_create(org=org, dept_name=department)
-
-    else:
-        # General user — use profile-linked org if available (informational only)
-        org  = profile.org           # may be None — FK is nullable
-        dept = None                  # no dept concept for general users
 
     # ── Detect file type ───────────────────────────────────────────────────
     ext = uploaded_file.name.lower().rsplit('.', 1)[-1]
@@ -276,18 +245,14 @@ def upload_file(request):
         if s3_key is None:
             return JsonResponse({'error': 'Failed to upload file to S3'}, status=500)
 
-        # Keep the file bytes in the Django cache so analyze_compliance can
-        # forward them directly to the AI without touching S3 again.
         with open(temp_path, 'rb') as f:
             file_bytes = f.read()
         cache.set(f'file_bytes_{uploaded_file.name}', file_bytes, timeout=3600)
 
-        # ── Create Document record ─────────────────────────────────────────
-        # org and dept are None for GENERAL_USER — the model FK fields allow null.
         document = Document.objects.create(
             user=profile,
-            org=org,           # None for general users
-            dept=dept,         # None for general users
+            org=org,
+            dept=dept,
             original_filename=uploaded_file.name,
             file_type=file_type,
             size_bytes=uploaded_file.size,
