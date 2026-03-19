@@ -35,4 +35,9 @@ urlpatterns = [
     path("api/analysis/history/", views.get_analysis_history, name="get_analysis_history"),
     path("api/analysis/<uuid:result_id>/", views.get_analysis_by_id, name="get_analysis_by_id"),
     path("api/analysis/<uuid:result_id>/findings/", views.get_findings_for_result, name="get_findings_for_result"),
+
+    # ── Admin Access Request API ──────────────────────────────────────────────
+    path("api/admin-access/request/", views.request_admin_access, name="request_admin_access"),
+    path("api/admin-access/verify/",  views.verify_admin_access,  name="verify_admin_access"),
+    path("api/admin-access/status/",  views.get_admin_access_status, name="get_admin_access_status"),
 ]
