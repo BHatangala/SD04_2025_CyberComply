@@ -7,7 +7,7 @@ from django.db.models.deletion import ProtectedError
 import hashlib
 
 # Database Model Unit Tests.
-from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document, AnalysisResult, Recommendation, AuditLog
+from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document, AnalysisResult, Recommendation, AuditLog, AdminAccessRequest
 
 class CoreModelsTest(TestCase):
     def setUp(self):
@@ -869,3 +869,212 @@ class ReportModelTest(TestCase):
                 expires_at=self.now + timedelta(days=1)
             )
             r.full_clean()
+
+
+# -----------------------------------------------------
+# AdminAccessRequest tests
+# -----------------------------------------------------
+ 
+class AdminAccessRequestModelTest(TestCase):
+    def setUp(self):
+        self.now = timezone.now()
+ 
+        # Auth user + profile
+        self.auth = User.objects.create_user(
+            username="admin.req@cybercomply.lk",
+            email="admin.req@cybercomply.lk",
+            password="SecurePass123!X"
+        )
+        self.profile = UserProfile.objects.create(
+            auth_user=self.auth,
+            full_name="Admin Requester",
+            role=UserProfile.Role.GENERAL,
+            is_verified=True,
+        )
+ 
+        # A second profile for isolation tests
+        self.auth2 = User.objects.create_user(
+            username="admin.req2@cybercomply.lk",
+            email="admin.req2@cybercomply.lk",
+            password="SecurePass123!Y"
+        )
+        self.profile2 = UserProfile.objects.create(
+            auth_user=self.auth2,
+            full_name="Admin Requester Two",
+            role=UserProfile.Role.GENERAL,
+            is_verified=True,
+        )
+ 
+        # OTP record used for verification FK
+        self.otp = OtpVerification.objects.create(
+            user=self.profile,
+            otp_hash=hashlib.sha256("999999".encode()).hexdigest(),
+            purpose=OtpVerification.Purpose.ADMIN_REQUEST_VERIFY,
+            expires_at=self.now + timedelta(minutes=5),
+        )
+ 
+        # Base request (PENDING, no OTP yet)
+        self.req1 = AdminAccessRequest.objects.create(
+            user=self.profile,
+            org_email="admin.req@cybercomply.lk",
+            status=AdminAccessRequest.Status.PENDING,
+        )
+ 
+        # Approved request with OTP linked
+        self.req2 = AdminAccessRequest.objects.create(
+            user=self.profile,
+            verification_otp=self.otp,
+            org_email="admin.req@cybercomply.lk",
+            status=AdminAccessRequest.Status.APPROVED,
+            verified_at=self.now,
+        )
+ 
+        # Rejected request with failure reason
+        self.req3 = AdminAccessRequest.objects.create(
+            user=self.profile2,
+            org_email="admin.req2@cybercomply.lk",
+            status=AdminAccessRequest.Status.REJECTED,
+            verified_at=self.now,
+            failure_reason="Organization email domain not recognised.",
+        )
+ 
+    # ── Basic creation ────────────────────────────────────────────────────
+ 
+    def test_admin_access_request_create_and_count(self):
+        # Verify that three records were created successfully
+        self.assertEqual(AdminAccessRequest.objects.count(), 3)
+ 
+    def test_admin_access_request_uuid_primary_key(self):
+        # Verify that request_id is auto-assigned as a valid UUID
+        import uuid
+        self.assertIsInstance(self.req1.request_id, uuid.UUID)
+ 
+    # ── FK: user (CASCADE) ────────────────────────────────────────────────
+ 
+    def test_admin_access_request_fk_user(self):
+        # Verify that the request is correctly linked to its user profile
+        self.assertEqual(self.req1.user, self.profile)
+ 
+    def test_admin_access_request_cascade_delete_user(self):
+        # Deleting the user profile must cascade-delete its access requests.
+        # Capture the PK before deletion — after delete() the instance is unsaved.
+        profile2_id = self.profile2.user_id
+ 
+        # Remove PROTECT-guarded related records so the profile can be deleted
+        LoginHistory.objects.filter(user=self.profile2).delete()
+        OtpVerification.objects.filter(user=self.profile2).delete()
+        self.profile2.delete()
+ 
+        # Filter by the captured UUID, not the deleted instance
+        self.assertEqual(
+            AdminAccessRequest.objects.filter(user_id=profile2_id).count(), 0
+        )
+ 
+    # ── FK: verification_otp (SET NULL) ──────────────────────────────────
+ 
+    def test_admin_access_request_fk_otp_set_null_on_delete(self):
+        # Deleting the OTP must set verification_otp to NULL on linked requests
+        otp_id = self.otp.otp_id
+        # Must unlink from req2 first because OtpVerification uses PROTECT elsewhere;
+        # here we only care about AdminAccessRequest's SET NULL behaviour.
+        # Delete req1 that has no OTP, then delete the OTP record via DB.
+        AdminAccessRequest.objects.filter(verification_otp=self.otp).update(verification_otp=None)
+        self.otp.delete()
+        self.req2.refresh_from_db()
+        self.assertIsNone(self.req2.verification_otp)
+ 
+    def test_admin_access_request_otp_nullable(self):
+        # A request may be created without an OTP (verification_otp=None)
+        self.assertIsNone(self.req1.verification_otp)
+ 
+    def test_admin_access_request_otp_linked(self):
+        # Verify that an OTP can be linked to a request
+        self.assertEqual(self.req2.verification_otp, self.otp)
+ 
+    # ── Status choices ────────────────────────────────────────────────────
+ 
+    def test_admin_access_request_status_pending(self):
+        # PENDING is accepted and stored correctly
+        self.assertEqual(self.req1.status, AdminAccessRequest.Status.PENDING)
+ 
+    def test_admin_access_request_status_approved(self):
+        # APPROVED is accepted and stored correctly
+        self.assertEqual(self.req2.status, AdminAccessRequest.Status.APPROVED)
+ 
+    def test_admin_access_request_status_rejected(self):
+        # REJECTED is accepted and stored correctly
+        self.assertEqual(self.req3.status, AdminAccessRequest.Status.REJECTED)
+ 
+    def test_admin_access_request_invalid_status_rejected_by_validation(self):
+        # Invalid status values must fail model validation
+        req = AdminAccessRequest(
+            user=self.profile,
+            org_email="test@example.com",
+            status="INVALID_STATUS",
+        )
+        with self.assertRaises(Exception):
+            req.full_clean()
+ 
+    # ── Timestamps ───────────────────────────────────────────────────────
+ 
+    def test_admin_access_request_requested_at_default(self):
+        # requested_at must be populated automatically
+        self.assertIsNotNone(self.req1.requested_at)
+ 
+    def test_admin_access_request_verified_at_nullable(self):
+        # verified_at may be NULL for a PENDING request
+        self.assertIsNone(self.req1.verified_at)
+ 
+    def test_admin_access_request_verified_at_set_on_approval(self):
+        # verified_at is stored correctly when set
+        self.assertIsNotNone(self.req2.verified_at)
+ 
+    # ── org_email field ───────────────────────────────────────────────────
+ 
+    def test_admin_access_request_org_email_stored(self):
+        # org_email is stored and retrieved correctly
+        self.assertEqual(self.req1.org_email, "admin.req@cybercomply.lk")
+ 
+    def test_admin_access_request_org_email_required(self):
+        # org_email must not be blank
+        req = AdminAccessRequest(
+            user=self.profile,
+            org_email="",
+            status=AdminAccessRequest.Status.PENDING,
+        )
+        with self.assertRaises(Exception):
+            req.full_clean()
+ 
+    # ── failure_reason field ──────────────────────────────────────────────
+ 
+    def test_admin_access_request_failure_reason_nullable(self):
+        # failure_reason is NULL for non-rejected requests
+        self.assertIsNone(self.req1.failure_reason)
+ 
+    def test_admin_access_request_failure_reason_stored(self):
+        # failure_reason is stored correctly when provided
+        self.assertEqual(
+            self.req3.failure_reason,
+            "Organization email domain not recognised."
+        )
+ 
+    # ── Multiple requests per user ────────────────────────────────────────
+ 
+    def test_admin_access_request_multiple_per_user(self):
+        # A user may have more than one request (e.g. re-apply after rejection)
+        self.assertEqual(
+            AdminAccessRequest.objects.filter(user=self.profile).count(), 2
+        )
+ 
+    def test_admin_access_request_isolated_per_user(self):
+        # Requests for different users are not mixed
+        self.assertEqual(
+            AdminAccessRequest.objects.filter(user=self.profile2).count(), 1
+        )
+ 
+    # ── __str__ ───────────────────────────────────────────────────────────
+ 
+    def test_admin_access_request_str(self):
+        # String representation includes user, status and org_email
+        expected = f"{self.profile} — PENDING (admin.req@cybercomply.lk)"
+        self.assertEqual(str(self.req1), expected)
