@@ -622,6 +622,7 @@
                 return {
                     sidebarOpen: false,
                     orgEmail: '',
+                    currentRequestId: null,           // store request_id from backend
                     step: 'form',              // 'form' | 'otp' | 'success'
                     message: { text: '', type: '' },
                     loading: false,
@@ -637,6 +638,9 @@
                 // Initialize filtered lists
                 this.filteredLast7Days = [...this.last7Days];
                 this.filteredLast30Days = [...this.last30Days];
+
+                // Check current admin access status on load
+                this.checkAdminRequestStatus();
             },
             methods: {
                 toggleSidebar() {
@@ -648,46 +652,127 @@
                 openReport(reportName) {
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
-                sendVerification() {
-                    // Clear previous message
+                //Send Admin Access Request
+                async sendVerification() {
                     this.message = { text: '', type: '' };
 
-                    // Same email regex used in login page
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-                    // Check empty or invalid format
                     if (!this.orgEmail || !emailRegex.test(this.orgEmail)) {
-                        this.message = {
-                            text: 'Please enter a valid email address.',
-                            type: 'error'
-                        };
+                        this.message = { text: 'Please enter a valid email address.', type: 'error' };
                         return;
                     }
 
-                    // simulate sending OTP
-                    this.step = 'otp';
-                    this.message = {
-                        text: `OTP sent to ${this.orgEmail}`,
-                        type: 'success'
-                    };
+                    this.loading = true;
+
+                    try {
+                        const response = await fetch('/api/admin-access/request/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${localStorage.getItem('sessionToken') || ''}`
+                            },
+                            body: JSON.stringify({ org_email: this.orgEmail })
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.detail || 'Request failed');
+                        }
+
+                        this.currentRequestId = data.request_id;
+                        this.step = 'otp';
+                        this.message = {
+                            text: `Verification code sent to ${this.orgEmail}`,
+                            type: 'success'
+                        };
+
+                    } catch (err) {
+                        this.message = {
+                            text: err.message || 'Something went wrong. Please try again.',
+                            type: 'error'
+                        };
+                    } finally {
+                        this.loading = false;
+                    }
                 },
-                handleOtpVerified() {
-                    // save email for profile page
-                    sessionStorage.setItem('userRole', 'Administrative User');
-                    sessionStorage.setItem('userEmail', this.orgEmail);
+                // Handle successful OTP verification
+                async handleOtpVerified(otpCode) {
+                    if (!this.currentRequestId) {
+                        this.message = { text: 'No active request found. Please start over.', type: 'error' };
+                        this.step = 'form';
+                        return;
+                    }
 
-                    // show green success message
-                    this.message = {
-                        text: 'Administrative access granted successfully.',
-                        type: 'success'
-                    };
+                    this.loading = true;
 
-                    this.step = 'success';
+                    try {
+                        const response = await fetch('/api/admin-access/verify/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${localStorage.getItem('sessionToken') || ''}`
+                            },
+                            body: JSON.stringify({
+                                otp: otpCode,
+                                request_id: this.currentRequestId
+                            })
+                        });
 
-                    // redirect after message
-                    setTimeout(() => {
-                        window.location.href = 'profile.html';
-                    }, 2200);
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.detail || 'Verification failed');
+                        }
+
+                        // Success!
+                        sessionStorage.setItem('userRole', 'Administrative User');
+                        sessionStorage.setItem('userEmail', this.orgEmail);
+
+                        this.message = {
+                            text: 'Administrative access granted successfully!',
+                            type: 'success'
+                        };
+                        this.step = 'success';
+
+                        setTimeout(() => {
+                            window.location.href = 'profile.html';
+                        }, 2200);
+
+                    } catch (err) {
+                        this.message = {
+                            text: err.message || 'Invalid or expired code. Please try again.',
+                            type: 'error'
+                        };
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                // Check current admin access request status on page load
+                async checkAdminRequestStatus() {
+                    try {
+                        const res = await fetch('/api/admin-access/status/', {
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('sessionToken') || ''}`
+                            }
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.status === 'PENDING') {
+                                this.orgEmail = data.org_email;
+                                this.currentRequestId = data.request_id;
+                                this.step = 'otp';
+                                this.message = {
+                                    text: `You have a pending request. Enter the code sent to ${data.org_email}`,
+                                    type: 'success'
+                                };
+                            } else if (data.status === 'APPROVED') {
+                                sessionStorage.setItem('userRole', 'Administrative User');
+                            }
+                        }
+                    } catch (e) {
+                        // silent fail — not critical
+                    }
                 },
                 goToProfile() {
                     window.location.href = 'profile.html';
