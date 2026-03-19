@@ -807,7 +807,10 @@
         */
         computed: {
                 roleDisplay() {
-                    return this.role === 'ADMINISTRATIVE_USER' ? 'Administrative User' : 'General User';
+                    const role = (this.role || "").toLowerCase();
+                    if (role.includes("administrative")) return "Administrative User";
+                    if (role.includes("general")) return "General User";
+                    return "General User";
                 }
             },
         watch: {
