@@ -324,20 +324,17 @@
 
         .metrics-row {
             display: flex;
-            align-items: center;
+            align-items: stretch;
             justify-content: space-between;
             margin-bottom: 50px;
-            gap: 20px;
-            flex-wrap: wrap;
+            gap: 55px;
         }
 
         .metric-box {
             background-color: white;
             color: black;
             padding: 15px 20px;
-            min-width: 200px;
-            width: auto;
-            /* Flexible width for longer names */
+            flex: 1;                
             height: 70px;
             display: flex;
             align-items: center;
@@ -379,9 +376,8 @@
             font-size: 1.1rem;
             letter-spacing: 1px;
             font-weight: 400;
-            min-width: 200px;
+            flex: 1;              
             padding: 15px 20px;
-            /* Adjust padding for the stats to be slightly thinner */
         }
 
         .stat-box div {
@@ -477,6 +473,24 @@
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.2);
         }
+
+        /* ── NEW: single-dept notice on the dropdown ── */
+        .custom-select option[disabled] {
+            color: #8b9dc3;
+            font-style: italic;
+            font-size: 0.85rem;
+        }
+
+        /* ── NEW: no-data banner ── */
+        .no-data-banner {
+            background: rgba(231,74,74,0.08);
+            border: 1px solid rgba(231,74,74,0.25);
+            border-radius: 10px;
+            padding: 18px 24px;
+            font-size: 14px;
+            color: #e74a4a;
+            margin-bottom: 30px;
+        }
     </style>
 </head>
 
@@ -565,20 +579,39 @@
 
             <!-- Dashboard Content -->
             <div class="dashboard-container">
-                <div class="company-name">ABC Company</div>
+
+                <!-- No data state -->
+                <div class="no-data-banner" v-if="!hasData">
+                    ⚠ No analysis result found. Please run a document analysis first from the home page.
+                </div>
+
+                <!-- Company name from metadata -->
+                <div class="company-name">Company Name : {{ companyName }}</div>
 
                 <div class="metrics-row">
+                    <!-- Department dropdown -->
                     <select class="metric-box custom-select" v-model="selectedDepartment">
-                        <option value="Security">Security Department</option>
-                        <option value="IT">IT Department</option>
-                        <option value="Finance">Finance Department</option>
-                        <option value="HR">HR Department</option>
-                        <option value="Admin">Admin Department</option>
+                        <!-- The analysed department — always present -->
+                        <option
+                            v-if="departmentName"
+                            :value="departmentName">
+                            {{ departmentName }} Department
+                        </option>
+                        <!-- Shown only when there is exactly one department, as a hint -->
+                        <option disabled value=""
+                            v-if="departmentName">
+                            — Only one department analysed —
+                        </option>
+                        <!-- Fallback when no data at all -->
+                        <option disabled value="" v-if="!departmentName">
+                            No departments available
+                        </option>
                     </select>
 
+                    <!-- Score and risk level from real AI result -->
                     <div class="info-box stat-box">
-                        <div>Score : 80%</div>
-                        <div>Risk Level : Low</div>
+                        <div>Score : {{ complianceScore }}%</div>
+                        <div>Risk Level : {{ overallRiskLevel }}</div>
                     </div>
 
                     <div class="metric-box" style="cursor: pointer;" @click="showGraphic" v-if="userRole === 'admin'">
@@ -586,32 +619,22 @@
                     </div>
                 </div>
 
-                <div class="info-box recommendations-section">
-                    <h2 class="rec-title">{{ selectedDepartment }} DEPARTMENTAL RECOMMENDATIONS :</h2>
+                <!-- Recommendations list for selected department -->
+                <div class="info-box recommendations-section" v-if="hasData">
+                    <h2 class="rec-title">{{ selectedDepartment || departmentName }} DEPARTMENTAL RECOMMENDATIONS :</h2>
                     <ul class="rec-list">
-                        <li>
-                            Lorem ipsum dolor sit amet, consectetur adipiscing elit
+                        <li v-for="rec in departmentRecommendations" :key="rec.requirementId">
+                            {{ rec.clauseTitle }}
                             <ul class="sub-rec-list">
-                                <li>As mentioned in page 15, line 18 of the Personal Data Protection Act No 9 of 2022
-                                </li>
+                                <li>{{ rec.reference }}</li>
                             </ul>
                         </li>
-                        <li>
-                            Lorem ipsum dolor sit amet, consectetur adipiscing elit
-                            <ul class="sub-rec-list">
-                                <li>As mentioned in page 15, line 18 of the Personal Data Protection Act No 9 of 2022
-                                </li>
-                            </ul>
-                        </li>
-                        <li>
-                            Lorem ipsum dolor sit amet, consectetur adipiscing elit
-                            <ul class="sub-rec-list">
-                                <li>As mentioned in page 15, line 18 of the Personal Data Protection Act No 9 of 2022
-                                </li>
-                            </ul>
+                        <li v-if="departmentRecommendations.length === 0">
+                            No recommendations — this department is fully compliant.
                         </li>
                     </ul>
                 </div>
+
             </div>
         </div>
 
@@ -631,18 +654,81 @@
                     sidebarOpen: true,
                     searchActive: false,
                     searchQuery: '',
-                    selectedDepartment: 'Security',
+                    selectedDepartment: '',
                     last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
                     last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
                     filteredLast7Days: [],
-                    filteredLast30Days: []
+                    filteredLast30Days: [],
+
+                    // ── Loaded from localStorage ──
+                    hasData:          false,
+                    companyName:      'Unknown Organisation',
+                    departmentName:   '',      // department assigned to the uploaded doc
+                    complianceScore:  0,
+                    allDetails:       []       // raw AI details array
+                }
+            },
+            computed: {
+                // Derive a plain-English overall risk level from the compliance score
+                overallRiskLevel() {
+                    if (this.complianceScore >= 75) return 'Low';
+                    if (this.complianceScore >= 40) return 'Medium';
+                    return 'High';
+                },
+
+                // Simple recommendation list: non-compliant + partial items for the selected dept
+                // Since there is currently only one department, this always reflects that dept's data.
+                // When multi-dept storage is added later, filter by selectedDepartment here.
+                departmentRecommendations() {
+                    return this.allDetails
+                        .filter(d => d.status === 'non_compliant' || d.status === 'partial')
+                        .map(d => ({
+                            requirementId: d.requirement_id,
+                            clauseTitle:   d.clause || d.requirement_id,
+                            // Build a concise PDPA reference from the requirement_id
+                            // e.g. SL-PDPA-S6-1 → Section 6(1) of the Personal Data Protection Act No. 9 of 2022
+                            reference:     this.buildReferenceFromId(d.requirement_id)
+                        }));
                 }
             },
             mounted() {
                 this.filteredLast7Days = [...this.last7Days];
                 this.filteredLast30Days = [...this.last30Days];
+                this.loadFromLocalStorage();
             },
             methods: {
+                loadFromLocalStorage() {
+                    const raw = localStorage.getItem('latestAnalysisResult');
+                    if (!raw) return;
+                    try {
+                        const result = JSON.parse(raw);
+
+                        this.hasData        = true;
+                        this.companyName    = result._meta?.company    || 'Unknown Organisation';
+                        // Department was stored in _meta by home.html when the file was uploaded
+                        this.departmentName = result._meta?.department || 'General';
+                        this.selectedDepartment = this.departmentName;
+
+                        const score = result.compliance?.compliance_score ?? 0;
+                        this.complianceScore = Math.round(score);
+                        this.allDetails      = result.compliance?.details || [];
+                    } catch (e) {
+                        console.error('Failed to parse analysis result from localStorage:', e);
+                    }
+                },
+
+                // Derive a human-readable PDPA reference string from a requirement ID.
+                // e.g. "SL-PDPA-S6-1"  → "Section 6(1) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)"
+                // e.g. "SL-PDPA-S23-1" → "Section 23(1) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)"
+                buildReferenceFromId(id) {
+                    // Strip the "SL-PDPA-S" prefix and split remaining parts on "-"
+                    const stripped = id.replace(/^SL-PDPA-S/, '');
+                    const parts    = stripped.split('-');
+                    let ref = `Section ${parts[0]}`;
+                    if (parts[1]) ref += `(${parts[1]})`;
+                    return `${ref} of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)`;
+                },
+
                 toggleSidebar() {
                     this.sidebarOpen = !this.sidebarOpen;
                 },
