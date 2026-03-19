@@ -26,7 +26,7 @@ import boto3
 import re
 from botocore.exceptions import BotoCoreError, ClientError
 
-from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report, AuditLog
+from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report, AuditLog, AdminAccessRequest
 
 # ──────────────────────────────────────────────
 # Security Configuration
@@ -2535,4 +2535,241 @@ def get_findings_for_result(request, result_id):
             ],
         },
         status=200,
+    )
+
+
+# ──────────────────────────────────────────────
+# Admin Access Request
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def request_admin_access(request):
+    """
+    POST /api/admin-access/request/
+    Body: { "org_email": "user@company.com" }
+ 
+    Creates an AdminAccessRequest with status=PENDING, then sends an OTP to
+    org_email so the user can prove ownership of that address.
+ 
+    Returns 201 on success.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+ 
+    # Already an admin — nothing to do
+    if profile.role == UserProfile.Role.ADMIN:
+        return JsonResponse(
+            {"detail": "Your account already has administrative access."},
+            status=400
+        )
+ 
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+ 
+    org_email = (data.get("org_email") or "").strip().lower()
+    if not org_email:
+        return JsonResponse({"detail": "org_email is required"}, status=400)
+ 
+    try:
+        validate_email(org_email)
+    except ValidationError:
+        return JsonResponse({"detail": "Please enter a valid email address."}, status=400)
+ 
+    # Check for an existing PENDING request to prevent duplicates
+    existing = AdminAccessRequest.objects.filter(
+        user=profile,
+        status=AdminAccessRequest.Status.PENDING
+    ).first()
+    if existing:
+        return JsonResponse(
+            {"detail": "You already have a pending admin access request."},
+            status=409
+        )
+ 
+    # Invalidate any previous ADMIN_REQUEST_VERIFY OTPs for this user
+    OtpVerification.objects.filter(
+        user=profile,
+        purpose=OtpVerification.Purpose.ADMIN_REQUEST_VERIFY,
+        used_at__isnull=True
+    ).update(used_at=timezone.now())
+ 
+    # Generate OTP
+    raw_otp = _generate_and_store_otp(profile, OtpVerification.Purpose.ADMIN_REQUEST_VERIFY)
+    otp_row = OtpVerification.objects.filter(
+        user=profile,
+        purpose=OtpVerification.Purpose.ADMIN_REQUEST_VERIFY,
+        used_at__isnull=True
+    ).order_by("-created_at").first()
+ 
+    # Create the request record
+    access_request = AdminAccessRequest.objects.create(
+        user=profile,
+        verification_otp=otp_row,
+        org_email=org_email,
+        status=AdminAccessRequest.Status.PENDING,
+    )
+ 
+    # Send OTP to the org email
+    if not send_otp_email(org_email, raw_otp, purpose="admin_access"):
+        # Roll back the request if email delivery fails
+        access_request.delete()
+        return JsonResponse(
+            {"detail": "Failed to send verification code. Please try again."},
+            status=500
+        )
+ 
+    _record_audit_log(
+        profile, "ADMIN_ACCESS_REQUEST", "admin_access_request",
+        access_request.request_id, True, request
+    )
+ 
+    return JsonResponse(
+        {
+            "detail": "A verification code has been sent to your organisation email.",
+            "request_id": str(access_request.request_id),
+        },
+        status=201
+    )
+ 
+ 
+@csrf_exempt
+@require_http_methods(["POST"])
+def verify_admin_access(request):
+    """
+    POST /api/admin-access/verify/
+    Body: { "otp": "123456", "org_email": "user@company.com" }
+ 
+    Validates the OTP.  On success:
+      • Marks the AdminAccessRequest as APPROVED (verified_at = now)
+      • Upgrades the user's role to ADMINISTRATIVE_USER
+      • Marks the OTP as used
+ 
+    Returns 200 on success.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    otp       = (data.get("otp") or "").strip()
+    request_id = (data.get("request_id") or "").strip()
+
+    if not otp or not request_id:
+        return JsonResponse({"detail": "otp and request_id are required"}, status=400)
+
+    if not otp.isdigit() or len(otp) != 6:
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
+
+    try:
+        access_request = AdminAccessRequest.objects.select_related("verification_otp").get(
+            request_id=request_id,
+            user=profile,
+            status=AdminAccessRequest.Status.PENDING
+        )
+    except AdminAccessRequest.DoesNotExist:
+        return JsonResponse({"detail": "No pending request found with this ID"}, status=404)
+
+    otp_row = access_request.verification_otp
+
+    if not otp_row or otp_row.used_at is not None:
+        return JsonResponse({"detail": "No valid OTP associated with this request"}, status=400)
+
+    # Brute-force guard
+    if otp_row.attempt_count >= MAX_OTP_ATTEMPTS:
+        otp_row.used_at = timezone.now()
+        otp_row.save(update_fields=["used_at"])
+        access_request.status = AdminAccessRequest.Status.REJECTED
+        access_request.verified_at = timezone.now()
+        access_request.failure_reason = "Too many incorrect OTP attempts."
+        access_request.save(update_fields=["status", "verified_at", "failure_reason"])
+        return JsonResponse(
+            {"detail": "Too many verification attempts. Please submit a new request."},
+            status=401
+        )
+
+    # Expiry check
+    if otp_row.expires_at <= timezone.now():
+        otp_row.used_at = timezone.now()
+        otp_row.save(update_fields=["used_at"])
+        access_request.status = AdminAccessRequest.Status.REJECTED
+        access_request.verified_at = timezone.now()
+        access_request.failure_reason = "Verification code expired."
+        access_request.save(update_fields=["status", "verified_at", "failure_reason"])
+        return JsonResponse({"detail": "Invalid or expired verification code"}, status=401)
+
+    # Hash comparison
+    incoming_hash = hashlib.sha256(otp.encode()).hexdigest()
+    if incoming_hash != otp_row.otp_hash:
+        otp_row.attempt_count += 1
+        otp_row.save(update_fields=["attempt_count"])
+        return JsonResponse({"detail": "Invalid verification code"}, status=401)
+
+    # Success
+    now = timezone.now()
+    with transaction.atomic():
+        otp_row.used_at = now
+        otp_row.save(update_fields=["used_at"])
+
+        access_request.status = AdminAccessRequest.Status.APPROVED
+        access_request.verified_at = now
+        access_request.save(update_fields=["status", "verified_at"])
+
+        profile.role = UserProfile.Role.ADMIN
+        profile.updated_at = now
+        profile.save(update_fields=["role", "updated_at"])
+
+    _record_audit_log(
+        profile, "ADMIN_ACCESS_APPROVED", "admin_access_request",
+        access_request.request_id, True, request
+    )
+
+    return JsonResponse(
+        {"detail": "Administrative access granted successfully.", "role": profile.role},
+        status=200
+    )
+ 
+ 
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_admin_access_status(request):
+    """
+    GET /api/admin-access/status/
+ 
+    Returns the most recent AdminAccessRequest record for the authenticated
+    user so the frontend can show current status (PENDING / APPROVED / REJECTED).
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+ 
+    latest = (
+        AdminAccessRequest.objects
+        .filter(user=profile)
+        .order_by("-requested_at")
+        .first()
+    )
+ 
+    if not latest:
+        return JsonResponse({"detail": "No admin access request found."}, status=404)
+ 
+    return JsonResponse(
+        {
+            "request_id":     str(latest.request_id),
+            "status":         latest.status,
+            "org_email":      latest.org_email,
+            "requested_at":   latest.requested_at.isoformat(),
+            "verified_at":    latest.verified_at.isoformat() if latest.verified_at else None,
+            "failure_reason": latest.failure_reason,
+        },
+        status=200
     )
