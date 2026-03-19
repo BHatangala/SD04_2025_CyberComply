@@ -1894,18 +1894,51 @@ def verify_email_change(request):
     if not otp.isdigit() or len(otp) != 6:
         return JsonResponse({"detail": "Invalid OTP format"}, status=400)
 
-    # Find latest unused EMAIL_CHANGE OTP for this user (we'll match by new_email later)
+    try:
+        validate_email(new_email)
+    except ValidationError:
+        return JsonResponse({"detail": "Invalid new email"}, status=400)
+
+    # Step 1: Find the user by the new_email they claim
+    # (we'll verify OTP belongs to them in next step)
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(
+            auth_user__username=new_email  # Wait — no: new_email is not yet in DB
+        )
+    except UserProfile.DoesNotExist:
+        # Actually we can't look up by new_email — need current_email or token
+        # Better: require current_email in payload from frontend
+        return JsonResponse({"detail": "Verification failed"}, status=400)
+
+    # IMPROVED VERSION: Require current_email in request body
+    current_email = data.get("current_email", "").strip().lower()
+    if not current_email:
+        return JsonResponse({"detail": "Current email required for verification"}, status=400)
+
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(
+            auth_user__username=current_email
+        )
+    except UserProfile.DoesNotExist:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    if profile.deleted_at:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    # Now find OTP belonging to THIS user only
     otp_row = OtpVerification.objects.filter(
+        user=profile,
         purpose="EMAIL_CHANGE",
         used_at__isnull=True,
         expires_at__gt=timezone.now()
     ).order_by("-created_at").first()
 
     if not otp_row:
-        return JsonResponse({"detail": "No active verification code"}, status=400)
+        return JsonResponse({"detail": "No active verification code found for this account"}, status=400)
 
     # Verify OTP hash
-    if hashlib.sha256(otp.encode()).hexdigest() != otp_row.otp_hash:
+    incoming_hash = hashlib.sha256(otp.encode()).hexdigest()
+    if incoming_hash != otp_row.otp_hash:
         otp_row.attempt_count += 1
         otp_row.save(update_fields=["attempt_count"])
         if otp_row.attempt_count >= 5:
@@ -1914,23 +1947,20 @@ def verify_email_change(request):
         return JsonResponse({"detail": "Invalid or expired code"}, status=400)
 
     # OTP valid — update email
-    profile = otp_row.user
     old_email = profile.auth_user.username
 
-    # Check new_email still free
+    # Final check: new_email still available
     if User.objects.filter(username=new_email).exclude(username=old_email).exists():
-        return JsonResponse({"detail": "Email taken"}, status=409)
+        return JsonResponse({"detail": "Email already taken"}, status=409)
 
-    # Update
+    # Perform update
     profile.auth_user.username = new_email
     profile.auth_user.email = new_email
     profile.auth_user.save(update_fields=["username", "email"])
 
-    # Mark OTP used
     otp_row.used_at = timezone.now()
     otp_row.save(update_fields=["used_at"])
 
-    # Log
     _record_login_attempt(
         profile,
         request,

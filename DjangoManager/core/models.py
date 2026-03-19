@@ -77,6 +77,7 @@ class OtpVerification(models.Model):
         RESET_PASSWORD = "RESET_PASSWORD", "RESET_PASSWORD"
         DELETE_ACCOUNT = "DELETE_ACCOUNT", "DELETE_ACCOUNT"
         ADMIN_REQUEST_VERIFY = "ADMIN_REQUEST_VERIFY", "ADMIN_REQUEST_VERIFY"
+        EMAIL_CHANGE = "EMAIL_CHANGE", "EMAIL_CHANGE"
 
     otp_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(UserProfile, on_delete=models.PROTECT, related_name="otps")

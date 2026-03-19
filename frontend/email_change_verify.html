@@ -212,7 +212,8 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 otp: otp.value,
-                                new_email: newEmail.value
+                                new_email: newEmail.value,
+                                current_email: sessionStorage.getItem('userEmail')
                             })
                         });
 
@@ -290,6 +291,7 @@
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
+                                current_email: sessionStorage.getItem('userEmail'),
                                 new_email: newEmail.value,
                                 resend: true
                             })
