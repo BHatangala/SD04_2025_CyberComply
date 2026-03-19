@@ -1928,7 +1928,7 @@ def verify_email_change(request):
     # Now find OTP belonging to THIS user only
     otp_row = OtpVerification.objects.filter(
         user=profile,
-        purpose="EMAIL_CHANGE",
+        purpose=OtpVerification.Purpose.EMAIL_CHANGE,
         used_at__isnull=True,
         expires_at__gt=timezone.now()
     ).order_by("-created_at").first()
