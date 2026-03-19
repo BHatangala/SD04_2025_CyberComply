@@ -320,3 +320,44 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.action_type} - {self.target_type}"
+
+
+# =========================
+# Table: admin_access_request
+# =========================
+class AdminAccessRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING  = "PENDING",  "Pending"
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+ 
+    request_id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user                = models.ForeignKey(
+                            UserProfile,
+                            on_delete=models.CASCADE,
+                            related_name="admin_access_requests"
+                          )
+    verification_otp    = models.ForeignKey(
+                            OtpVerification,
+                            on_delete=models.SET_NULL,
+                            null=True, blank=True,
+                            related_name="+",
+                            db_column="verification_otp_id"
+                          )
+    org_email           = models.CharField(max_length=255, db_column="org_email")
+    status              = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    requested_at        = models.DateTimeField(default=timezone.now, db_column="requested_at")
+    verified_at         = models.DateTimeField(null=True, blank=True, db_column="verified_at")
+    failure_reason      = models.TextField(null=True, blank=True, db_column="failure_reason")
+ 
+    class Meta:
+        db_table = "admin_access_request"
+        ordering = ["-requested_at"]
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["status", "requested_at"]),
+        ]
+ 
+    def __str__(self):
+        return f"{self.user} — {self.status} ({self.org_email})"
+ 
