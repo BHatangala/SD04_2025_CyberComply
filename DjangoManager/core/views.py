@@ -1853,11 +1853,18 @@ def request_email_change(request):
     raw_otp = f"{random.randint(100000, 999999)}"
     otp_hash = hashlib.sha256(raw_otp.encode()).hexdigest()
 
+    # Invalidate previous email-change OTPs
+    OtpVerification.objects.filter(
+        user=profile,
+        purpose=OtpVerification.Purpose.EMAIL_CHANGE,
+        used_at__isnull=True
+    ).update(used_at=timezone.now())
+
     # Store in DB (not cache — more reliable)
     OtpVerification.objects.create(
         user=profile,
         otp_hash=otp_hash,
-        purpose="EMAIL_CHANGE",  # ← matches new purpose you'll add
+        purpose=OtpVerification.Purpose.EMAIL_CHANGE,
         expires_at=timezone.now() + timedelta(minutes=10),
     )
 
@@ -1865,7 +1872,7 @@ def request_email_change(request):
     if not send_otp_email(
         new_email,
         raw_otp,
-        purpose="email_change"  # ← matches your updated email_service.py
+        purpose="email_change"
     ):
         return JsonResponse({"detail": "Failed to send code"}, status=500)
 
@@ -1899,19 +1906,20 @@ def verify_email_change(request):
     except ValidationError:
         return JsonResponse({"detail": "Invalid new email"}, status=400)
 
-    # Step 1: Find the user by the new_email they claim
-    # (we'll verify OTP belongs to them in next step)
-    try:
-        profile = UserProfile.objects.select_related("auth_user").get(
-            auth_user__username=new_email  # Wait — no: new_email is not yet in DB
-        )
-    except UserProfile.DoesNotExist:
-        # Actually we can't look up by new_email — need current_email or token
-        # Better: require current_email in payload from frontend
-        return JsonResponse({"detail": "Verification failed"}, status=400)
-
-    # IMPROVED VERSION: Require current_email in request body
     current_email = data.get("current_email", "").strip().lower()
+    if not current_email:
+        return JsonResponse({"detail": "Current email is required"}, status=400)
+
+    if current_email == new_email:
+        return JsonResponse({"detail": "New email must be different"}, status=400)
+
+    try:
+        profile = UserProfile.objects.select_related("auth_user").get(auth_user__username=current_email)
+    except UserProfile.DoesNotExist:
+        return JsonResponse({"detail": "User not found"}, status=404)
+
+    if profile.deleted_at:
+        return JsonResponse({"detail": "User not found"}, status=404)
     if not current_email:
         return JsonResponse({"detail": "Current email required for verification"}, status=400)
 
