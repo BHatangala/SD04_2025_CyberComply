@@ -447,3 +447,72 @@ SELECT * FROM recommendations;
 \echo '=============================='
 \echo 'END OF DEMO SCRIPT'
 \echo '=============================='
+
+-- ==============================
+-- 8. REPORTS
+-- ==============================
+
+\echo ''
+\echo '8.1 Valid Insert - Report linked to existing analysis_result'
+\echo ''
+INSERT INTO reports (report_id, result_id, report_snapshot, report_s3_key, file_size, generated_at, expires_at)
+VALUES (
+    gen_random_uuid(),
+    (SELECT result_id FROM analysis_result LIMIT 1),
+    '{"company": "Lanka FinTech (Pvt) Ltd", "framework": "ISO 27001", "score": 87}',
+    'reports/lanka-fintech-iso27001-2026-03-01.pdf',
+    204800,
+    NOW(),
+    NOW() + INTERVAL '30 days'
+);
+
+\echo ''
+\echo '8.2 Valid Select - All reports'
+\echo ''
+SELECT report_id, result_id, report_s3_key, file_size, generated_at, expires_at
+FROM reports
+ORDER BY generated_at DESC;
+
+\echo ''
+\echo '8.3 Invalid Insert - NULL report_snapshot (violates NOT NULL constraint)'
+\echo '    Expected: ERROR'
+\echo ''
+INSERT INTO reports (report_id, result_id, report_snapshot, report_s3_key, file_size, generated_at, expires_at)
+VALUES (
+    gen_random_uuid(),
+    (SELECT result_id FROM analysis_result LIMIT 1),
+    NULL,
+    'reports/missing-snapshot.pdf',
+    1024,
+    NOW(),
+    NOW() + INTERVAL '30 days'
+);
+
+\echo ''
+\echo '8.4 Invalid Insert - Non-existent result_id (violates FK constraint)'
+\echo '    Expected: ERROR — foreign key violation'
+\echo ''
+INSERT INTO reports (report_id, result_id, report_snapshot, report_s3_key, file_size, generated_at, expires_at)
+VALUES (
+    gen_random_uuid(),
+    '00000000-0000-0000-0000-000000000000',
+    '{"company": "Test"}',
+    'reports/orphan.pdf',
+    1024,
+    NOW(),
+    NOW() + INTERVAL '30 days'
+);
+
+\echo ''
+\echo '8.5 CASCADE Delete - Deleting analysis_result removes linked reports'
+\echo ''
+DELETE FROM analysis_result
+WHERE result_id = (SELECT result_id FROM analysis_result LIMIT 1);
+
+SELECT * FROM reports;
+\echo '    Expected: 0 rows for the deleted result'
+
+\echo ''
+\echo '=============================='
+\echo 'END OF DEMO SCRIPT (REPORTS)'
+\echo '=============================='

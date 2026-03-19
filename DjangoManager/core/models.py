@@ -132,7 +132,11 @@ class LoginHistory(models.Model):
         DELETE_ACCOUNT_OTP = "DELETE_ACCOUNT_OTP", "DELETE_ACCOUNT_OTP"
         UPDATE_2FA = "UPDATE_2FA", "UPDATE_2FA"
         UPDATE_EMAIL = "UPDATE_EMAIL", "UPDATE_EMAIL"
+<<<<<<< HEAD
         OTP_SUBMISSION = "OTP_SUBMISSION", "OTP_SUBMISSION" # Fallback purpose used when no active OTP record exists
+=======
+        OTP_SUBMISSION = "OTP_SUBMISSION", "OTP_SUBMISSION"
+>>>>>>> b298825 (Implemented reports table, backend API and  unit tests)
 
     login_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(UserProfile, on_delete=models.PROTECT, related_name="login_history")
@@ -140,7 +144,7 @@ class LoginHistory(models.Model):
     attempt_time = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=Status.choices)
 
-    purpose = models.CharField(max_length=30,choices=Purpose.choices)
+    purpose = models.CharField(max_length=30, choices=Purpose.choices)
 
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(null=True, blank=True)
@@ -150,7 +154,12 @@ class LoginHistory(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.status}"
+<<<<<<< HEAD
     
+=======
+
+
+>>>>>>> b298825 (Implemented reports table, backend API and  unit tests)
 # =========================
 # Table: document
 # =========================
@@ -177,7 +186,11 @@ class Document(models.Model):
         blank=True,
         related_name="documents"
     )
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> b298825 (Implemented reports table, backend API and  unit tests)
     dept = models.ForeignKey(
         Department,
         on_delete=models.SET_NULL,
@@ -211,16 +224,31 @@ class Document(models.Model):
 
     def __str__(self):
         return self.original_filename
+<<<<<<< HEAD
     
 # =========================
 # Table: analysis_result (placeholder - to be properly implemented by Ammaar)
+=======
+
+
+# =========================
+# Table: analysis_result
+>>>>>>> b298825 (Implemented reports table, backend API and  unit tests)
 # =========================
 class AnalysisResult(models.Model):
     result_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
     class Meta:
         db_table = "analysis_result"
+<<<<<<< HEAD
     
+=======
+
+    def __str__(self):
+        return str(self.result_id)
+
+
+>>>>>>> b298825 (Implemented reports table, backend API and  unit tests)
 # =========================
 # Table: recommendations
 # =========================
@@ -247,4 +275,32 @@ class Recommendation(models.Model):
         db_table = "recommendations"
 
     def __str__(self):
+<<<<<<< HEAD
         return f"{self.act_name} - {self.status}"
+=======
+        return f"{self.act_name} - {self.status}"
+
+
+# =========================
+# Table: reports
+# =========================
+class Report(models.Model):
+    report_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    result = models.ForeignKey(
+        AnalysisResult,
+        on_delete=models.CASCADE,
+        related_name="reports",
+        db_column="result_id"
+    )
+    report_snapshot = models.JSONField()
+    report_s3_key = models.CharField(max_length=255)
+    file_size = models.BigIntegerField()
+    generated_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        db_table = "reports"
+
+    def __str__(self):
+        return str(self.report_id)
+>>>>>>> b298825 (Implemented reports table, backend API and  unit tests)

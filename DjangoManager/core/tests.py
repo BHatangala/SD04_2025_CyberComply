@@ -661,3 +661,103 @@ class CoreModelsTest(TestCase):
     def test_recommendation_str(self):
         # Verify that the string representation includes act name and status
         self.assertEqual(str(self.rec1), "Data Protection Act - PENDING")
+
+# -----------------------------------------------------
+# Report & AnalysisResult tests
+# -----------------------------------------------------
+
+from .models import Report
+
+class ReportModelTest(TestCase):
+    def setUp(self):
+        self.now = timezone.now()
+
+        self.result1 = AnalysisResult.objects.create()
+        self.result2 = AnalysisResult.objects.create()
+
+        self.report1 = Report.objects.create(
+            result=self.result1,
+            report_snapshot={
+                "company": "Lanka FinTech (Pvt) Ltd",
+                "framework": "ISO 27001",
+                "score": 87,
+                "findings": ["Access control gaps", "Missing encryption policy"]
+            },
+            report_s3_key="reports/lanka-fintech-iso27001-2026-03-01.pdf",
+            file_size=204800,
+            expires_at=self.now + timedelta(days=30)
+        )
+
+        self.report2 = Report.objects.create(
+            result=self.result2,
+            report_snapshot={
+                "company": "Serendib Health Systems PLC",
+                "framework": "GDPR",
+                "score": 72,
+                "findings": ["Data retention not documented", "No DPO appointed"]
+            },
+            report_s3_key="reports/serendib-health-gdpr-2026-03-15.pdf",
+            file_size=153600,
+            expires_at=self.now + timedelta(days=30)
+        )
+
+    def test_report_create_and_count(self):
+        self.assertEqual(Report.objects.count(), 2)
+
+    def test_report_id_is_uuid(self):
+        import uuid
+        self.assertIsInstance(self.report1.report_id, uuid.UUID)
+
+    def test_report_snapshot_is_dict(self):
+        self.assertIsInstance(self.report1.report_snapshot, dict)
+        self.assertEqual(self.report1.report_snapshot["framework"], "ISO 27001")
+
+    def test_report_file_size_is_int(self):
+        self.assertIsInstance(self.report1.file_size, int)
+        self.assertEqual(self.report1.file_size, 204800)
+
+    def test_report_s3_key_stored_correctly(self):
+        self.assertEqual(
+            self.report2.report_s3_key,
+            "reports/serendib-health-gdpr-2026-03-15.pdf"
+        )
+
+    def test_report_generated_at_auto(self):
+        self.assertIsNotNone(self.report1.generated_at)
+
+    def test_report_expires_at_in_future(self):
+        self.assertTrue(self.report1.expires_at > self.now)
+
+    def test_report_fk_to_analysis_result(self):
+        self.assertEqual(self.report1.result, self.result1)
+        self.assertEqual(self.report2.result, self.result2)
+
+    def test_report_reverse_relation(self):
+        self.assertEqual(self.result1.reports.count(), 1)
+
+    def test_cascade_delete_analysis_result_deletes_reports(self):
+        result1_id = self.result1.result_id
+        self.result1.delete()
+        self.assertEqual(Report.objects.filter(result_id=result1_id).count(), 0)
+
+    def test_report_missing_s3_key_raises(self):
+        with self.assertRaises(Exception):
+            r = Report(
+                result=self.result1,
+                report_snapshot={"key": "value"},
+                report_s3_key=None,
+                file_size=1024,
+                expires_at=self.now + timedelta(days=1)
+            )
+            r.full_clean()
+
+    def test_report_missing_snapshot_raises(self):
+        with self.assertRaises(Exception):
+            r = Report(
+                result=self.result1,
+                report_snapshot=None,
+                report_s3_key="reports/test.pdf",
+                file_size=1024,
+                expires_at=self.now + timedelta(days=1)
+            )
+            r.full_clean()

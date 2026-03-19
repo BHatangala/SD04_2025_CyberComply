@@ -26,7 +26,7 @@ import boto3
 import re
 from botocore.exceptions import BotoCoreError, ClientError
 
-from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Recommendation
+from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Recommendation, Report
 
 # ──────────────────────────────────────────────
 # Security Configuration
@@ -2065,4 +2065,118 @@ def get_recommendations(request):
             }
             for rec in recommendations
         ]
+    }, status=200)
+
+# ──────────────────────────────────────────────
+# Reports — List all
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def list_reports(request):
+    """
+    GET /api/reports/
+    Returns all reports ordered by generated_at descending.
+    """
+    if request.method != "GET":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    reports = Report.objects.select_related("result").order_by("-generated_at")
+    data = []
+    for r in reports:
+        snapshot = r.report_snapshot or {}
+        display_name = snapshot.get("company", r.report_s3_key)
+        framework = snapshot.get("framework", "")
+        if framework:
+            display_name = f"{display_name} — {framework}"
+        data.append({
+            "report_id": str(r.report_id),
+            "display_name": display_name,
+            "report_s3_key": r.report_s3_key,
+            "file_size": r.file_size,
+            "generated_at": r.generated_at.isoformat(),
+            "expires_at": r.expires_at.isoformat(),
+        })
+
+    return JsonResponse({"reports": data}, status=200)
+
+
+# ──────────────────────────────────────────────
+# Reports — Generate
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def generate_report(request):
+    """
+    POST /api/reports/generate/
+    Body: { "result_id": "<uuid>", "report_snapshot": {...}, "report_s3_key": "...", "file_size": 123, "expires_in_days": 30 }
+    Creates a Report record linked to an AnalysisResult.
+    """
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    result_id = (payload.get("result_id") or "").strip()
+    report_snapshot = payload.get("report_snapshot")
+    report_s3_key = (payload.get("report_s3_key") or "").strip()
+    file_size = payload.get("file_size")
+    expires_in_days = payload.get("expires_in_days", 30)
+
+    if not result_id or not report_snapshot or not report_s3_key or file_size is None:
+        return JsonResponse({"detail": "result_id, report_snapshot, report_s3_key and file_size are required"}, status=400)
+
+    try:
+        analysis_result = AnalysisResult.objects.get(result_id=result_id)
+    except (AnalysisResult.DoesNotExist, Exception):
+        return JsonResponse({"detail": "analysis_result not found"}, status=404)
+
+    try:
+        expires_at = timezone.now() + timedelta(days=int(expires_in_days))
+        report = Report.objects.create(
+            result=analysis_result,
+            report_snapshot=report_snapshot,
+            report_s3_key=report_s3_key,
+            file_size=int(file_size),
+            expires_at=expires_at
+        )
+    except Exception as e:
+        return JsonResponse({"detail": f"Failed to create report: {str(e)}"}, status=500)
+
+    return JsonResponse({
+        "detail": "Report generated successfully",
+        "report_id": str(report.report_id),
+        "generated_at": report.generated_at.isoformat(),
+        "expires_at": report.expires_at.isoformat()
+    }, status=201)
+
+
+# ──────────────────────────────────────────────
+# Reports — Retrieve
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def get_report(request, report_id):
+    """
+    GET /api/reports/<report_id>/
+    Returns a single report's metadata and snapshot.
+    """
+    if request.method != "GET":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    try:
+        report = Report.objects.select_related("result").get(report_id=report_id)
+    except Report.DoesNotExist:
+        return JsonResponse({"detail": "Report not found"}, status=404)
+
+    return JsonResponse({
+        "report_id": str(report.report_id),
+        "result_id": str(report.result.result_id),
+        "report_snapshot": report.report_snapshot,
+        "report_s3_key": report.report_s3_key,
+        "file_size": report.file_size,
+        "generated_at": report.generated_at.isoformat(),
+        "expires_at": report.expires_at.isoformat()
     }, status=200)

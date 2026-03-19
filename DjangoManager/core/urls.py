@@ -4,6 +4,7 @@ from . import views
 # URL patterns for core application APIs
 urlpatterns = [
 
+<<<<<<< HEAD
     path('', views.home, name='home'),  # This makes home.html show at http://127.0.0.1:8000/ai/
 
     # ── Two-phase document pipeline ──
@@ -25,6 +26,17 @@ urlpatterns = [
     path('upload-from-drive/', views.upload_from_drive, name='upload_from_drive'),
 
     # S3 file deletion (called by frontend × button)
+=======
+    path('', views.home, name='home'),
+
+    # ── Two-phase document pipeline ──
+    path('upload/', views.upload_file, name='upload_file'),
+    path('analyze/', views.analyze_compliance, name='analyze_compliance'),
+    path('analyze-batch/', views.analyze_batch, name='analyze_batch'),
+    path('upload-from-drive/', views.upload_from_drive, name='upload_from_drive'),
+
+    # S3 file deletion
+>>>>>>> b298825 (Implemented reports table, backend API and  unit tests)
     path('api/delete-file/', views.delete_file, name='delete_file'),
 
     # User registration endpoint
@@ -75,5 +87,19 @@ urlpatterns = [
 
     # Fetch recommendations for a given analysis result
     path("api/recommendations/", views.get_recommendations, name="get_recommendations"),
+<<<<<<< HEAD
     
 ]
+=======
+
+    # Report list endpoint
+    path("api/reports/", views.list_reports, name="list_reports"),
+
+    # Report generation endpoint
+    path("api/reports/generate/", views.generate_report, name="generate_report"),
+
+    # Report retrieval endpoint
+    path("api/reports/<uuid:report_id>/", views.get_report, name="get_report"),
+
+]
+>>>>>>> b298825 (Implemented reports table, backend API and  unit tests)
