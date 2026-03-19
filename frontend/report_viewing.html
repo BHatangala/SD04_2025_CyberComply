@@ -522,13 +522,13 @@
             No results to display
         </div>
         <div v-else>
-          <div 
-              v-for="report in filteredLast7Days" 
-              :key="report"
+          <div
+              v-for="report in filteredLast7Days"
+              :key="report.report_id"
               class="sidebar-item"
               @click="openReport(report)"
           >
-              {{ report }}
+              {{ report.display_name }}
           </div>
         </div>
       </div>
@@ -544,13 +544,13 @@
               No results to display
           </div>
           <div v-else>
-              <div 
-                  v-for="report in filteredLast30Days" 
-                  :key="report"
+              <div
+                  v-for="report in filteredLast30Days"
+                  :key="report.report_id"
                   class="sidebar-item"
                   @click="openReport(report)"
               >
-                  {{ report }}
+                  {{ report.display_name }}
               </div>
           </div>
       </div>
@@ -559,8 +559,34 @@
     <!-- Main Content -->
     <div class="report-viewer" :class="{ shifted: sidebarOpen }">
         <h2 class="report-title">{{ currentReport || 'Select a report' }}</h2>
-        <div class="pdf-container">
-            {{ currentReportContent || 'Please select a report from the sidebar to view its content.' }}
+        <div class="pdf-container" style="padding: 24px; overflow-y: auto;">
+            <div v-if="!currentSnapshot" style="color:#6b7a99; text-align:center; margin-top:40px;">
+                Please select a report from the sidebar to view its content.
+            </div>
+            <div v-else>
+                <div style="margin-bottom:16px;"><strong>File:</strong> {{ currentSnapshot.metadata?.file_analyzed || '—' }}</div>
+                <div style="margin-bottom:16px;"><strong>Company:</strong> {{ currentSnapshot.metadata?.company || '—' }}</div>
+                <div style="margin-bottom:16px;"><strong>Compliance Score:</strong> {{ currentSnapshot.compliance?.compliance_score ?? '—' }}%</div>
+                <div style="margin-bottom:16px;"><strong>Risk Level:</strong> {{ currentSnapshot.risks?.status || '—' }}</div>
+                <div v-if="currentSnapshot.risks?.factors?.length" style="margin-bottom:16px;">
+                    <strong>Risk Factors:</strong>
+                    <ul style="margin-top:8px; padding-left:20px;">
+                        <li v-for="(f, i) in currentSnapshot.risks.factors" :key="i">{{ f }}</li>
+                    </ul>
+                </div>
+                <div v-if="currentSnapshot.recommendations?.top_action" style="margin-bottom:16px;">
+                    <strong>Top Recommendation:</strong> {{ currentSnapshot.recommendations.top_action }}
+                </div>
+                <div v-if="currentSnapshot.compliance?.details?.length" style="margin-top:20px;">
+                    <strong>Compliance Details:</strong>
+                    <div v-for="(d, i) in currentSnapshot.compliance.details" :key="i"
+                         style="margin-top:12px; padding:12px; background:#1a2845; border-radius:8px;">
+                        <div><strong>{{ d.clause }}</strong> — <span :style="{ color: d.status === 'compliant' ? '#4caf50' : '#f44336' }">{{ d.status }}</span></div>
+                        <div style="margin-top:4px; font-size:13px; color:#c5d0e6;">{{ d.reasoning }}</div>
+                        <div style="margin-top:4px; font-size:12px; color:#8b9dc3;">Risk: {{ d.risk_level }} | Confidence: {{ d.confidence }}%</div>
+                    </div>
+                </div>
+            </div>
         </div>
         <p class="report-notice">Note: Reports are automatically deleted after 30 days.</p>
     </div>
@@ -618,35 +644,42 @@ createApp({
       sidebarOpen: false,
       searchActive: false,
       searchQuery: '',
-      last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
-      last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
+      last7Days: [],
+      last30Days: [],
       filteredLast7Days: [],
       filteredLast30Days: [],
-      currentReport:'',
-      currentReportContent:'',
-      isAdmin: false,
-      reportContents: {
-            "Curtin Report": "Loading Curtin Report content...",
-            "IFS Report": "Loading IFS Report content...",
-            "Pearson Report": "Loading Pearson Report content...",
-            "Wiley Report": "Loading Wiley Report content...",
-            "Example Report": "Loading Example Report content..."
-        }
+      currentReport: '',
+      currentSnapshot: null,
+      isAdmin: false
     }
   },
-mounted() {
-    //Initialize filtered lists
-    this.filteredLast7Days = [...this.last7Days];
-    this.filteredLast30Days = [...this.last30Days];
-
+async mounted() {
+    await this.fetchReports();
     const params = new URLSearchParams(window.location.search);
-    const reportFromUrl = params.get('report');
-
-    if (reportFromUrl) {
-      this.openReport(reportFromUrl);
+    const reportId = params.get('report_id');
+    if (reportId) {
+      const report = [...this.last7Days, ...this.last30Days].find(r => r.report_id === reportId);
+      if (report) this.openReport(report);
     }
+    this.isAdmin = localStorage.getItem('role') === 'ADMINISTRATIVE_USER';
   },
   methods: {
+    async fetchReports() {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/reports/');
+        if (!res.ok) return;
+        const data = await res.json();
+        const now = new Date();
+        const cutoff7 = new Date(now - 7 * 24 * 60 * 60 * 1000);
+        const cutoff30 = new Date(now - 30 * 24 * 60 * 60 * 1000);
+        this.last7Days = data.reports.filter(r => new Date(r.generated_at) >= cutoff7);
+        this.last30Days = data.reports.filter(r => new Date(r.generated_at) >= cutoff30 && new Date(r.generated_at) < cutoff7);
+        this.filteredLast7Days = [...this.last7Days];
+        this.filteredLast30Days = [...this.last30Days];
+      } catch (e) {
+        console.error('Failed to load reports:', e);
+      }
+    },
     toggleSidebar() {
       this.sidebarOpen = !this.sidebarOpen;
     },
@@ -672,32 +705,21 @@ mounted() {
           this.filteredLast7Days = [...this.last7Days];
           this.filteredLast30Days = [...this.last30Days];
       } else {
-          this.filteredLast7Days = this.last7Days.filter(report => 
-              report.toLowerCase().includes(query)
-          );
-          this.filteredLast30Days = this.last30Days.filter(report => 
-              report.toLowerCase().includes(query)
-          );
+          this.filteredLast7Days = this.last7Days.filter(r => r.display_name.toLowerCase().includes(query));
+          this.filteredLast30Days = this.last30Days.filter(r => r.display_name.toLowerCase().includes(query));
       }
     },
-    
-    openReport(reportName) {
-        this.currentReport = reportName; // set the report to display
-        this.currentReportContent = this.reportContents[reportName] || "No content available yet.";
-    },
-    getReportUrl(reportName) {
-        /* This function returns the URL of the PDF for embedding
-        //This function is intentionally disabled because report PDFs are not yet
-        // served by the backend. Once backend storage and access control are implemented,
-        // uncomment and use this function to return actual report URLs.
-        const reportMap = {
-            "Curtin Report": "pdfs/curtin_report.pdf",
-            "IFS Report": "pdfs/ifs_report.pdf",
-            "Pearson Report": "pdfs/pearson_report.pdf",
-            "Wiley Report": "pdfs/wiley_report.pdf",
-            "Example Report": "pdfs/example_report.pdf"
-        };*/
-        return ""; /*reportMap[reportName] || "pdfs/placeholder.pdf";*/
+    async openReport(report) {
+      this.currentReport = report.display_name;
+      this.currentSnapshot = null;
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/api/reports/${report.report_id}/`);
+        if (!res.ok) return;
+        const data = await res.json();
+        this.currentSnapshot = data.report_snapshot;
+      } catch (e) {
+        console.error('Failed to load report:', e);
+      }
     },
     //download
     downloadReport() {
@@ -705,7 +727,7 @@ mounted() {
         alert('Please select a report first.');
         return;
       }
-      const content = this.currentReportContent || "No content available";
+      const content = this.currentSnapshot ? JSON.stringify(this.currentSnapshot, null, 2) : "No content available";
       const blob = new Blob([content], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

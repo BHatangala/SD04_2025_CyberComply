@@ -676,11 +676,6 @@
             flex-shrink: 0;
         }
 
-        .status-pending {
-            background: rgba(255, 152, 0, 0.12);
-            color: #ff9800;
-        }
-
         .status-uploading {
             background: rgba(74, 143, 231, 0.12);
             color: #4a8fe7;
@@ -1165,7 +1160,6 @@
                     <div
                         class="file-status-badge"
                         :class="{
-                            'status-pending':    file.status === 'pending',
                             'status-uploading':  file.status === 'uploading',
                             'status-uploaded':   file.status === 'uploaded',
                             'status-analysing':  file.status === 'analysing',
@@ -1173,8 +1167,7 @@
                             'status-error':      file.status === 'error'
                         }"
                     >
-                        <span v-if="file.status === 'pending'">SELECT DEPT</span>
-                        <span v-else-if="file.status === 'uploading'">UPLOADING…</span>
+                        <span v-if="file.status === 'uploading'">UPLOADING…</span>
                         <span v-else-if="file.status === 'uploaded'">UPLOADED</span>
                         <span v-else-if="file.status === 'analysing'">ANALYSING…</span>
                         <span v-else-if="file.status === 'analysed'">✓ ANALYSED</span>
@@ -1323,15 +1316,13 @@
         computed: {
             // True if any file is still in the uploading state
             hasUploadingFiles() {
-                return this.uploadedFiles.some(f =>
-                    f.status === 'uploading' || (f.status === 'pending' && this.isAdmin)
-                );
+                return this.uploadedFiles.some(f => f.status === 'uploading');
             },
 
             // True if admin mode and any ready file is missing a department
             hasMissingDepartments() {
                 return this.uploadedFiles
-                    .filter(f => f.status !== 'uploading' && f.status !== 'error' && f.status !== 'pending')
+                    .filter(f => f.status !== 'uploading' && f.status !== 'error')
                     .some(f => !f.department);
             },
 
@@ -1454,7 +1445,7 @@
                     const fileObj = {
                         name:       file.name,
                         size:       file.size,
-                        status:     this.isAdmin ? 'pending' : 'uploading',
+                        status:     'uploading', // uploading | uploaded | analysing | analysed | error
                         department: '',
                         deptOpen:   false,
                         rawFile:    file,
@@ -1464,9 +1455,8 @@
 
                     this.uploadedFiles.push(fileObj);
 
-                    if (!this.isAdmin) {
-                        this.uploadToDjango(fileObj);
-                    }
+                    // Phase 1: upload to Django/S3 only — AI is not called here.
+                    this.uploadToDjango(fileObj);
                 }
             },
 
@@ -1717,7 +1707,7 @@
                 this.uploadedFiles.splice(index, 1);
 
                 // Only hit the delete endpoint if the file made it past the uploading phase
-                if (file.status !== 'uploading' && file.status !== 'pending') {
+                if (file.status !== 'uploading') {
                     try {
                         const body = { file_name: file.name };
                         // Prefer document_id — more reliable than filename for DB lookup
@@ -1754,14 +1744,6 @@
             assignDepartment(index, dept) {
                 this.uploadedFiles[index].department = dept;
                 this.uploadedFiles[index].deptOpen   = false;
-
-                // For device files: trigger upload now that dept is selected.
-                // Google Drive files are uploaded immediately (dept sent separately).
-                const fileObj = this.uploadedFiles[index];
-                if (fileObj.status === 'pending' && fileObj.rawFile) {
-                    fileObj.status = 'uploading';
-                    this.uploadToDjango(fileObj);
-                }
             },
             closeAllDropdowns() {
                 this.uploadedFiles.forEach(f => f.deptOpen = false);
