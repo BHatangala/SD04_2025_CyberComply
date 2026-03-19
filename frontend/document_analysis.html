@@ -750,10 +750,10 @@
                 <div v-else>
                     <div
                         v-for="report in filteredLast7Days"
-                        :key="report"
+                        :key="report.resultId || report"
                         class="sidebar-item"
                         @click="openReport(report)"
-                    >{{ report }}</div>
+                    >{{ report.label || report }}</div>
                 </div>
             </div>
 
@@ -768,10 +768,10 @@
                 <div v-else>
                     <div
                         v-for="report in filteredLast30Days"
-                        :key="report"
+                        :key="report.resultId || report"
                         class="sidebar-item"
                         @click="openReport(report)"
-                    >{{ report }}</div>
+                    >{{ report.label || report }}</div>
                 </div>
             </div>
         </div>
@@ -909,6 +909,8 @@
         const isAdminUser = true;  // <-- swap to `true` to test admin view
         // ─────────────────────────────────────────────────────────────
 
+        const BASE = 'http://127.0.0.1:8000/ai';
+
         createApp({
             data() {
                 return {
@@ -918,60 +920,102 @@
                     isAdmin: isAdminUser,
                     toastVisible: false,
                     toastTimer: null,
-                    last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
-                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
+                    last7Days: [],
+                    last30Days: [],
                     filteredLast7Days: [],
                     filteredLast30Days: [],
 
                     // ── AI Result Fields ──
-                    // TODO: Replace this localStorage read with a fetch('/api/results/latest') once PostgreSQL is connected.
                     complianceScore: 0,
                     complianceLabel: 'Loading...',
                     barWidth: '0%',
                     analysedFilename: 'DOCUMENT ANALYSIS',
                     analysedCompany: '',
                     topRecommendation: '',
-                    complianceDetails: []
+                    complianceDetails: [],
+
+                    // Loading / error state
+                    isLoading: true,
+                    loadError: ''
                 }
             },
-            mounted() {
-                this.filteredLast7Days  = [...this.last7Days];
-                this.filteredLast30Days = [...this.last30Days];
+            async mounted() {
+                this.filteredLast7Days  = [];
+                this.filteredLast30Days = [];
 
-                // ── Load AI result from localStorage ──
-                const raw = localStorage.getItem('latestAnalysisResult');
-                if (raw) {
-                    try {
-                        const result = JSON.parse(raw);
-
-                        // Metadata (set by home.html before redirect)
-                        this.analysedFilename = result._meta?.filename || 'Document Analysis';
-                        this.analysedCompany  = result._meta?.company  || '';
-
-                        // Compliance score and label
-                        const score = result.compliance?.compliance_score ?? 0;
-                        this.complianceScore = Math.round(score);
-                        this.complianceLabel = score >= 75 ? 'High Compliance Level'
-                                            : score >= 40 ? 'Medium Compliance Level'
-                                            :               'Low Compliance Level';
-
-                        // Per-clause details for Recommendations section
-                        this.complianceDetails = (result.compliance?.details || []).filter(
-                            d => d.status === 'non-compliant' || d.status === 'partial' || d.status === 'non_compliant'
-                        );
-
-                        // Top recommendation from Flask placeholder
-                        this.topRecommendation = result.recommendations?.top_action || '';
-
-                        // Animate bar after a short delay (allows CSS transition to fire)
-                        setTimeout(() => {
-                            this.barWidth = `${this.complianceScore}%`;
-                        }, 300);
-
-                    } catch (e) {
-                        console.error('Failed to parse analysis result from localStorage:', e);
-                    }
+                const token = sessionStorage.getItem('authToken');
+                if (!token) {
+                    window.location.href = 'login.html';
+                    return;
                 }
+
+                // ── Determine which result to display ────────────────────
+                // Prefer an explicit result_id written by home.html after save.
+                // Fall back to /api/analysis/latest/ if none is stored.
+                const resultId = sessionStorage.getItem('latestResultId');
+                const url = resultId
+                    ? `${BASE}/api/analysis/${resultId}/`
+                    : `${BASE}/api/analysis/latest/`;
+
+                try {
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (res.status === 401 || res.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (!res.ok) {
+                        this.loadError    = 'No analysis results found. Please upload and analyse a document first.';
+                        this.complianceLabel = 'No results yet';
+                        this.isLoading    = false;
+                        return;
+                    }
+
+                    const data = await res.json();
+
+                    // ── Populate UI fields ────────────────────────────────
+                    this.analysedFilename = data.original_filename || 'Document Analysis';
+                    this.analysedCompany  = data.org || '';
+                    this.complianceScore  = Math.round(data.compliance_score ?? 0);
+                    this.complianceLabel  = data.compliance_label || 'Unknown';
+
+                    // Per-clause details for the Recommendations panel
+                    this.complianceDetails = (
+                        (data.compliance?.details || []).filter(
+                            d => d.status === 'non-compliant'
+                              || d.status === 'partial'
+                              || d.status === 'non_compliant'
+                        )
+                    );
+
+                    // Top-level recommendation from the AI payload
+                    this.topRecommendation = data.recommendations?.top_action || '';
+
+                    // Store result_id so sub-pages (compliance, recommendations) can pick it up
+                    if (data.result_id) {
+                        sessionStorage.setItem('latestResultId', data.result_id);
+                    }
+
+                    // Animate progress bar
+                    setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 300);
+
+                } catch (e) {
+                    console.error('Failed to load analysis result:', e);
+                    this.loadError = 'Could not reach the server. Please check your connection.';
+                } finally {
+                    this.isLoading = false;
+                }
+
+                // ── Populate sidebar history ──────────────────────────────
+                await this.fetchHistory(token);
+
+                // ── Resolve admin flag from session (server-confirmed) ────
+                const roleRaw = sessionStorage.getItem('userRole');
+                this.isAdmin  = (roleRaw === 'ADMINISTRATIVE_USER');
             },
             methods: {
                 toggleSidebar() {
@@ -993,8 +1037,9 @@
                         this.filteredLast7Days  = [...this.last7Days];
                         this.filteredLast30Days = [...this.last30Days];
                     } else {
-                        this.filteredLast7Days  = this.last7Days.filter(r => r.toLowerCase().includes(q));
-                        this.filteredLast30Days = this.last30Days.filter(r => r.toLowerCase().includes(q));
+                        const match = r => (r.label || r).toLowerCase().includes(q);
+                        this.filteredLast7Days  = this.last7Days.filter(match);
+                        this.filteredLast30Days = this.last30Days.filter(match);
                     }
                 },
                 showProfile() {
@@ -1003,8 +1048,31 @@
                 goBack() {
                     window.location.href = 'home.html';
                 },
-                openReport(reportName) {
-                    window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
+                openReport(report) {
+                    // report may be a history object { resultId, label } or a plain string
+                    const resultId = report.resultId || null;
+                    if (resultId) {
+                        sessionStorage.setItem('latestResultId', resultId);
+                        window.location.href = 'document_analysis.html';
+                    } else {
+                        window.location.href = `report_viewing.html?report=${encodeURIComponent(report.label || report)}`;
+                    }
+                },
+
+                async fetchHistory(token) {
+                    try {
+                        const res = await fetch(`${BASE}/api/analysis/history/`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        this.last7Days  = (data.last_7_days  || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
+                        this.last30Days = (data.last_30_days || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
+                        this.filteredLast7Days  = [...this.last7Days];
+                        this.filteredLast30Days = [...this.last30Days];
+                    } catch (e) {
+                        console.warn('Could not load analysis history:', e);
+                    }
                 },
 
                 // ── Compliance Score: open to all ──

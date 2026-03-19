@@ -26,7 +26,7 @@ import boto3
 import re
 from botocore.exceptions import BotoCoreError, ClientError
 
-from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Recommendation, Report
+from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report
 
 # ──────────────────────────────────────────────
 # Security Configuration
@@ -2024,8 +2024,11 @@ def save_recommendations(request):
     except ValueError:
         return JsonResponse({"detail": "Invalid result_id format"}, status=400)
     
-    # Get or create the AnalysisResult record for this result_id
-    analysis_result, _ = AnalysisResult.objects.get_or_create(result_id=result_uuid)
+    # AnalysisResult must already exist (created by /api/analysis/save/)
+    try:
+        analysis_result = AnalysisResult.objects.get(result_id=result_uuid)
+    except AnalysisResult.DoesNotExist:
+        return JsonResponse({"detail": "Analysis result not found. Run analysis first."}, status=404)
 
     # Save each recommendation, skip incomplete entries
     created = []
@@ -2228,3 +2231,287 @@ def get_report(request, report_id):
         "generated_at": report.generated_at.isoformat(),
         "expires_at": report.expires_at.isoformat()
     }, status=200)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Analysis Result API
+#
+#   POST   /api/analysis/save/                 — persist AI result + findings
+#   GET    /api/analysis/latest/               — caller's most recent result
+#   GET    /api/analysis/<result_id>/          — specific result by UUID
+#   GET    /api/analysis/history/              — sidebar last-7 / last-30 days
+#   GET    /api/analysis/<result_id>/findings/ — GAP + RISK findings
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _score_to_risk_level(score: int) -> str:
+    if score >= 75:
+        return AnalysisResult.RiskLevel.LOW
+    if score >= 40:
+        return AnalysisResult.RiskLevel.MEDIUM
+    return AnalysisResult.RiskLevel.HIGH
+
+
+def _serialize_analysis(analysis: AnalysisResult) -> dict:
+    return {
+        "result_id":         str(analysis.result_id),
+        "document_id":       str(analysis.document_id),
+        "original_filename": analysis.document.original_filename,
+        "compliance_score":  analysis.compliance_score,
+        "risk_level":        analysis.risk_level,
+        "summary":           analysis.summary,
+        "raw_output":        analysis.raw_output,
+        "created_at":        analysis.created_at.isoformat(),
+        "compliance":        (analysis.raw_output or {}).get("compliance", {}),
+        "recommendations":   (analysis.raw_output or {}).get("recommendations", {}),
+    }
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def save_analysis_result(request):
+    """
+    POST /api/analysis/save/
+    Persist an AI analysis result + findings atomically.
+    Body: { "result": {...}, "document_id": "uuid" }
+    Returns 201: { "result_id", "compliance_score", "risk_level", "findings_saved" }
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "Invalid JSON body"}, status=400)
+
+    ai_result = data.get("result", {})
+    doc_id    = (data.get("document_id") or "").strip()
+
+    if not ai_result:
+        return JsonResponse({"detail": "'result' is required and must not be empty"}, status=400)
+    if not doc_id:
+        return JsonResponse({"detail": "'document_id' is required"}, status=400)
+
+    try:
+        document = Document.objects.get(document_id=doc_id)
+    except Document.DoesNotExist:
+        return JsonResponse({"detail": "Document not found"}, status=404)
+
+    is_owner = str(document.user_id) == str(profile.user_id)
+    is_org_admin = (
+        profile.role == UserProfile.Role.ADMIN
+        and document.org_id is not None
+        and str(document.org_id) == str(profile.org_id)
+    )
+    if not is_owner and not is_org_admin:
+        return JsonResponse({"detail": "You do not have access to this document"}, status=403)
+
+    raw_score        = ai_result.get("compliance", {}).get("compliance_score", 0)
+    compliance_score = max(0, min(100, int(round(float(raw_score)))))
+    risk_level       = _score_to_risk_level(compliance_score)
+    summary          = (
+        ai_result.get("summary")
+        or ai_result.get("recommendations", {}).get("top_action")
+        or None
+    )
+
+    with transaction.atomic():
+        # Upsert: document is OneToOne so delete any previous result first
+        AnalysisResult.objects.filter(document=document).delete()
+
+        analysis = AnalysisResult.objects.create(
+            document=document,
+            compliance_score=compliance_score,
+            risk_level=risk_level,
+            summary=summary,
+            raw_output=ai_result,
+        )
+
+        findings_to_create = []
+
+        for d in ai_result.get("compliance", {}).get("details", []):
+            raw_status = (d.get("status") or "").lower().replace("-", "_")
+            if raw_status in ("non_compliant", "partial"):
+                findings_to_create.append(Finding(
+                    result=analysis,
+                    finding_type=Finding.FindingType.GAP,
+                    title=(d.get("clause") or "Unknown Clause")[:200],
+                    description=d.get("reasoning") or "",
+                ))
+
+        for r in ai_result.get("risk_assessment", []):
+            if isinstance(r, str):
+                title_text, desc_text = r[:200], ""
+            else:
+                title_text = (r.get("title") or r.get("risk") or "Risk Item")[:200]
+                desc_text  = r.get("description") or r.get("detail") or ""
+            findings_to_create.append(Finding(
+                result=analysis,
+                finding_type=Finding.FindingType.RISK,
+                title=title_text,
+                description=desc_text,
+            ))
+
+        if findings_to_create:
+            Finding.objects.bulk_create(findings_to_create)
+
+    if document.status != Document.Status.COMPLETED:
+        document.status = Document.Status.COMPLETED
+        document.save(update_fields=["status"])
+
+    return JsonResponse(
+        {
+            "result_id":        str(analysis.result_id),
+            "compliance_score": compliance_score,
+            "risk_level":       risk_level,
+            "findings_saved":   len(findings_to_create),
+        },
+        status=201,
+    )
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_latest_analysis(request):
+    """GET /api/analysis/latest/"""
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    try:
+        analysis = (
+            AnalysisResult.objects
+            .select_related("document")
+            .filter(document__user=profile)
+            .latest("created_at")
+        )
+    except AnalysisResult.DoesNotExist:
+        return JsonResponse({"detail": "No analysis results found for this user"}, status=404)
+
+    return JsonResponse(_serialize_analysis(analysis), status=200)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_analysis_by_id(request, result_id):
+    """GET /api/analysis/<result_id>/"""
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    try:
+        analysis = (
+            AnalysisResult.objects
+            .select_related("document")
+            .get(result_id=result_id)
+        )
+    except AnalysisResult.DoesNotExist:
+        return JsonResponse({"detail": "Analysis result not found"}, status=404)
+
+    is_owner = str(analysis.document.user_id) == str(profile.user_id)
+    is_org_admin = (
+        profile.role == UserProfile.Role.ADMIN
+        and analysis.document.org_id is not None
+        and str(analysis.document.org_id) == str(profile.org_id)
+    )
+    if not is_owner and not is_org_admin:
+        return JsonResponse({"detail": "You do not have access to this result"}, status=403)
+
+    return JsonResponse(_serialize_analysis(analysis), status=200)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_analysis_history(request):
+    """GET /api/analysis/history/"""
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    now       = timezone.now()
+    cutoff_7  = now - timedelta(days=7)
+    cutoff_30 = now - timedelta(days=30)
+
+    if profile.role == UserProfile.Role.ADMIN and profile.org_id:
+        qs = AnalysisResult.objects.filter(document__user__org=profile.org)
+    else:
+        qs = AnalysisResult.objects.filter(document__user=profile)
+
+    qs = qs.order_by("-created_at").values(
+        "result_id", "compliance_score", "risk_level",
+        "created_at", "document__original_filename",
+    )
+
+    last_7  = list(qs.filter(created_at__gte=cutoff_7))
+    last_30 = list(qs.filter(created_at__gte=cutoff_30, created_at__lt=cutoff_7))
+
+    def _summary(row):
+        return {
+            "result_id":        str(row["result_id"]),
+            "display_name":     row["document__original_filename"],
+            "compliance_score": row["compliance_score"],
+            "risk_level":       row["risk_level"],
+            "created_at":       row["created_at"].isoformat(),
+        }
+
+    return JsonResponse(
+        {"last_7_days": [_summary(r) for r in last_7],
+         "last_30_days": [_summary(r) for r in last_30]},
+        status=200,
+    )
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_findings_for_result(request, result_id):
+    """GET /api/analysis/<result_id>/findings/"""
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    try:
+        analysis = (
+            AnalysisResult.objects
+            .select_related("document")
+            .get(result_id=result_id)
+        )
+    except AnalysisResult.DoesNotExist:
+        return JsonResponse({"detail": "Analysis result not found"}, status=404)
+
+    is_owner = str(analysis.document.user_id) == str(profile.user_id)
+    is_org_admin = (
+        profile.role == UserProfile.Role.ADMIN
+        and analysis.document.org_id is not None
+        and str(analysis.document.org_id) == str(profile.org_id)
+    )
+    if not is_owner and not is_org_admin:
+        return JsonResponse({"detail": "You do not have access to this result"}, status=403)
+
+    findings = list(
+        Finding.objects
+        .filter(result=analysis)
+        .order_by("finding_type", "title")
+        .values("finding_id", "finding_type", "title", "description")
+    )
+
+    gap_count  = sum(1 for f in findings if f["finding_type"] == Finding.FindingType.GAP)
+    risk_count = sum(1 for f in findings if f["finding_type"] == Finding.FindingType.RISK)
+
+    return JsonResponse(
+        {
+            "result_id":  str(result_id),
+            "total":      len(findings),
+            "gap_count":  gap_count,
+            "risk_count": risk_count,
+            "findings": [
+                {
+                    "finding_id":   str(f["finding_id"]),
+                    "finding_type": f["finding_type"],
+                    "title":        f["title"],
+                    "description":  f["description"],
+                }
+                for f in findings
+            ],
+        },
+        status=200,
+    )

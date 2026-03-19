@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 # Database Models
 
@@ -165,13 +166,96 @@ class Document(models.Model):
 # Table: analysis_result
 # =========================
 class AnalysisResult(models.Model):
+    """
+    One row per compliance analysis run, linked 1-to-1 with the Document analysed.
+    """
+
+    class RiskLevel(models.TextChoices):
+        LOW    = "LOW",    "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH   = "HIGH",   "High"
+
     result_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # OneToOneField enforces NOT NULL + UNIQUE per the schema spec
+    document = models.OneToOneField(
+        Document,
+        on_delete=models.CASCADE,
+        related_name="analysis_result",
+        db_column="document_id",
+    )
+
+    compliance_score = models.IntegerField(default=0)
+    risk_level       = models.CharField(
+        max_length=10,
+        choices=RiskLevel.choices,
+        default=RiskLevel.MEDIUM,
+    )
+    summary    = models.TextField(null=True, blank=True)
+    raw_output = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         db_table = "analysis_result"
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(compliance_score__gte=0) & models.Q(compliance_score__lte=100),
+                name="compliance_score_range",
+            ),
+            models.CheckConstraint(
+                check=models.Q(risk_level__in=["LOW", "MEDIUM", "HIGH"]),
+                name="risk_level_valid",
+            ),
+        ]
 
     def __str__(self):
-        return str(self.result_id)
+        return f"{self.document.original_filename} — {self.compliance_score}%"
+
+
+# =========================
+# Table: finding
+# =========================
+class Finding(models.Model):
+    """
+    One row per identified compliance gap or risk item within an AnalysisResult.
+    finding_type='GAP'  — a clause that is not satisfied.
+    finding_type='RISK' — a risk item derived from the AI risk assessment.
+    """
+
+    class FindingType(models.TextChoices):
+        GAP  = "GAP",  "Gap"
+        RISK = "RISK", "Risk"
+
+    finding_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    result = models.ForeignKey(
+        AnalysisResult,
+        on_delete=models.CASCADE,
+        related_name="findings",
+        db_column="result_id",
+    )
+
+    finding_type = models.CharField(max_length=10, choices=FindingType.choices, default=FindingType.GAP)
+    title        = models.CharField(max_length=200, default='')
+    description  = models.TextField(default='')
+    created_at   = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "finding"
+        ordering = ["finding_type", "title"]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(finding_type__in=["GAP", "RISK"]),
+                name="finding_type_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["result", "finding_type"], name="finding_result_type_idx"),
+        ]
+
+    def __str__(self):
+        return f"[{self.finding_type}] {self.title}"
 
 
 # =========================

@@ -28,4 +28,11 @@ urlpatterns = [
     path("api/reports/", views.list_reports, name="list_reports"),
     path("api/reports/generate/", views.generate_report, name="generate_report"),
     path("api/reports/<uuid:report_id>/", views.get_report, name="get_report"),
+
+    # ── Analysis Result API ───────────────────────────────────────────────
+    path("api/analysis/save/", views.save_analysis_result, name="save_analysis_result"),
+    path("api/analysis/latest/", views.get_latest_analysis, name="get_latest_analysis"),
+    path("api/analysis/history/", views.get_analysis_history, name="get_analysis_history"),
+    path("api/analysis/<uuid:result_id>/", views.get_analysis_by_id, name="get_analysis_by_id"),
+    path("api/analysis/<uuid:result_id>/findings/", views.get_findings_for_result, name="get_findings_for_result"),
 ]
