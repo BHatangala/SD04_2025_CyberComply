@@ -338,6 +338,10 @@
             backdrop-filter: blur(6px);
             transition: box-shadow 0.3s, border-color 0.3s;
         }
+        .recommendations-section .section-header {
+            align-items: flex-start;
+            padding-top: 40px;
+        }
 
         .compliance-section:hover,
         .recommendations-section:hover {
@@ -833,9 +837,6 @@
                         </button>
                     </div>
                     <div class="recommendations-list">
-                        <div class="recommendation-item" v-if="topRecommendation">
-                            {{ topRecommendation }}
-                        </div>
                         <!-- Per-clause findings from AI -->
                         <div
                             class="recommendation-item"

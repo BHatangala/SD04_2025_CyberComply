@@ -14,7 +14,9 @@ CORS(app)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 # Initialize components (Singleton model loading)
-analyzer = ComplianceAnalyzer()
+analyzer = ComplianceAnalyzer(
+    requirements_path=os.path.join(os.path.dirname(__file__), 'data', 'pdpa_requirements_full.json')
+)
 
 @app.route('/health', methods=['GET'])
 def health_check():

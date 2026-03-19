@@ -1192,10 +1192,16 @@
                 console.log(`🚀 Uploading: ${fileObj.name}`);
 
                 try {
+                    const controller = new AbortController();
+                    // 20-minute timeout — covers 12 batches with delays comfortably
+                    const timeoutId = setTimeout(() => controller.abort(), 20 * 60 * 1000);
+
                     const response = await fetch(this.analyzeEndpoint, {
                         method: 'POST',
-                        body: formData
+                        body:   formData,
+                        signal: controller.signal
                     });
+                    clearTimeout(timeoutId);
 
                     if (!response.ok) {
                         throw new Error(`Server returned HTTP ${response.status}`);

@@ -171,7 +171,7 @@ def analyze_compliance(request):
                     f"{AI_API_URL}/analyze",
                     files=files,
                     data=data,
-                    timeout=300
+                    timeout=1200
                 )
                 result = response.json()
 
