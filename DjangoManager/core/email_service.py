@@ -38,6 +38,12 @@ def send_otp_email(email: str, otp: str, purpose: str = "verification") -> bool:
                 "intro": "We received a request to change your email address.",
                 "instruction": "Use the verification code below to confirm your new email address.",
             },
+            "admin_access": {
+                "subject": f"{app_name} Administrative Access Verification Code",
+                "title": "Administrative Access Verification Code",
+                "intro": "We received a request to grant administrative access to your CyberComply account.",
+                "instruction": "Use the verification code below to verify your organisation email and complete the request.",
+            },
         }
 
         selected = purpose_config.get(purpose, purpose_config["verification"])
