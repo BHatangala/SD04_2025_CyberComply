@@ -241,6 +241,10 @@
             border-color: #4a8fe7;
         }
 
+        .search-input::placeholder {
+            color: #6b7a99;
+        }
+
         .sidebar-section {
             margin-bottom: 30px;
         }
@@ -319,20 +323,8 @@
             font-size: 1.2rem;
             font-weight: bold;
             letter-spacing: 1px;
-            margin-bottom: 15px;
-            color: #ffffff;
-        }
-
-        .bullet-list {
-            margin-top: 10px;
-            padding-left: 20px;
-        }
-
-        .bullet-list li {
-            font-size: 1rem;
             margin-bottom: 8px;
-            color: #c5d0e6;
-            letter-spacing: normal;
+            color: #ffffff;
         }
 
         /* --- WAVY BACKGROUND --- */
@@ -353,21 +345,214 @@
         }
 
         /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        /* --- SUMMARY CHIPS --- */
+        .summary-bar {
+            max-width: 900px;
+            margin: 0 auto 30px;
+            display: flex;
+            gap: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
-        ::-webkit-scrollbar-track {
-            background: transparent;
+        .summary-chip {
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 7px;             
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            opacity: 0.95;
         }
 
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
+        .summary-chip:hover,
+        .summary-chip.chip-active {
+            opacity: 1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.3);
         }
 
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.2);
+        .summary-bar.has-filter .summary-chip:not(.chip-active) {
+            opacity: 0.35;
+        }
+
+        .filter-label {
+            max-width: 900px;
+            margin: -18px auto 18px; 
+            padding-top: 12px;
+            margin: 0 auto 20px;
+            font-size: 12px;
+            color: #6b7a99;
+            display: flex;
+            align-items: center;
+            justify-content: center;  
+            gap: 6px;
+        }
+        .filter-clear { color: #4a8fe7; font-weight: 600; cursor: pointer; }
+        .filter-clear:hover { text-decoration: underline; }
+
+        /* --- SECTION META --- */
+        .section-meta {
+            font-size: 12px;
+            color: #6b7a99;
+            margin-bottom: 20px;
+            letter-spacing: 0.4px;
+        }
+
+        /* --- GAP / RISK ITEMS --- */
+        .gap-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 13px 0;
+            border-bottom: 1px solid rgba(74,143,231,0.1);
+        }
+
+        .gap-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .gap-id {
+            font-size: 11px;
+            font-weight: 700;
+            color: #4a8fe7;
+            letter-spacing: 0.8px;
+            min-width: 20px;
+            padding-top: 3px;
+            flex-shrink: 0;
+        }
+
+        .gap-text {
+            flex: 1;
+        }
+
+        .gap-clause {
+            font-size: 14px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .gap-reasoning {
+            font-size: 13px;
+            color: #8b9dc3;
+            line-height: 1.55;
+        }
+
+        /* --- RISK BADGES --- */
+        .risk-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            padding: 3px 9px;
+            border-radius: 99px;
+            text-transform: uppercase;
+            flex-shrink: 0;
+            align-self: flex-start;
+            margin-top: 3px;
+            white-space: nowrap;
+        }
+
+        .risk-title {
+            font-size: 11px; 
+            font-weight: 700; 
+            letter-spacing: 0.8px;
+            text-transform: uppercase; 
+            color: #c5d0e6; 
+            margin-bottom: 4px;
+        }
+
+        .impact-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+        .impact-pill {
+            font-size: 11px; 
+            font-weight: 600;
+            padding: 3px 10px; 
+            border-radius: 99px;
+            background: rgba(74,143,231,0.1); 
+            color: #8bb8f0;
+            border: 1px solid rgba(74,143,231,0.25); 
+            letter-spacing: 0.3px;
+        }
+
+        .risk-critical {
+            background: rgba(231,74,74,0.15);
+            color: #e74a4a;
+            border: 1px solid rgba(231,74,74,0.4);
+        }
+        .risk-high {
+            background: rgba(231,150,74,0.15);
+            color: #e7964a;
+            border: 1px solid rgba(231,150,74,0.4);
+        }
+        .risk-medium {
+            background: rgba(231,210,74,0.15);
+            color: #d4bf2e;
+            border: 1px solid rgba(231,210,74,0.4);
+        }
+        .risk-low {
+            background: rgba(144, 238, 144, 0.15);
+            color: #66cc66;
+            border: 1px solid rgba(144, 238, 144, 0.4);
+        }
+        .risk-unknown {
+            background: rgba(139,157,195,0.15);
+            color: #8b9dc3;
+            border: 1px solid rgba(139,157,195,0.3);
+        }
+
+        /* Chip colours mirror badge colours */
+        .chip-critical { background: rgba(231,74,74,0.15);  color: #e74a4a; border: 1px solid rgba(231,74,74,0.35); }
+        .chip-high     { background: rgba(231,150,74,0.15); color: #e7964a; border: 1px solid rgba(231,150,74,0.35); }
+        .chip-medium   { background: rgba(231,210,74,0.15); color: #d4bf2e; border: 1px solid rgba(231,210,74,0.35); }
+        .chip-low      { background: rgba(74,143,231,0.15); color: #66cc66; border: 1px solid rgba(144, 238, 144, 0.4); }
+
+        .status-partial {
+            font-size: 11px;
+            font-weight: 600;
+            color: #e7964a;
+            background: rgba(231,150,74,0.12);
+            border: 1px solid rgba(231,150,74,0.3);
+            padding: 1px 7px;
+            border-radius: 99px;
+            letter-spacing: 0.5px;
+        }
+
+        .empty-state {
+            color: #6b7a99;
+            font-size: 14px;
+            font-style: italic;
+            padding: 10px 0;
+        }
+
+        /* --- NO DATA STATE --- */
+        .no-data-banner {
+            max-width: 900px;
+            margin: 0 auto 30px;
+            background: rgba(231,74,74,0.08);
+            border: 1px solid rgba(231,74,74,0.25);
+            border-radius: 10px;
+            padding: 18px 24px;
+            font-size: 14px;
+            color: #e74a4a;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
     </style>
 </head>
@@ -379,8 +564,7 @@
             <div class="menu-icon" @click="toggleSidebar">●●●</div>
             <div class="user-profile" @click="showProfile">
                 <svg viewBox="0 0 24 24">
-                    <path
-                        d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                 </svg>
             </div>
         </div>
@@ -399,14 +583,11 @@
         <div class="sidebar" :class="{ open: sidebarOpen }">
             <div class="sidebar-icon-bar">
                 <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
-                    <!-- Search Icon from snippet -->
                     <svg viewBox="0 0 24 24">
-                        <path
-                            d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
                     </svg>
                 </div>
                 <div class="sidebar-icon" @click="goToHome" title="Start new analysis">
-                    <!-- Plus Icon from screenshot, but using Home icon from provided snippet code for valid path, actually screenshot has plus. I'll stick to provided snippet code logic which had Home icon there, but I will use the SVG for Plus if I can find it, or just stick to the snippet's Home Icon to avoid breaking. User said "use this code" referencing the snippet. Wait, script had goToHome. I'll stick to Home icon. -->
                     <svg viewBox="0 0 24 24">
                         <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
                     </svg>
@@ -414,22 +595,21 @@
             </div>
 
             <div class="search-container" :class="{ active: searchActive }">
-                <input type="text" class="search-input" v-model="searchQuery" placeholder="Search documents..."
-                    @input="filterReports">
+                <input type="text" class="search-input" v-model="searchQuery"
+                    placeholder="Search documents..." @input="filterReports">
             </div>
 
             <div class="sidebar-section">
                 <div class="sidebar-header">
                     <svg viewBox="0 0 24 24">
-                        <path
-                            d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
+                        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
                     </svg>
                     LAST 7 DAYS
                 </div>
                 <div v-if="filteredLast7Days.length === 0" class="no-results">No results</div>
                 <div v-else>
-                    <div v-for="report in filteredLast7Days" :key="report" class="sidebar-item"
-                        @click="openReport(report)">
+                    <div v-for="report in filteredLast7Days" :key="report"
+                        class="sidebar-item" @click="openReport(report)">
                         {{ report }}
                     </div>
                 </div>
@@ -438,15 +618,14 @@
             <div class="sidebar-section">
                 <div class="sidebar-header">
                     <svg viewBox="0 0 24 24">
-                        <path
-                            d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z" />
+                        <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z" />
                     </svg>
                     LAST 30 DAYS
                 </div>
                 <div v-if="filteredLast30Days.length === 0" class="no-results">No results</div>
                 <div v-else>
-                    <div v-for="report in filteredLast30Days" :key="report" class="sidebar-item"
-                        @click="openReport(report)">
+                    <div v-for="report in filteredLast30Days" :key="report"
+                        class="sidebar-item" @click="openReport(report)">
                         {{ report }}
                     </div>
                 </div>
@@ -457,24 +636,111 @@
         <div class="main-content" :class="{ shifted: sidebarOpen }">
             <h1 class="page-title">COMPLIANCE SCORE</h1>
 
-            <div class="info-section">
-                <h2 class="section-header">Gap Identification</h2>
-                <ul class="bullet-list">
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                </ul>
+            <!-- No data banner — shown only if localStorage is empty -->
+            <div class="no-data-banner" v-if="allDetails.length === 0">
+                ⚠ No analysis result found. Please run a document analysis first from the home page.
             </div>
 
-            <div class="info-section">
+            <!-- Summary chips — shown only when data is available -->
+            <div class="summary-bar" v-if="allDetails.length > 0">
+                <!--<div class="summary-bar" :class="{ 'has-filter': activeFilter !== null }" v-if="allDetails.length > 0"></div> -->
+                <div class="summary-chip chip-critical"
+                    :class="{ 'chip-active': activeFilter === 'critical' }"
+                    @click="toggleFilter('critical')">
+                    {{ riskCounts.critical }} Critical
+                </div>
+                <div class="summary-chip chip-high"
+                    :class="{ 'chip-active': activeFilter === 'high' }"
+                    @click="toggleFilter('high')">
+                    {{ riskCounts.high }} High
+                </div>
+                <div class="summary-chip chip-medium"
+                    :class="{ 'chip-active': activeFilter === 'medium' }"
+                    @click="toggleFilter('medium')">
+                    {{ riskCounts.medium }} Medium
+                </div>
+                <div class="summary-chip chip-low"
+                    :class="{ 'chip-active': activeFilter === 'low' }"
+                    @click="toggleFilter('low')">
+                    {{ riskCounts.low }} Low Risk
+                </div>
+                <div class="filter-label" v-if="activeFilter">
+                    Showing <strong style="color:#c5d0e6">{{ activeFilter }}</strong> severity only —
+                    <span class="filter-clear" @click="toggleFilter(activeFilter)">Clear filter ✕</span>
+                </div>
+            </div>
+
+            <!-- Gap Identification -->
+            <div class="info-section" v-if="allDetails.length > 0">
+                <h2 class="section-header">Gap Identification</h2>
+                <p class="section-meta">
+                    Requirements completely absent from the policy —
+                    {{ gaps.length }} gap{{ gaps.length !== 1 ? 's' : '' }} identified,
+                    sorted by severity
+                </p>
+
+                <div v-if="gaps.length === 0" class="empty-state">
+                    No compliance gaps detected. All requirements are at least partially addressed.
+                </div>
+
+                <div v-for="(item, index) in gaps" :key="'gap-' + item.requirement_id" class="gap-item">
+                    <div class="gap-id">{{ index + 1 }}</div>
+                    <div class="gap-text">
+                        <div class="gap-clause">{{ item.clause }}</div>
+                        <div class="gap-reasoning">{{ item.reasoning }}</div>
+                    </div>
+                    <span class="risk-badge" :class="`risk-${item.risk_level || 'unknown'}`">
+                        {{ item.risk_level || 'unknown' }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Risk Assessment -->
+            <div class="info-section" v-if="allDetails.length > 0">
                 <h2 class="section-header">Risk Assessment</h2>
-                <ul class="bullet-list">
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                </ul>
+                <p class="section-meta">
+                    All non-compliant and partially compliant requirements, sorted by severity —
+                    {{ risks.length }} item{{ risks.length !== 1 ? 's' : '' }} flagged
+                </p>
+
+                <div v-if="risks.length === 0" class="empty-state">
+                    No risks identified. The document appears fully compliant.
+                </div>
+
+                <div v-for="(item, index) in risks" :key="'risk-' + item.requirement_id" class="gap-item">
+                    <div class="gap-id">{{ index + 1 }}</div>
+                    <div class="gap-text">
+                        <div class="gap-clause">
+                            {{ item.clause }}
+                            <span v-if="item.status === 'partial'" class="status-partial">Partially Implemented</span>
+                        </div>
+
+                        <!-- Risk title from mapping file -->
+                        <div class="risk-title" v-if="riskMapping[item.requirement_id]">
+                            {{ riskMapping[item.requirement_id].risk_title }}
+                        </div>
+
+                        <!-- Consequence from mapping; falls back to AI reasoning if not mapped -->
+                        <div class="gap-reasoning">
+                            {{ riskMapping[item.requirement_id]
+                                ? riskMapping[item.requirement_id].consequence
+                                : item.reasoning }}
+                        </div>
+
+                        <!-- Business impact pills -->
+                        <div class="impact-pills"
+                            v-if="riskMapping[item.requirement_id]?.business_impact?.length">
+                            <span class="impact-pill"
+                                v-for="impact in riskMapping[item.requirement_id].business_impact"
+                                :key="impact">
+                                {{ impact }}
+                            </span>
+                        </div>
+                    </div>
+                    <span class="risk-badge" :class="`risk-${item.risk_level || 'unknown'}`">
+                        {{ item.risk_level || 'unknown' }}
+                    </span>
+                </div>
             </div>
         </div>
 
@@ -487,6 +753,9 @@
     <script>
         const { createApp } = Vue;
 
+        // Severity sort order — critical surfaces first
+        const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+
         createApp({
             data() {
                 return {
@@ -494,16 +763,88 @@
                     searchActive: false,
                     searchQuery: '',
                     last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
-                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
+                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report',
+                                 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
                     filteredLast7Days: [],
-                    filteredLast30Days: []
+                    filteredLast30Days: [],
+                    activeFilter: null,
+                    riskMapping:  {},
+
+                    // Raw details array loaded from localStorage
+                    allDetails: []
+                };
+            },
+
+            computed: {
+                // Gaps: requirements completely missing from the policy
+                gaps() {
+                    return this.allDetails
+                        .filter(d => {
+                            if (d.status !== 'non_compliant') return false;
+                            if (this.activeFilter) return d.risk_level === this.activeFilter;
+                            return true;
+                        })
+                        .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
+                },
+
+                // Risks: non_compliant + partial, sorted by severity
+                // Partial = something exists but is insufficient — still a risk, not a full gap
+                risks() {
+                    return this.allDetails
+                        .filter(d => {
+                            if (d.status !== 'non_compliant' && d.status !== 'partial') return false;
+                            if (this.activeFilter) return d.risk_level === this.activeFilter;
+                            return true;
+                        })
+                        .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
+                },
+
+                // Count risks per severity level for the summary chips
+                riskCounts() {
+                    const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+                    for (const item of this.risks) {
+                        if (item.risk_level && counts[item.risk_level] !== undefined) {
+                            counts[item.risk_level]++;
+                        }
+                    }
+                    return counts;
                 }
             },
+
             mounted() {
-                this.filteredLast7Days = [...this.last7Days];
+                this.filteredLast7Days  = [...this.last7Days];
                 this.filteredLast30Days = [...this.last30Days];
+                this.loadFromLocalStorage();
+                this.loadRiskMapping();
             },
+
             methods: {
+                loadFromLocalStorage() {
+                    const raw = localStorage.getItem('latestAnalysisResult');
+                    if (!raw) return;
+                    try {
+                        const result = JSON.parse(raw);
+                        this.allDetails = result.compliance?.details || [];
+                    } catch (e) {
+                        console.error('Failed to parse analysis result from localStorage:', e);
+                    }
+                },
+                async loadRiskMapping() {
+                    // Adjust this path to match your folder structure
+                    const MAPPING_PATH = '../AIModel/data/risk_mapping.json';
+                    try {
+                        const res = await fetch(MAPPING_PATH);
+                        if (res.ok) {
+                            this.riskMapping = await res.json();
+                            console.log('[INFO] Risk mapping loaded —', Object.keys(this.riskMapping).length, 'entries');
+                        } else {
+                            console.warn('[WARN] risk_mapping.json not found — falling back to AI reasoning.');
+                        }
+                    } catch (e) {
+                        console.warn('[WARN] Could not fetch risk_mapping.json:', e.message);
+                    }
+                },
+
                 toggleSidebar() {
                     this.sidebarOpen = !this.sidebarOpen;
                 },
@@ -517,11 +858,11 @@
                 filterReports() {
                     const query = this.searchQuery.toLowerCase();
                     if (!query) {
-                        this.filteredLast7Days = [...this.last7Days];
+                        this.filteredLast7Days  = [...this.last7Days];
                         this.filteredLast30Days = [...this.last30Days];
                     } else {
-                        this.filteredLast7Days = this.last7Days.filter(report => report.toLowerCase().includes(query));
-                        this.filteredLast30Days = this.last30Days.filter(report => report.toLowerCase().includes(query));
+                        this.filteredLast7Days  = this.last7Days.filter(r => r.toLowerCase().includes(query));
+                        this.filteredLast30Days = this.last30Days.filter(r => r.toLowerCase().includes(query));
                     }
                 },
                 showProfile() {
@@ -530,12 +871,11 @@
                 openReport(reportName) {
                     window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
                 },
-                goBack() {
-                    window.history.back();
+                toggleFilter(level) {
+                    this.activeFilter = this.activeFilter === level ? null : level;
                 },
-                goToHome() {
-                    window.location.href = 'home.html';
-                }
+                goBack()   { window.history.back(); },
+                goToHome() { window.location.href = 'home.html'; }
             }
         }).mount('#app');
     </script>
