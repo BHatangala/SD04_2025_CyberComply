@@ -26,7 +26,7 @@ import boto3
 import re
 from botocore.exceptions import BotoCoreError, ClientError
 
-from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department
+from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Recommendation
 
 # ──────────────────────────────────────────────
 # Security Configuration
@@ -1923,4 +1923,146 @@ def verify_email_change(request):
     return JsonResponse({
         "detail": "Email updated successfully",
         "new_email": new_email
+    }, status=200)
+
+
+# ──────────────────────────────────────────────
+# Recommendations — Save recommendations from AI result
+# Called by frontend (home.html) after AI analysis completes
+# ──────────────────────────────────────────────
+@csrf_exempt
+def save_recommendations(request):
+    """
+    POST {
+        "result_id": "...",
+        "recommendations": [
+            {
+                "recommendation_text": "...",
+                "act_name": "...",
+                "page_no": 1,
+                "line_no": 1,
+                "status": "PENDING"
+            }
+        ]
+    }
+    Saves AI-generated recommendations linked to an analysis result.
+    Creates the AnalysisResult record if it does not already exist.
+    """
+    if request.method != "POST":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    result_id       = (payload.get("result_id") or "").strip()
+    recommendations = payload.get("recommendations", [])
+
+    if not result_id:
+        return JsonResponse({"detail": "result_id is required"}, status=400)
+
+    if not isinstance(recommendations, list) or len(recommendations) == 0:
+        return JsonResponse({"detail": "A non-empty recommendations list is required"}, status=400)
+
+    try:
+        import uuid as uuid_module
+        result_uuid = uuid_module.UUID(result_id)
+    except ValueError:
+        return JsonResponse({"detail": "Invalid result_id format"}, status=400)
+    
+    # Get or create the AnalysisResult record for this result_id
+    analysis_result, _ = AnalysisResult.objects.get_or_create(result_id=result_uuid)
+
+    # Save each recommendation, skip incomplete entries
+    created = []
+    for item in recommendations:
+        recommendation_text = (item.get("recommendation_text") or "").strip()
+        act_name            = (item.get("act_name") or "").strip()
+        page_no             = item.get("page_no")
+        line_no             = item.get("line_no")
+        status              = (item.get("status") or Recommendation.Status.PENDING).strip()
+
+        # Skip if any required field is missing
+        if not recommendation_text or not act_name or page_no is None or line_no is None:
+            continue
+
+        # Default to PENDING if status value is invalid
+        valid_statuses = [s.value for s in Recommendation.Status]
+        if status not in valid_statuses:
+            status = Recommendation.Status.PENDING
+
+        rec = Recommendation.objects.create(
+            result=analysis_result,
+            recommendation_text=recommendation_text,
+            status=status,
+            act_name=act_name,
+            page_no=int(page_no),
+            line_no=int(line_no)
+        )
+        created.append(str(rec.rec_id))
+
+    return JsonResponse({
+        "detail": f"{len(created)} recommendation(s) saved successfully.",
+        "result_id": str(result_uuid),
+        "rec_ids": created
+    }, status=201)
+
+
+# ──────────────────────────────────────────────
+# Recommendations — Get recommendations by result_id
+# Called by recommendations.html to display recommendations
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def get_recommendations(request):
+    """
+    GET /api/recommendations/?result_id=<uuid>
+    Returns all recommendations linked to a given analysis result.
+    """
+    if request.method != "GET":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
+    result_id = (request.GET.get("result_id") or "").strip()
+
+    if not result_id:
+        return JsonResponse({"detail": "result_id is required"}, status=400)
+
+    try:
+        analysis_result = AnalysisResult.objects.get(result_id=result_id)
+    except AnalysisResult.DoesNotExist:
+        return JsonResponse({"detail": "Analysis result not found"}, status=404)
+
+    recommendations = Recommendation.objects.filter(
+        result=analysis_result
+    ).order_by("created_at").values(
+        "rec_id",
+        "recommendation_text",
+        "status",
+        "act_name",
+        "page_no",
+        "line_no",
+        "created_at"
+    )
+
+    return JsonResponse({
+        "result_id": result_id,
+        "recommendations": [
+            {
+                **rec,
+                "rec_id":     str(rec["rec_id"]),
+                "created_at": rec["created_at"].isoformat()
+            }
+            for rec in recommendations
+        ]
     }, status=200)

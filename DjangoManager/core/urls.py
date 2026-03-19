@@ -70,4 +70,10 @@ urlpatterns = [
     # Issue a signed session token after successful login
     path("api/session-token/", views.issue_session_token, name="issue_session_token"),
 
+    # Save AI-generated recommendations to the database
+    path("api/recommendations/save/", views.save_recommendations, name="save_recommendations"),
+
+    # Fetch recommendations for a given analysis result
+    path("api/recommendations/", views.get_recommendations, name="get_recommendations"),
+    
 ]

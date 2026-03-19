@@ -278,6 +278,172 @@ SELECT * FROM login_history
 ORDER BY attempt_time DESC;
 
 \echo ''
+\echo '6.7 document table'
+\echo ''
+SELECT * FROM document
+ORDER BY uploaded_at DESC;
+
+\echo ''
+\echo '6.8 analysis_result table'
+\echo ''
+SELECT * FROM analysis_result;
+
+\echo ''
+\echo '6.9 recommendations table'
+\echo ''
+SELECT * FROM recommendations
+ORDER BY created_at DESC;
+
+\echo ''
+\echo ''
+\echo ''
+\echo '=============================='
+\echo '7. RECOMMENDATIONS'
+\echo '=============================='
+
+\x off
+
+\echo ''
+\echo '7.1 Valid Insert - Recommendation with PENDING status'
+\echo ''
+INSERT INTO recommendations (rec_id, result_id, recommendation_text, status, act_name, page_no, line_no, created_at)
+VALUES (
+    gen_random_uuid(),
+    (SELECT result_id FROM analysis_result LIMIT 1),
+    'Ensure all personal data is encrypted at rest using AES-256.',
+    'PENDING',
+    'Personal Data Protection Act No. 9 of 2022',
+    12,
+    5,
+    NOW()
+);
+
+\echo ''
+\echo '7.2 Valid Insert - Recommendation with IN_PROGRESS status'
+\echo ''
+INSERT INTO recommendations (rec_id, result_id, recommendation_text, status, act_name, page_no, line_no, created_at)
+VALUES (
+    gen_random_uuid(),
+    (SELECT result_id FROM analysis_result LIMIT 1),
+    'Update access control policies to restrict admin privileges.',
+    'IN_PROGRESS',
+    'Cybersecurity Act No. 19 of 2022',
+    7,
+    20,
+    NOW()
+);
+
+\echo ''
+\echo '7.3 Valid Insert - Recommendation with DONE status'
+\echo ''
+INSERT INTO recommendations (rec_id, result_id, recommendation_text, status, act_name, page_no, line_no, created_at)
+VALUES (
+    gen_random_uuid(),
+    (SELECT result_id FROM analysis_result LIMIT 1),
+    'Conduct annual staff training on data handling procedures.',
+    'DONE',
+    'Personal Data Protection Act No. 9 of 2022',
+    3,
+    10,
+    NOW()
+);
+
+\echo ''
+\echo '7.4 Valid Select - All recommendations for a given result'
+\echo ''
+SELECT * FROM recommendations
+WHERE result_id = (SELECT result_id FROM analysis_result LIMIT 1)
+ORDER BY created_at;
+
+\echo ''
+\echo '7.5 Valid Update - Change recommendation status from PENDING to IN_PROGRESS'
+\echo ''
+UPDATE recommendations
+SET status = 'IN_PROGRESS'
+WHERE recommendation_text LIKE '%encrypted at rest%';
+
+\echo ''
+\echo '7.6 Valid Select - Recommendations filtered by status'
+\echo ''
+SELECT * FROM recommendations WHERE status = 'PENDING';
+SELECT * FROM recommendations WHERE status = 'IN_PROGRESS';
+SELECT * FROM recommendations WHERE status = 'DONE';
+
+\echo ''
+\echo '7.7 Invalid Insert - Bad status value (violates CHECK constraint)'
+\echo '    Expected: ERROR — invalid input value for check constraint'
+\echo ''
+INSERT INTO recommendations (rec_id, result_id, recommendation_text, status, act_name, page_no, line_no, created_at)
+VALUES (
+    gen_random_uuid(),
+    (SELECT result_id FROM analysis_result LIMIT 1),
+    'Test bad status.',
+    'INVALID_STATUS',
+    'Some Act',
+    1,
+    1,
+    NOW()
+);
+
+\echo ''
+\echo '7.8 Invalid Insert - Non-existent result_id (violates FK constraint)'
+\echo '    Expected: ERROR — foreign key violation'
+\echo ''
+INSERT INTO recommendations (rec_id, result_id, recommendation_text, status, act_name, page_no, line_no, created_at)
+VALUES (
+    gen_random_uuid(),
+    '00000000-0000-0000-0000-000000000000',
+    'Orphaned recommendation.',
+    'PENDING',
+    'Some Act',
+    1,
+    1,
+    NOW()
+);
+
+\echo ''
+\echo '7.9 Invalid Insert - NULL recommendation_text (violates NOT NULL constraint)'
+\echo '    Expected: ERROR — null value violates not-null constraint'
+\echo ''
+INSERT INTO recommendations (rec_id, result_id, recommendation_text, status, act_name, page_no, line_no, created_at)
+VALUES (
+    gen_random_uuid(),
+    (SELECT result_id FROM analysis_result LIMIT 1),
+    NULL,
+    'PENDING',
+    'Some Act',
+    1,
+    1,
+    NOW()
+);
+
+\echo ''
+\echo '7.10 Invalid Insert - NULL act_name (violates NOT NULL constraint)'
+\echo '     Expected: ERROR — null value violates not-null constraint'
+\echo ''
+INSERT INTO recommendations (rec_id, result_id, recommendation_text, status, act_name, page_no, line_no, created_at)
+VALUES (
+    gen_random_uuid(),
+    (SELECT result_id FROM analysis_result LIMIT 1),
+    'Some recommendation.',
+    'PENDING',
+    NULL,
+    1,
+    1,
+    NOW()
+);
+
+\echo ''
+\echo '7.11 CASCADE Delete - Deleting analysis_result removes linked recommendations'
+\echo '     Expected: All linked recommendations deleted automatically'
+\echo ''
+DELETE FROM analysis_result
+WHERE result_id = (SELECT result_id FROM analysis_result LIMIT 1);
+
+SELECT * FROM recommendations;
+\echo '     Expected: 0 rows returned for the deleted result'
+
+\echo ''
 \echo '=============================='
 \echo 'END OF DEMO SCRIPT'
 \echo '=============================='

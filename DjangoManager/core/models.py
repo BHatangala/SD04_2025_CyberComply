@@ -211,3 +211,40 @@ class Document(models.Model):
 
     def __str__(self):
         return self.original_filename
+    
+# =========================
+# Table: analysis_result (placeholder - to be properly implemented by Ammaar)
+# =========================
+class AnalysisResult(models.Model):
+    result_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    class Meta:
+        db_table = "analysis_result"
+    
+# =========================
+# Table: recommendations
+# =========================
+class Recommendation(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        IN_PROGRESS = "IN_PROGRESS", "In Progress"
+        DONE = "DONE", "Done"
+
+    rec_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    result = models.ForeignKey(
+        AnalysisResult,
+        on_delete=models.CASCADE,
+        related_name="recommendations"
+    )
+    recommendation_text = models.TextField()
+    status = models.CharField(max_length=20, choices=Status.choices)
+    act_name = models.CharField(max_length=255)
+    page_no = models.IntegerField()
+    line_no = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "recommendations"
+
+    def __str__(self):
+        return f"{self.act_name} - {self.status}"

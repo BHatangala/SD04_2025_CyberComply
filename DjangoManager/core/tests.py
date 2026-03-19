@@ -7,7 +7,7 @@ from django.db.models.deletion import ProtectedError
 import hashlib
 
 # Database Model Unit Tests.
-from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document
+from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document, AnalysisResult, Recommendation
 
 class CoreModelsTest(TestCase):
     def setUp(self):
@@ -118,6 +118,29 @@ class CoreModelsTest(TestCase):
             size_bytes=102400,
             s3_key="docs/employee_data_v1.docx",
             status=Document.Status.COMPLETED
+        )
+
+        # Create sample AnalysisResult records for recommendation testing
+        self.result1 = AnalysisResult.objects.create()
+        self.result2 = AnalysisResult.objects.create()
+
+        # Create sample recommendation records
+        self.rec1 = Recommendation.objects.create(
+            result=self.result1,
+            recommendation_text="Ensure all sensitive data is encrypted at rest.",
+            status=Recommendation.Status.PENDING,
+            act_name="Data Protection Act",
+            page_no=12,
+            line_no=5
+        )
+
+        self.rec2 = Recommendation.objects.create(
+            result=self.result1,
+            recommendation_text="Update access control policies to restrict admin privileges.",
+            status=Recommendation.Status.IN_PROGRESS,
+            act_name="Cybersecurity Act",
+            page_no=7,
+            line_no=20
         )
 
     # -----------------------------------------------------
@@ -561,3 +584,80 @@ class CoreModelsTest(TestCase):
         dept_id = self.dept1.dept_id
         self.dept1.delete()
         self.assertEqual(Document.objects.filter(dept_id=dept_id).count(), 0)
+
+    # -----------------------------------------------------
+    # Recommendation tests
+    # -----------------------------------------------------
+
+    def test_recommendation_create_and_count(self):
+        # Verify that two recommendation records were created successfully
+        self.assertEqual(Recommendation.objects.count(), 2)
+
+    def test_recommendation_fk_relationship(self):
+        # Verify that the recommendation is correctly linked to its analysis result
+        self.assertEqual(self.rec1.result, self.result1)
+        self.assertEqual(self.rec2.result, self.result1)
+
+    def test_recommendation_status_choices_validation(self):
+        # Verify that invalid status values are rejected during model validation
+        rec = Recommendation(
+            result=self.result1,
+            recommendation_text="Test invalid status.",
+            status="INVALID_STATUS",
+            act_name="Some Act",
+            page_no=1,
+            line_no=1
+        )
+        with self.assertRaises(Exception):
+            rec.full_clean()
+    
+    def test_recommendation_valid_status_pending(self):
+        # Verify that PENDING is accepted as a valid recommendation status
+        self.assertEqual(self.rec1.status, Recommendation.Status.PENDING)
+
+    def test_recommendation_valid_status_in_progress(self):
+        # Verify that IN_PROGRESS is accepted as a valid recommendation status
+        self.assertEqual(self.rec2.status, Recommendation.Status.IN_PROGRESS)
+
+    def test_recommendation_valid_status_done(self):
+        # Verify that DONE is accepted as a valid recommendation status
+        rec = Recommendation.objects.create(
+            result=self.result2,
+            recommendation_text="Review audit logging procedures.",
+            status=Recommendation.Status.DONE,
+            act_name="Audit Act",
+            page_no=3,
+            line_no=10
+        )
+        self.assertEqual(rec.status, Recommendation.Status.DONE)
+    
+    def test_recommendation_uuid_primary_key(self):
+        # Verify that rec_id is automatically assigned as a valid UUID
+        import uuid
+        self.assertIsInstance(self.rec1.rec_id, uuid.UUID)
+
+    def test_recommendation_created_at_auto(self):
+        # Verify that created_at is automatically populated when a recommendation is created
+        self.assertIsNotNone(self.rec1.created_at)
+
+    def test_recommendation_cascade_delete(self):
+        # Verify that deleting an analysis result also deletes its linked recommendations
+        self.result1.delete()
+        self.assertEqual(Recommendation.objects.count(), 0)
+
+    def test_recommendation_isolated_per_result(self):
+        # Verify that recommendations are correctly isolated per analysis result
+        Recommendation.objects.create(
+            result=self.result2,
+            recommendation_text="Review audit logging procedures.",
+            status=Recommendation.Status.DONE,
+            act_name="Audit Act",
+            page_no=3,
+            line_no=10
+        )
+        self.assertEqual(Recommendation.objects.filter(result=self.result1).count(), 2)
+        self.assertEqual(Recommendation.objects.filter(result=self.result2).count(), 1)
+    
+    def test_recommendation_str(self):
+        # Verify that the string representation includes act name and status
+        self.assertEqual(str(self.rec1), "Data Protection Act - PENDING")
