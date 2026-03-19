@@ -113,6 +113,49 @@ def upload_to_s3(file_path, file_name):
 
 
 # ──────────────────────────────────────────────
+# OAuth Token helpers (SSM Parameter Store)
+# ──────────────────────────────────────────────
+
+def save_oauth_token(user_id: str, provider: str, token: str):
+    """Save a user's OAuth token securely to AWS SSM Parameter Store."""
+    try:
+        ssm = boto3.client(
+            'ssm',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME
+        )
+        ssm.put_parameter(
+            Name=f"/cybercomply/oauth/{user_id}/{provider}_token",
+            Value=token,
+            Type="SecureString",
+            Overwrite=True
+        )
+        return True
+    except (BotoCoreError, ClientError) as e:
+        print(f"ERROR saving OAuth token for {user_id}/{provider}: {e}")
+        return False
+    
+def get_oauth_token(user_id: str, provider: str):
+    """Retrieve a user's OAuth token from AWS SSM Parameter Store."""
+    try:
+        ssm = boto3.client(
+            'ssm',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME
+        )
+        response = ssm.get_parameter(
+            Name=f"/cybercomply/oauth/{user_id}/{provider}_token",
+            WithDecryption=True
+        )
+        return response["Parameter"]["Value"]
+    except (BotoCoreError, ClientError) as e:
+        print(f"ERROR retrieving OAuth token for {user_id}/{provider}: {e}")
+        return None
+
+
+# ──────────────────────────────────────────────
 # Phase 1 — Device upload (validate → scan → S3)
 # Called immediately when the user selects a file
 # from their device. Does NOT call the AI service.
@@ -414,6 +457,9 @@ def upload_from_drive(request):
 
     if not file_id or not access_token or not file_name:
         return JsonResponse({'error': 'file_id, access_token and file_name are required'}, status=400)
+    # Save the access token securely to AWS SSM
+    user_id = request.user.id if request.user.is_authenticated else 'anonymous'
+    save_oauth_token(user_id, 'google', access_token)
 
     valid_exts = ('.pdf', '.docx', '.txt')
     if not file_name.lower().endswith(valid_exts):
