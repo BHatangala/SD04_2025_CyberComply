@@ -543,21 +543,91 @@
                 id: "docs",
                 title: "Documents & Uploads",
                 items: [
-                  { no: 17, q: "What document formats are supported?", a: "CyberComply supports PDF, DOCX, and TXT formats." },
-                  { no: 18, q: "Is there a file size or upload limit?", a: "Each document can be up to 50MB, with a maximum of 10 documents per upload session." },
-                  { no: 19, q: "Are uploaded documents stored permanently?", a: "No. Uploaded documents are stored temporarily and are automatically deleted once analysis is complete." },
-                  { no: 20, q: "Are uploaded documents checked for security threats?", a: "Yes. All uploaded documents are scanned for malware before processing." },
+                  { 
+                    no: 17, 
+                    q: "What document formats are supported?", 
+                    a: "CyberComply supports PDF, DOCX, and TXT formats." 
+                  },
+                  { 
+                    no: 18, 
+                    q: "Is there a file size or upload limit?", 
+                    a: "Each document can be up to 50MB, with a maximum of 10 documents per upload session." 
+                  },
+                  { 
+                    no: 19, 
+                    q: "Are uploaded documents stored permanently?", 
+                    a: "No. Uploaded documents are stored temporarily and are automatically deleted once analysis is complete." 
+                  },
+                  { 
+                    no: 20, 
+                    q: "Are uploaded documents checked for security threats?", 
+                    a: "Yes. All uploaded documents are scanned for malware before processing." 
+                  },
                 ],
+              },
+
+              {
+                id: "retention",
+                title: "Document Retention",
+                items: [
+                  { 
+                    no: 21, 
+                    q: "What is document retention?", 
+                    a: "Document retention refers to how long uploaded files are kept in the system before they are automatically deleted. CyberComply only retains documents for the minimum time required to complete compliance analysis and related processing." 
+                  },
+                  { 
+                    no: 22, 
+                    q: "How long are uploaded documents stored?", 
+                    a: "Uploaded documents are stored temporarily and are automatically removed after processing or within the configured retention period of the system." 
+                  },
+                  { 
+                    no: 23, 
+                    q: "Are my uploaded documents stored permanently?", 
+                    a: "No. CyberComply does not permanently store uploaded compliance documents. Files are retained only for temporary processing and are deleted afterward to reduce data exposure risks." 
+                  },
+                  { 
+                    no: 24, 
+                    q: "Can I delete my uploaded documents manually?", 
+                    a: "Yes. Users can remove uploaded documents when needed, and deleted files are permanently removed from the system storage." 
+                  },
+                  { 
+                    no: 25, 
+                    q: "Why does CyberComply limit document retention?", 
+                    a: "Document retention is limited to protect sensitive organisational data, reduce unnecessary storage of confidential files, and support compliance with privacy and data protection requirements." 
+                  },
+                  { 
+                    no: 26, 
+                    q: "What happens after a document is deleted?", 
+                    a: "Once a document is deleted, it cannot be recovered. The system removes it permanently to help maintain confidentiality and reduce security risks." 
+                  },
+                  { 
+                    no: 27, 
+                    q: "Does CyberComply follow data protection practices for document retention?", 
+                    a: "Yes. CyberComply follows secure document handling practices by limiting retention, reducing unnecessary storage, and supporting privacy-focused compliance processes." 
+                  }
+                ]
               },
 
               {
                 id: "reports",
                 title: "Reports & Dashboards",
                 items: [
-                  { no: 21, q: "Does CyberComply generate compliance reports?", a: "Yes. CyberComply generates structured, audit-ready compliance reports." },
-                  { no: 22, q: "In what format are reports generated?", a: "Reports are generated in PDF format." },
-                  { no: 23, q: "Who can download or share compliance reports?", a: "Only Administrative Users can download and securely share compliance reports." },
-                  { no: 24, q: "Does CyberComply provide dashboards?", a: "Yes. Administrative Users can access a comparison dashboard to analyse compliance levels across departments." },
+                  { no: 23, 
+                    q: "Does CyberComply generate compliance reports?", 
+                    a: "Yes. CyberComply generates structured, audit-ready compliance reports." 
+                  },
+                  { no: 24, 
+                    q: "In what format are reports generated?", 
+                    a: "Reports are generated in PDF format." 
+                  },
+                  { no: 25, 
+                    q: "Who can download or share compliance reports?", 
+                    a: "Only Administrative Users can download and securely share compliance reports." 
+                  },
+                  { no: 26, 
+                    q: "Does CyberComply provide dashboards?", 
+                    a: "Yes. Administrative Users can access a comparison dashboard to analyse compliance levels across departments." 
+                  },
                 ],
               },
 
@@ -566,42 +636,42 @@
                 title: "Comparison Dashboard (Graphical View)",
                 items: [
                   {
-                    no: 25,
+                    no: 27,
                     q: "What is the Comparison Dashboard (Graphical View)?",
                     a: "It is an interactive dashboard that visually compares department compliance results using a pie chart, ranking table, and detailed drill-down insights.",
                   },
                   {
-                    no: 26,
+                    no: 28,
                     q: "How do I filter departments by risk level?",
                     a: "Use the Risk Filter drop-down (All / High / Medium / Low). The chart, legend, and table will update automatically.",
                   },
                   {
-                    no: 27,
+                    no: 29,
                     q: "How do I sort the departments?",
                     a: "Use Sort By to choose the field (Compliance %, Risk Level, Improvement Needs, or Department Name), then choose Order (High → Low or Low → High).",
                   },
                   {
-                    no: 28,
+                    no: 30,
                     q: "What does each slice in the pie chart represent?",
                     a: "Each slice represents a department and its share of the total compliance score shown on the dashboard.",
                   },
                   {
-                    no: 29,
+                    no: 31,
                     q: "How can I view a department’s details?",
                     a: "Click a pie slice, a legend item, or a row in the ranking table. A Department Details popup will open with improvement needs and recommended actions.",
                   },
                   {
-                    no: 30,
+                    no: 32,
                     q: "Why don’t I see any departments in the chart/table?",
                     a: "This usually happens when the selected Risk Filter has no matching departments. Click Reset to return to default settings.",
                   },
                   {
-                    no: 31,
+                    no: 33,
                     q: "What are “Improvement Needs”?",
                     a: "It is the number of identified gaps/actions required to improve compliance for that department.",
                   },
                   {
-                    no: 32,
+                    no: 34,
                     q: "What is “Top Gap / Improvement”?",
                     a: "It highlights the most critical issue that needs attention first (example: access control reviews, incident readiness, encryption & backups).",
                   },
@@ -612,9 +682,18 @@
                 id: "security",
                 title: "Security & Privacy",
                 items: [
-                  { no: 33, q: "How is user and document data protected?", a: "All sensitive data is encrypted using AES-256 encryption, both in transit and at rest." },
-                  { no: 34, q: "Is Multi-Factor Authentication (MFA) supported?", a: "Yes. CyberComply enforces Multi-Factor Authentication (MFA), particularly for Administrative Users." },
-                  { no: 35, q: "Is CyberComply designed to comply with data protection standards?", a: "Yes. CyberComply aligns with GDPR-style data protection principles and regulatory compliance requirements." },
+                  { no: 35, 
+                    q: "How is user and document data protected?", 
+                    a: "All sensitive data is encrypted using AES-256 encryption, both in transit and at rest." 
+                  },
+                  { no: 36, 
+                    q: "Is Multi-Factor Authentication (MFA) supported?", 
+                    a: "Yes. CyberComply enforces Multi-Factor Authentication (MFA), particularly for Administrative Users." 
+                  },
+                  { no: 37, 
+                    q: "Is CyberComply designed to comply with data protection standards?", 
+                    a: "Yes. CyberComply aligns with GDPR-style data protection principles and regulatory compliance requirements." 
+                  },
                 ],
               },
 
@@ -622,10 +701,22 @@
                 id: "tech",
                 title: "Technical Requirements",
                 items: [
-                  { no: 36, q: "Is any software installation required?", a: "No. CyberComply is fully web-based and accessed via a supported web browser." },
-                  { no: 37, q: "Which web browsers are supported?", a: "CyberComply supports modern browsers such as Google Chrome, Microsoft Edge, Mozilla Firefox, and Safari." },
-                  { no: 38, q: "Which operating systems are supported?", a: "CyberComply supports Windows 10 and newer, macOS 11 and newer, and Linux 20.04 LTS and newer." },
-                  { no: 39, q: "Is an internet connection required?", a: "Yes. A stable internet connection is required for uploads, analysis, and report generation." },
+                  { no: 38, 
+                    q: "Is any software installation required?", 
+                    a: "No. CyberComply is fully web-based and accessed via a supported web browser." 
+                  },
+                  { no: 39, 
+                    q: "Which web browsers are supported?", 
+                    a: "CyberComply supports modern browsers such as Google Chrome, Microsoft Edge, Mozilla Firefox, and Safari." 
+                  },
+                  { no: 40, 
+                    q: "Which operating systems are supported?", 
+                    a: "CyberComply supports Windows 10 and newer, macOS 11 and newer, and Linux 20.04 LTS and newer." 
+                  },
+                  { no: 41, 
+                    q: "Is an internet connection required?", 
+                    a: "Yes. A stable internet connection is required for uploads, analysis, and report generation." 
+                  },
                 ],
               },
 
@@ -633,8 +724,14 @@
                 id: "integration",
                 title: "Integration & Scalability",
                 items: [
-                  { no: 40, q: "Can CyberComply integrate with external systems?", a: "Yes. CyberComply supports secure API integration with cloud storage services, regulatory databases, and enterprise compliance systems." },
-                  { no: 41, q: "Is CyberComply suitable for large organisations?", a: "Yes. The platform is designed to support organisation-wide compliance analysis with department-level breakdowns." },
+                  { no: 42, 
+                    q: "Can CyberComply integrate with external systems?", 
+                    a: "Yes. CyberComply supports secure API integration with cloud storage services, regulatory databases, and enterprise compliance systems." 
+                  },
+                  { no: 43, 
+                    q: "Is CyberComply suitable for large organisations?", 
+                    a: "Yes. The platform is designed to support organisation-wide compliance analysis with department-level breakdowns." 
+                  },
                 ],
               },
 
@@ -643,17 +740,17 @@
                 title: "Support & Help",
                 items: [
                   {
-                    no: 42,
+                    no: 44,
                     q: "Where can I find user guidance and troubleshooting information?",
                     a: "Detailed guidance and troubleshooting steps are available in the User Guide (PDF), which can be accessed from the User Support page.",
                   },
                   {
-                    no: 43,
+                    no: 45,
                     q: "How will I know the status of uploads, analysis, or report generation?",
                     a: "CyberComply provides system notifications to inform users about upload status, analysis progress, and report generation.",
                   },
                   {
-                    no: 44,
+                    no: 46,
                     q: "Where can I access help resources?",
                     a: "Help resources are available through the User Support section, which provides access to the User Guide, FAQs, and system guidance.",
                   },
@@ -665,7 +762,7 @@
                 title: "Limitations & Disclaimer",
                 items: [
                   {
-                    no: 45,
+                    no: 47,
                     q: "Does CyberComply replace professional auditors or legal experts?",
                     a: "No. CyberComply is designed to support and enhance compliance activities but does not replace professional audits, legal advice, or regulatory judgment.",
                   },
