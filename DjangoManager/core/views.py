@@ -326,6 +326,24 @@ def analyze_compliance(request):
             )
             result = response.json()
 
+            # Save AnalysisResult + Report to database
+            try:
+                from django.utils import timezone
+                from datetime import timedelta
+                import json as _json
+                analysis_result = AnalysisResult.objects.create()
+                snapshot = {**result, 'metadata': {**result.get('metadata', {}), 'file_analyzed': file_name, 'company': company_name}}
+                snapshot_str = _json.dumps(snapshot)
+                Report.objects.create(
+                    result=analysis_result,
+                    report_snapshot=snapshot,
+                    report_s3_key=file_name,
+                    file_size=len(snapshot_str),
+                    expires_at=timezone.now() + timedelta(days=30)
+                )
+            except Exception:
+                pass  # non-critical — don't break the SSE stream
+
             yield f"data: {json.dumps({'status': 'analysed', 'result': result})}\n\n".encode('utf-8')
 
             # Clean up cache entry once analysis is done
