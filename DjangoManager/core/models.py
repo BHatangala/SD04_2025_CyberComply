@@ -300,3 +300,23 @@ class Report(models.Model):
 
     def __str__(self):
         return str(self.report_id)
+    
+
+# =========================
+# Table: audit_logs
+# =========================
+class AuditLog(models.Model):
+    audit_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_logs")
+    action_type = models.CharField(max_length=50)
+    target_type = models.CharField(max_length=50)
+    target_id = models.UUIDField()
+    success = models.BooleanField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "audit_logs"
+
+    def __str__(self):
+        return f"{self.user} - {self.action_type} - {self.target_type}"

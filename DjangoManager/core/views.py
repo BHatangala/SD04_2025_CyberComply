@@ -26,7 +26,7 @@ import boto3
 import re
 from botocore.exceptions import BotoCoreError, ClientError
 
-from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report
+from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report, AuditLog
 
 # ──────────────────────────────────────────────
 # Security Configuration
@@ -260,6 +260,7 @@ def upload_file(request):
             status=Document.Status.UPLOADED,
         )
 
+        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request)
         return JsonResponse({
             'status':      'uploaded',
             's3_url':      s3_url,
@@ -550,6 +551,7 @@ def delete_file(request):
             Bucket=settings.AWS_STORAGE_BUCKET_NAME,
             Delete={'Objects': objects}
         )
+        _record_audit_log(profile, "DELETE", "document", None, True, request)
         return JsonResponse({'status': f'{len(keys_to_delete)} file(s) deleted'})
 
     except (BotoCoreError, ClientError) as e:
@@ -1046,6 +1048,16 @@ def _generate_and_store_otp(profile: UserProfile, purpose: str) -> str:
     )
     return raw_otp
 
+def _record_audit_log(profile, action_type: str, target_type: str, target_id, success: bool, request=None) -> None:
+    ip = request.META.get("REMOTE_ADDR") if request else None
+    AuditLog.objects.create(
+        user=profile,
+        action_type=action_type,
+        target_type=target_type,
+        target_id=target_id,
+        success=success,
+        ip_address=ip
+    )
 
 # def _send_otp_email(email: str, otp: str) -> bool:
 #    """Send OTP to user via AWS SES (configured as Django email backend)."""
@@ -2367,6 +2379,7 @@ def save_analysis_result(request):
         document.status = Document.Status.COMPLETED
         document.save(update_fields=["status"])
 
+    _record_audit_log(profile, "ANALYSE", "analysis_result", analysis.result_id, True, request)
     return JsonResponse(
         {
             "result_id":        str(analysis.result_id),

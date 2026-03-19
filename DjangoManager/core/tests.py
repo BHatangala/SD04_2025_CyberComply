@@ -7,7 +7,7 @@ from django.db.models.deletion import ProtectedError
 import hashlib
 
 # Database Model Unit Tests.
-from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document, AnalysisResult, Recommendation
+from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document, AnalysisResult, Recommendation, AuditLog
 
 class CoreModelsTest(TestCase):
     def setUp(self):
@@ -121,8 +121,8 @@ class CoreModelsTest(TestCase):
         )
 
         # Create sample AnalysisResult records for recommendation testing
-        self.result1 = AnalysisResult.objects.create()
-        self.result2 = AnalysisResult.objects.create()
+        self.result1 = AnalysisResult.objects.create(document=self.doc1)
+        self.result2 = AnalysisResult.objects.create(document=self.doc2)
 
         # Create sample recommendation records
         self.rec1 = Recommendation.objects.create(
@@ -141,6 +141,25 @@ class CoreModelsTest(TestCase):
             act_name="Cybersecurity Act",
             page_no=7,
             line_no=20
+        )
+
+        # Create sample audit log records
+        self.log1 = AuditLog.objects.create(
+            user=self.profile1,
+            action_type="UPLOAD",
+            target_type="document",
+            target_id=self.doc1.document_id,
+            success=True,
+            ip_address="203.143.27.18"
+        )
+
+        self.log2 = AuditLog.objects.create(
+            user=self.profile2,
+            action_type="DELETE",
+            target_type="document",
+            target_id=self.doc2.document_id,
+            success=False,
+            ip_address="112.134.45.201"
         )
 
     # -----------------------------------------------------
@@ -662,6 +681,81 @@ class CoreModelsTest(TestCase):
         # Verify that the string representation includes act name and status
         self.assertEqual(str(self.rec1), "Data Protection Act - PENDING")
 
+    # -----------------------------------------------------
+    # AuditLog tests
+    # -----------------------------------------------------
+
+    def test_auditlog_create_and_count(self):
+        # Verify that two audit log records were created successfully
+        self.assertEqual(AuditLog.objects.count(), 2)
+
+    def test_auditlog_fk_relationship(self):
+        # Verify that the audit log is correctly linked to the user profile
+        self.assertEqual(self.log1.user, self.profile1)
+        self.assertEqual(self.log2.user, self.profile2)
+
+    def test_auditlog_created_at_auto(self):
+        # Verify that created_at is automatically populated when an audit log is created
+        self.assertIsNotNone(self.log1.created_at)
+
+    def test_auditlog_success_true(self):
+        # Verify that success=True is stored correctly
+        self.assertTrue(self.log1.success)
+
+    def test_auditlog_success_false(self):
+        # Verify that success=False is stored correctly
+        self.assertFalse(self.log2.success)
+
+    def test_auditlog_ip_address_optional(self):
+        # Verify that ip_address can be NULL
+        log = AuditLog.objects.create(
+            user=self.profile1,
+            action_type="DOWNLOAD",
+            target_type="document",
+            target_id=self.doc1.document_id,
+            success=True,
+            ip_address=None
+        )
+        self.assertIsNone(log.ip_address)
+
+    def test_auditlog_user_set_null_on_delete(self):
+        # Verify that deleting a user profile sets user to NULL on related audit logs
+        LoginHistory.objects.filter(user=self.profile2).delete()
+        OtpVerification.objects.filter(user=self.profile2).delete()
+        self.profile2.delete()
+        self.log2.refresh_from_db()
+        self.assertIsNone(self.log2.user)
+
+    def test_auditlog_user_nullable(self):
+        # Verify that audit logs can be created without a user (anonymous actions)
+        log = AuditLog.objects.create(
+            user=None,
+            action_type="UPLOAD",
+            target_type="document",
+            target_id=self.doc1.document_id,
+            success=True,
+            ip_address="10.0.0.1"
+        )
+        self.assertIsNone(log.user)
+
+    def test_auditlog_uuid_primary_key(self):
+        # Verify that audit_id is automatically assigned as a valid UUID
+        import uuid
+        self.assertIsInstance(self.log1.audit_id, uuid.UUID)
+
+    def test_auditlog_str(self):
+        # Verify that the string representation includes user, action type and target type
+        self.assertEqual(str(self.log1), f"{self.profile1} - UPLOAD - document")
+
+    def test_auditlog_action_type_stored_correctly(self):
+        # Verify that action_type is stored and retrieved correctly
+        self.assertEqual(self.log1.action_type, "UPLOAD")
+        self.assertEqual(self.log2.action_type, "DELETE")
+
+    def test_auditlog_target_id_stored_correctly(self):
+        # Verify that target_id correctly stores the UUID of the affected record
+        self.assertEqual(self.log1.target_id, self.doc1.document_id)
+
 # -----------------------------------------------------
 # Report & AnalysisResult tests
 # -----------------------------------------------------
@@ -672,8 +766,22 @@ class ReportModelTest(TestCase):
     def setUp(self):
         self.now = timezone.now()
 
-        self.result1 = AnalysisResult.objects.create()
-        self.result2 = AnalysisResult.objects.create()
+        self.auth = User.objects.create_user(username="report.user", password="Pass123!")
+        self.org = Organization.objects.create(org_name="Report Test Org")
+        self.dept = Department.objects.create(org=self.org, dept_name="Report Dept")
+        self.profile = UserProfile.objects.create(auth_user=self.auth, full_name="Report User")
+        self.doc1 = Document.objects.create(
+            user=self.profile, org=self.org, dept=self.dept,
+            original_filename="report_test1.pdf", file_type="PDF",
+            s3_key="docs/report_test1.pdf"
+        )
+        self.doc2 = Document.objects.create(
+            user=self.profile, org=self.org, dept=self.dept,
+            original_filename="report_test2.pdf", file_type="PDF",
+            s3_key="docs/report_test2.pdf"
+        )
+        self.result1 = AnalysisResult.objects.create(document=self.doc1)
+        self.result2 = AnalysisResult.objects.create(document=self.doc2)
 
         self.report1 = Report.objects.create(
             result=self.result1,
