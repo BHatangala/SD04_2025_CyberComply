@@ -27,6 +27,7 @@ import re
 from botocore.exceptions import BotoCoreError, ClientError
 
 from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report, AuditLog, AdminAccessRequest
+from .utils import validate_org_email
 
 # ──────────────────────────────────────────────
 # Security Configuration
@@ -2579,6 +2580,11 @@ def request_admin_access(request):
         validate_email(org_email)
     except ValidationError:
         return JsonResponse({"detail": "Please enter a valid email address."}, status=400)
+    
+    # Validate organisational email domain
+    is_valid_org, org_error = validate_org_email(org_email)
+    if not is_valid_org:
+        return JsonResponse({"detail": org_error}, status=400)
  
     # Check for an existing PENDING request to prevent duplicates
     existing = AdminAccessRequest.objects.filter(
