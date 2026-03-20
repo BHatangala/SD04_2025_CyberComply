@@ -800,6 +800,12 @@ def signup(request):
     role_db = role_map.get(role_ui)
     if not role_db:
         return JsonResponse({"detail": "Invalid role selected"}, status=400)
+    
+    # Validate organisational email if role is Administrative
+    if role_db == UserProfile.Role.ADMIN:
+        is_valid_org, org_error = validate_org_email(email)
+        if not is_valid_org:
+            return JsonResponse({"detail": org_error}, status=400)
 
     if User.objects.filter(username=email).exists():
         return JsonResponse({"detail": "Email already registered"}, status=409)
