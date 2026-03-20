@@ -669,7 +669,7 @@
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${localStorage.getItem('sessionToken') || ''}`
+                                'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`
                             },
                             body: JSON.stringify({ org_email: this.orgEmail })
                         });
@@ -711,7 +711,7 @@
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${localStorage.getItem('sessionToken') || ''}`
+                                'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`
                             },
                             body: JSON.stringify({
                                 otp: otpCode,
@@ -753,7 +753,7 @@
                     try {
                         const res = await fetch('/api/admin-access/status/', {
                             headers: {
-                                'Authorization': `Bearer ${localStorage.getItem('sessionToken') || ''}`
+                                'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`
                             }
                         });
                         if (res.ok) {
