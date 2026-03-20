@@ -573,7 +573,9 @@
                 <!-- OTP Verification View -->
                 <div v-if="step === 'otp'">
 
-                    <h2>Enter the OTP sent to {{ orgEmail }}</h2>
+                    <h2 style="word-break: break-word; overflow-wrap: break-word; padding: 0 10px; font-size: 18px; line-height: 1.5;">
+                        Enter the OTP sent to {{ orgEmail }}
+                    </h2>
 
                     <transition name="fade">
                         <div v-if="message.text"
@@ -583,10 +585,25 @@
                         </div>
                     </transition>
 
-                    <otp-verification 
-                        :email="orgEmail" 
-                        @verified="handleOtpVerified">
-                    </otp-verification>
+                    <div class="otp-wrapper">
+                        <div class="otp-field">
+                            <label class="otp-label">Enter OTP</label>
+                            <input
+                                v-model="otpCode"
+                                type="text"
+                                inputmode="numeric"
+                                maxlength="6"
+                                placeholder="******"
+                                class="otp-input"
+                                :disabled="loading"
+                                @input="otpCode = otpCode.replace(/\D/g, '').slice(0, 6)"
+                                @keyup.enter="handleOtpVerified"
+                            />
+                        </div>
+                        <button class="otp-btn" @click="handleOtpVerified" :disabled="loading">
+                            {{ loading ? 'VERIFYING...' : 'VERIFY OTP' }}
+                        </button>
+                    </div>
 
                 </div>
 
@@ -665,7 +682,7 @@
                     this.loading = true;
 
                     try {
-                        const response = await fetch('/api/admin-access/request/', {
+                        const response = await fetch('http://127.0.0.1:8000/api/admin-access/request/', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -697,24 +714,29 @@
                     }
                 },
                 // Handle successful OTP verification
-                async handleOtpVerified(otpCode) {
+                async handleOtpVerified() {
                     if (!this.currentRequestId) {
                         this.message = { text: 'No active request found. Please start over.', type: 'error' };
                         this.step = 'form';
                         return;
                     }
 
+                    if (!/^\d{6}$/.test(this.otpCode)) {
+                        this.message = { text: 'Please enter a valid 6-digit code.', type: 'error' };
+                        return;
+                    }
+
                     this.loading = true;
 
                     try {
-                        const response = await fetch('/api/admin-access/verify/', {
+                        const response = await fetch('http://127.0.0.1:8000/api/admin-access/verify/', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`
                             },
                             body: JSON.stringify({
-                                otp: otpCode,
+                                otp: this.otpCode,
                                 request_id: this.currentRequestId
                             })
                         });
@@ -722,17 +744,13 @@
                         const data = await response.json();
 
                         if (!response.ok) {
+                            this.otpCode = '';
                             throw new Error(data.detail || 'Verification failed');
                         }
 
-                        // Success!
-                        sessionStorage.setItem('userRole', 'Administrative User');
-                        sessionStorage.setItem('userEmail', this.orgEmail);
-
-                        this.message = {
-                            text: 'Administrative access granted successfully!',
-                            type: 'success'
-                        };
+                        sessionStorage.setItem('userRole', data.role);
+                        this.otpCode = '';
+                        this.message = { text: 'Administrative access granted successfully!', type: 'success' };
                         this.step = 'success';
 
                         setTimeout(() => {
@@ -751,7 +769,7 @@
                 // Check current admin access request status on page load
                 async checkAdminRequestStatus() {
                     try {
-                        const res = await fetch('/api/admin-access/status/', {
+                        const res = await fetch('http://127.0.0.1:8000/api/admin-access/status/', {
                             headers: {
                                 'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`
                             }
