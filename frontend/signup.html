@@ -73,13 +73,18 @@
       border-radius: 4px;
     }
 
+    .primary-btn {
+      background-color: #a2b8c8;
+      color: #123456;
+    }
+
     .link-text {
       font-size: 14px;
       margin-bottom: 20px;
     }
 
     .wave-right {
-      position: absolute;
+      position: fixed;
       bottom: 0;
       right: 0;
       width: 65%;
@@ -87,26 +92,57 @@
       pointer-events: none;
     }
 
+    .terms-box {
+      margin-top: 8px;
+      background: rgba(35, 69, 97, 0.55);
+      border: 1px solid rgba(169, 199, 255, 0.18);
+      border-radius: 12px;
+      padding: 14px 14px 12px;
+      text-align: left;
+    }
+
     .terms-label {
       display: flex;
-      align-items: center;
-      gap: 8px;
+      align-items: flex-start;
+      gap: 10px;
       font-size: 12px;
       cursor: pointer;
+      line-height: 1.6;
+      color: #d7e0ea;
     }
 
     .terms-label input {
       width: auto;
-      margin: 0;
+      margin: 3px 0 0 0;
+      accent-color: #a9c7ff;
+      transform: scale(1.05);
+      flex-shrink: 0;
+    }
+
+    .terms-link {
+      color: #a9c7ff;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      font-weight: 600;
+    }
+
+    .terms-link:hover {
+      color: #d9e8ff;
+    }
+
+    .terms-mini {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #b8c6d8;
+      line-height: 1.6;
+      border-top: 1px solid rgba(169, 199, 255, 0.12);
+      padding-top: 10px;
     }
 
     .modal {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.7);
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
       display: flex;
       justify-content: center;
       align-items: center;
@@ -114,16 +150,64 @@
       animation: fadeIn 0.25s ease;
     }
 
-    /* UPDATED TO MAKE SCROLLABLE */
     .modal-content {
-      background: #fff;
-      color: #000;
-      padding: 20px;
-      width: 420px;
-      max-height: 80vh;      /* limits height */
-      overflow-y: auto;      /* enables scrolling */
-      border-radius: 8px;
+        background: rgba(16, 23, 38, 0.65);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+
+      color: #f3f4f6;
+      width: 100%;
+      max-width: 720px;
+      max-height: 85vh;
+      overflow: hidden;
+
+      border-radius: 16px;
       text-align: left;
+
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 28px 70px rgba(0,0,0,0.55);
+
+      display: flex;
+      flex-direction: column;  
+    }
+
+    .modal-header {
+      padding: 22px 56px 16px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      background: transparent;
+    }
+
+    .close-icon {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      width: auto;
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      border: none;
+      color: #a2b8c8;
+      font-size: 24px;
+      font-weight: bold;
+      line-height: 1;
+      cursor: pointer;
+      z-index: 20;
+      box-shadow: none;
+      transition: color 0.2s ease;
+    }
+
+    .close-icon:hover {
+      color: #ffffff;
+      background: transparent;
+      transform: none;
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      text-align: left;
+      font-size: 26px;
+      color: #f9fafb;
     }
 
     /* Real-time password rules styling */
@@ -435,52 +519,157 @@
 
     <img src="img2.png" alt="Wave design right" class="wave-right">
 
-    <!-- SCROLLABLE TERMS MODAL -->
     <div v-if="showTerms" class="modal">
       <div class="modal-content">
-        <h3>CyberComply – Terms & Conditions</h3>
+        <button class="close-icon" @click="closeTermsModal">✕</button>
 
-        <p><strong>1. Acceptance of Terms</strong><br>
-        By creating an account on CyberComply, you acknowledge that you have read, understood,
-        and agreed to comply with these Terms & Conditions and all applicable cybersecurity
-        and data protection regulations.</p>
+        <div class="modal-header">
 
-        <p><strong>2. User Account Responsibility</strong><br>
-        • You are responsible for maintaining the confidentiality of your login credentials.<br>
-        • Multi-Factor Authentication (OTP verification) may be required.<br>
-        • Unauthorized access must be reported immediately.</p>
+          <h3>CyberComply Terms &amp; Conditions</h3>
 
-        <p><strong>3. Role-Based Access Control</strong><br>
-        • General Users may upload and analyse only their own documents.<br>
-        • Administrative Users must register using a valid organisational email.<br>
-        • Access to dashboards and reports is role-restricted.</p>
+          <div class="modal-subtitle">
+            Please review these terms carefully before creating your account.
+            These conditions govern access to the CyberComply compliance management platform.
+          </div>
 
-        <p><strong>4. Document Upload & Storage</strong><br>
-        • Documents are stored temporarily for compliance analysis.<br>
-        • Files are automatically deleted after processing.<br>
-        • Malware scanning and validation are performed.</p>
+        </div>
 
-        <p><strong>5. Data Protection & Encryption</strong><br>
-        • All data is encrypted via HTTPS/TLS.<br>
-        • Stored data is protected using AES-256 encryption.<br>
-        • System aligns with GDPR and PDPA regulations.</p>
+        <div
+          class="modal-body"
+          ref="termsScrollBox"
+          @scroll="handleTermsScroll"
+        >
+          <div class="terms-section">
+            <h4>1. Acceptance of Terms</h4>
+            <p>
+              By creating an account, you confirm that you have read, understood, and agreed to these
+              Terms &amp; Conditions, including platform policies relating to data usage, privacy,
+              access privileges, limitation of liability, and enforcement actions for misuse.
+            </p>
+          </div>
 
-        <p><strong>6. AI Disclaimer</strong><br>
-        Compliance results are AI-generated and for guidance only. They do not replace legal advice.</p>
+          <div class="terms-section">
+            <h4>2. Authorised Account Use</h4>
+            <p>
+              CyberComply is intended for authorised users performing legitimate compliance-related
+              activities on behalf of an organisation. You must provide accurate registration details
+              and use your account only for approved and lawful purposes.
+            </p>
+          </div>
 
-        <p><strong>7. Prohibited Activities</strong><br>
-        • Uploading malicious content<br>
-        • Attempting to bypass security mechanisms<br>
-        • Accessing other users' documents</p>
+          <div class="terms-section">
+            <h4>3. Account Security and Authentication</h4>
+            <p>
+              You are responsible for maintaining the confidentiality of your login credentials.
+              CyberComply may require password verification, one-time verification codes, or
+              multi-factor authentication to protect account access and sensitive compliance data.
+            </p>
+          </div>
 
-        <p><strong>8. Suspension</strong><br>
-        Accounts violating policies may be suspended or terminated.</p>
+          <div class="terms-section">
+            <h4>4. Role-Based Access and Privileges</h4>
+            <p>
+              Access to platform features is granted according to the role assigned to your account.
+              Users must not attempt to access restricted resources, reports, dashboards, or organisational
+              data beyond their authorised privilege level.
+            </p>
+          </div>
 
-        <p><strong>9. Updates</strong><br>
-        Continued use of the platform indicates acceptance of updated terms.</p>
+          <div class="terms-section">
+            <h4>5. Data Usage and Document Processing</h4>
+            <p>
+              Documents and information submitted through the platform may be processed for compliance
+              analysis, risk categorisation, recommendation generation, and reporting. Users must ensure
+              that all uploaded information is accurate, relevant, and authorised for submission.
+            </p>
+          </div>
 
-        <br>
-        <button @click="showTerms = false">Close</button>
+          <div class="terms-section">
+            <h4>6. Confidentiality, Storage, and Deletion</h4>
+            <p>
+              Uploaded compliance documents are handled as confidential information. Documents are stored
+              only for the period necessary to complete analysis and related processing tasks and are then
+              securely deleted in accordance with platform security requirements.
+            </p>
+          </div>
+
+          <div class="terms-section">
+            <h4>7. Security Protections</h4>
+            <p>
+              CyberComply applies technical safeguards such as encrypted communication, secure authentication,
+              controlled access, and related security measures to protect user information and organisational data.
+            </p>
+          </div>
+
+          <div class="terms-section">
+            <h4>8. Prohibited Activities</h4>
+            <ul>
+              <li>Providing false, misleading, or unauthorised registration information</li>
+              <li>Attempting to bypass authentication or security controls</li>
+              <li>Uploading malicious, corrupted, unsupported, or unlawful content</li>
+              <li>Accessing or attempting to access another user’s data without permission</li>
+              <li>Using the platform in a way that disrupts service availability, confidentiality, or integrity</li>
+            </ul>
+          </div>
+
+          <div class="terms-section">
+            <h4>9. AI-Generated Analysis Disclaimer</h4>
+            <p>
+              CyberComply provides AI-assisted compliance assessments, scores, and recommendations based on
+              uploaded documents and supported regulatory frameworks. These outputs are intended to assist users
+              and should not be treated as a substitute for independent legal, regulatory, or professional advice.
+            </p>
+          </div>
+
+          <div class="terms-section">
+            <h4>10. Suspension, Restriction, and Termination</h4>
+            <p>
+              CyberComply reserves the right to suspend, restrict, or terminate accounts where users violate
+              platform policies, misuse system resources, repeatedly fail security checks, or engage in activities
+              that threaten the platform or the confidentiality of compliance-related information.
+            </p>
+          </div>
+
+          <div class="terms-section">
+            <h4>11. Limitation of Liability</h4>
+            <p>
+              CyberComply shall not be held responsible for decisions made solely on automated system outputs,
+              inaccuracies caused by incomplete or misleading user-provided data, unsupported document formats,
+              or regulatory changes outside the system’s current supported scope.
+            </p>
+          </div>
+
+          <div class="terms-section">
+            <h4>12. Updates to Terms</h4>
+            <p>
+              These Terms &amp; Conditions may be updated to reflect legal, security, operational, or platform
+              changes. Continued use of the platform after such updates constitutes acceptance of the revised terms.
+            </p>
+          </div>
+
+          <div
+            class="scroll-notice"
+            :class="{ ready: termsScrolledToBottom }"
+          >
+            <span v-if="!termsScrolledToBottom">
+              Please scroll to the bottom of this Terms &amp; Conditions document to enable acceptance.
+            </span>
+            <span v-else>
+              You have reached the end of the Terms &amp; Conditions. You may now confirm that you have read them.
+            </span>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+
+          <button
+            class="primary-btn"
+            @click="acceptTermsFromModal"
+            :disabled="!termsScrolledToBottom"
+          >
+            I Have Read and Understood
+          </button>
+        </div>
       </div>
     </div>
 

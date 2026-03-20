@@ -186,7 +186,6 @@ const OtpVerification = {
                     this.$emit("verified", data);
                 }
 
-            // Clear OTP after failure and keep error generic    
             } catch (err) {
                 this.otp = "";
                 this.setMessage('error', err.message || 'Invalid or expired verification code.');
