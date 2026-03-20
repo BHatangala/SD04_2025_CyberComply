@@ -2192,6 +2192,11 @@ def generate_report(request):
     if request.method != "POST":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
 
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except Exception:
@@ -2223,6 +2228,7 @@ def generate_report(request):
     except Exception as e:
         return JsonResponse({"detail": f"Failed to create report: {str(e)}"}, status=500)
 
+    _record_audit_log(profile, "GENERATE_REPORT", "report", report.report_id, True, request)
     return JsonResponse({
         "detail": "Report generated successfully",
         "report_id": str(report.report_id),
@@ -2244,10 +2250,17 @@ def get_report(request, report_id):
     if request.method != "GET":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
 
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
     try:
         report = Report.objects.select_related("result").get(report_id=report_id)
     except Report.DoesNotExist:
         return JsonResponse({"detail": "Report not found"}, status=404)
+    
+    _record_audit_log(profile, "VIEW_REPORT", "report", report.report_id, True, request)
 
     return JsonResponse({
         "report_id": str(report.report_id),
