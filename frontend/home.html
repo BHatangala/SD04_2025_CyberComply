@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="sidebar_component.js"></script>
     <style>
         * {
             margin: 0;
@@ -30,7 +31,10 @@
             padding: 15px 30px;
             display: flex;
             align-items: center;
-            position: relative;
+            position: fixed;       
+            top: 0;                
+            left: 0;                
+            width: 100%;            
             z-index: 100;
         }
 
@@ -71,135 +75,6 @@
             fill: #1a2845;
         }
 
-        /* ── Sidebar ── */
-        .sidebar {
-            position: absolute;
-            left: 0;
-            top: 60px;
-            width: 280px;
-            height: calc(100vh - 60px);
-            background-color: #0d1420;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease-in-out;
-            z-index: 90;
-            overflow-y: auto;
-            padding: 20px 0;
-            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
-        }
-
-        .sidebar.open {
-            transform: translateX(0);
-        }
-
-        .sidebar-icon-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0px 10px 15px 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #1a2845;
-        }
-
-        .sidebar-icon {
-            width: 45px;
-            height: 45px;
-            background-color: #1a2845;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .sidebar-icon:hover {
-            background-color: #2a4a7c;
-            transform: scale(1.05);
-        }
-
-        .sidebar-icon svg {
-            width: 22px;
-            height: 22px;
-            fill: #8b9dc3;
-            transition: fill 0.3s;
-        }
-
-        .sidebar-icon:hover svg {
-            fill: #ffffff;
-        }
-
-        .search-container {
-            padding: 0 20px 20px;
-            display: none;
-        }
-
-        .search-container.active {
-            display: block;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 10px 15px;
-            background-color: #1a2845;
-            border: 2px solid #2a4a7c;
-            border-radius: 8px;
-            color: #ffffff;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #4a8fe7;
-        }
-
-        .search-input::placeholder {
-            color: #6b7a99;
-        }
-
-        .sidebar-section {
-            margin-bottom: 30px;
-        }
-
-        .sidebar-header {
-            padding: 10px 20px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #6b7a99;
-            letter-spacing: 1.5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .sidebar-header svg {
-            width: 14px;
-            height: 14px;
-            fill: #6b7a99;
-        }
-
-        .sidebar-item {
-            padding: 12px 20px;
-            color: #c5d0e6;
-            cursor: pointer;
-            transition: all 0.2s;
-            border-left: 3px solid transparent;
-            font-size: 14px;
-        }
-
-        .sidebar-item:hover {
-            background-color: #1a2845;
-            border-left-color: #4a8fe7;
-            color: #ffffff;
-        }
-
-        .no-results {
-            padding: 12px 20px;
-            color: #6b7a99;
-            font-size: 12px;
-            font-style: italic;
-        }
-
         /* ── Main Content ── */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
@@ -215,6 +90,7 @@
         /* ── Logo ── */
         .logo {
             text-align: center;
+            margin-top: 45px;
             margin-bottom: 36px;
         }
 
@@ -769,7 +645,7 @@
 
     <!-- ── Top Header ── -->
     <div class="top-header">
-        <div class="menu-icon" @click="toggleSidebar">●●●</div>
+        <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
         <div class="user-profile" @click="showProfile">
             <svg viewBox="0 0 24 24">
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
@@ -778,66 +654,10 @@
     </div>
 
     <!-- ── Sidebar ── -->
-    <div class="sidebar" :class="{ open: sidebarOpen }">
-        <div class="sidebar-icon-bar">
-            <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
-                <svg viewBox="0 0 24 24">
-                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                </svg>
-            </div>
-            <div class="sidebar-icon" @click="goToHome" title="Start new analysis">
-                <svg viewBox="0 0 24 24">
-                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                </svg>
-            </div>
-        </div>
-
-        <div class="search-container" :class="{ active: searchActive }">
-            <input
-                type="text"
-                class="search-input"
-                v-model="searchQuery"
-                placeholder="Search documents..."
-                @input="filterReports"
-            >
-        </div>
-
-        <div class="sidebar-section">
-            <div class="sidebar-header">
-                <svg viewBox="0 0 24 24">
-                    <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                </svg>
-                LAST 7 DAYS
-            </div>
-            <div v-if="filteredLast7Days.length === 0" class="no-results">No results to display</div>
-            <div v-else>
-                <div
-                    v-for="report in filteredLast7Days"
-                    :key="report"
-                    class="sidebar-item"
-                    @click="openReport(report)"
-                >{{ report }}</div>
-            </div>
-        </div>
-
-        <div class="sidebar-section">
-            <div class="sidebar-header">
-                <svg viewBox="0 0 24 24">
-                    <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-                </svg>
-                LAST 30 DAYS
-            </div>
-            <div v-if="filteredLast30Days.length === 0" class="no-results">No results to display</div>
-            <div v-else>
-                <div
-                    v-for="report in filteredLast30Days"
-                    :key="report"
-                    class="sidebar-item"
-                    @click="openReport(report)"
-                >{{ report }}</div>
-            </div>
-        </div>
-    </div>
+    <cybercomply-sidebar
+        :sidebar-open="sidebarOpen"
+        @toggle="sidebarOpen = !sidebarOpen"
+    ></cybercomply-sidebar>
 
     <!-- ── Main Content ── -->
     <div class="main-content" :class="{ shifted: sidebarOpen }" @click="closeAllDropdowns">
@@ -1039,17 +859,11 @@
 <script>
     const { createApp } = Vue;
 
-    createApp({
+    const app = createApp({
         data() {
             return {
                 // ── Sidebar ──
-                sidebarOpen: false,
-                searchActive: false,
-                searchQuery: '',
-                last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
-                last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
-                filteredLast7Days: [],
-                filteredLast30Days: [],
+                sidebarOpen: true,
 
                 // ── Admin fields ──
                 // TODO: Replace with isAdmin flag from auth/database once implemented.
@@ -1078,8 +892,6 @@
         },
 
         mounted() {
-            this.filteredLast7Days  = [...this.last7Days];
-            this.filteredLast30Days = [...this.last30Days];
             document.addEventListener('click', this.closeAllDropdowns);
         },
 
@@ -1093,29 +905,9 @@
             toggleSidebar() {
                 this.sidebarOpen = !this.sidebarOpen;
             },
-            toggleSearch() {
-                this.searchActive = !this.searchActive;
-                if (!this.searchActive) {
-                    this.searchQuery = '';
-                    this.filterReports();
-                }
-            },
-            filterReports() {
-                const q = this.searchQuery.toLowerCase();
-                if (!q) {
-                    this.filteredLast7Days  = [...this.last7Days];
-                    this.filteredLast30Days = [...this.last30Days];
-                } else {
-                    this.filteredLast7Days  = this.last7Days.filter(r => r.toLowerCase().includes(q));
-                    this.filteredLast30Days = this.last30Days.filter(r => r.toLowerCase().includes(q));
-                }
-            },
             goToHome()   { window.location.href = 'home.html'; },
             showProfile(){ window.location.href = 'profile.html'; },
             showHelp()   { window.location.href = 'user_support.html'; },
-            openReport(reportName) {
-                window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
-            },
 
             // ── File Input Triggers ──
             triggerFileInput() { this.$refs.fileInput.click(); },
@@ -1181,7 +973,7 @@
                     if (i === -1) return; // user removed the file mid-upload — do nothing
                     // Object.assign keeps Vue 3's reactivity intact on array items.
                     Object.assign(this.uploadedFiles[i], { status: newStatus });
-                    console.log(`📊 [${fileObj.name}] → ${newStatus}`);
+                    console.log(`[${fileObj.name}] → ${newStatus}`);
                 };
 
                 const formData = new FormData();
@@ -1189,7 +981,7 @@
                 formData.append('company_name', this.companyName || '');
                 formData.append('department',   fileObj.department || '');
 
-                console.log(`🚀 Uploading: ${fileObj.name}`);
+                console.log(`Uploading: ${fileObj.name}`);
 
                 try {
                     const response = await fetch(this.analyzeEndpoint, {
@@ -1229,7 +1021,7 @@
 
                             try {
                                 const payload = JSON.parse(dataLine.slice(6)); // strip "data: "
-                                console.log(`📡 [${fileObj.name}] SSE:`, payload.status);
+                                console.log(`[${fileObj.name}] SSE:`, payload.status);
 
                                 switch (payload.status) {
 
@@ -1283,7 +1075,7 @@
                     }
 
                 } catch (error) {
-                    console.error(`❌ Upload failed for ${fileObj.name}:`, error);
+                    console.error(`Upload failed for ${fileObj.name}:`, error);
                     const i = getIndex();
                     if (i !== -1) {
                         Object.assign(this.uploadedFiles[i], { status: 'error' });
@@ -1358,7 +1150,9 @@
                 return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
             }
         }
-    }).mount('#app');
+    });
+    registerSidebarComponent(app);
+    app.mount('#app');
 </script>
 </body>
 </html>

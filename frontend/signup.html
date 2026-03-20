@@ -15,7 +15,10 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
+      padding: 24px;
+      overflow-x: hidden;
+      position: relative;
     }
 
     .container {
@@ -45,6 +48,11 @@
       margin-top: 5px;
     }
 
+    input::placeholder {
+      color: #d1d5db;
+      opacity: 1;
+    }  
+
     .note {
       font-size: 12px;
       margin-top: 5px;
@@ -66,13 +74,18 @@
       border-radius: 4px;
     }
 
+    .primary-btn {
+      background-color: #a2b8c8;
+      color: #123456;
+    }
+
     .link-text {
       font-size: 14px;
       margin-bottom: 20px;
     }
 
     .wave-right {
-      position: absolute;
+      position: fixed;
       bottom: 0;
       right: 0;
       width: 65%;
@@ -80,49 +93,275 @@
       pointer-events: none;
     }
 
+    .terms-box {
+      margin-top: 8px;
+      background: rgba(35, 69, 97, 0.55);
+      border: 1px solid rgba(169, 199, 255, 0.18);
+      border-radius: 12px;
+      padding: 14px 14px 12px;
+      text-align: left;
+    }
+
     .terms-label {
       display: flex;
-      align-items: center;
-      gap: 8px;
+      align-items: flex-start;
+      gap: 10px;
       font-size: 12px;
       cursor: pointer;
+      line-height: 1.6;
+      color: #d7e0ea;
     }
 
     .terms-label input {
       width: auto;
-      margin: 0;
+      margin: 3px 0 0 0;
+      accent-color: #a9c7ff;
+      transform: scale(1.05);
+      flex-shrink: 0;
+    }
+
+    .terms-link {
+      color: #a9c7ff;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      font-weight: 600;
+    }
+
+    .terms-link:hover {
+      color: #d9e8ff;
+    }
+
+    .terms-mini {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #b8c6d8;
+      line-height: 1.6;
+      border-top: 1px solid rgba(169, 199, 255, 0.12);
+      padding-top: 10px;
     }
 
     .modal {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.7);
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
       display: flex;
       justify-content: center;
       align-items: center;
       padding: 20px;
+      z-index: 50;
+      backdrop-filter: blur(4px);
     }
 
-    /* UPDATED TO MAKE SCROLLABLE */
     .modal-content {
-      background: #fff;
-      color: #000;
-      padding: 20px;
-      width: 420px;
-      max-height: 80vh;      /* limits height */
-      overflow-y: auto;      /* enables scrolling */
-      border-radius: 8px;
+        background: rgba(16, 23, 38, 0.65);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+
+      color: #f3f4f6;
+      width: 100%;
+      max-width: 720px;
+      max-height: 85vh;
+      overflow: hidden;
+
+      border-radius: 16px;
       text-align: left;
+
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 28px 70px rgba(0,0,0,0.55);
+
+      display: flex;
+      flex-direction: column;  
     }
 
-    .modal-content h3 {
+    .modal-header {
+      padding: 22px 56px 16px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      background: transparent;
+    }
+
+    .close-icon {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      width: auto;
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      border: none;
+      color: #a2b8c8;
+      font-size: 24px;
+      font-weight: bold;
+      line-height: 1;
+      cursor: pointer;
+      z-index: 20;
+      box-shadow: none;
+      transition: color 0.2s ease;
+    }
+
+    .close-icon:hover {
+      color: #ffffff;
+      background: transparent;
+      transform: none;
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      text-align: left;
+      font-size: 26px;
+      color: #f9fafb;
+    }
+
+    .modal-subtitle {
+      margin-top: 6px;
+      color: #e0e3e9;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .modal-body {
+      padding: 20px 24px 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .terms-section {
+      margin-bottom: 18px;
+    }
+
+    .terms-section h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      color: #f3f4f6;
+    }
+
+    .terms-section p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #d1d5db;
+    }
+
+    .terms-section ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+      color: #d5d8dd;
+    }
+
+    .terms-section li {
+      margin-bottom: 6px;
+      font-size: 14px;
+      line-height: 1.6;
+    }    
+
+    .scroll-notice {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(162, 184, 200, 0.08);
+      border: 1px solid rgba(162, 184, 200, 0.25);
+      color: #cdb5e1;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .scroll-notice.ready {
+      background: rgba(162, 184, 200, 0.15);   
+      border: 1px solid rgba(162, 184, 200, 0.35);
+      color: #e2e8f0;                          
+      font-weight: 500;
+      border-radius: 10px;
+    }
+
+    .modal-footer {
+      padding: 16px 24px 22px;
+      border-top: 1px solid rgba(255,255,255,0.15);
+      background: transparent;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .modal-footer-text {
+      font-size: 12px;
+      color: #475569;
+      line-height: 1.5;
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .modal-footer button {
       margin-top: 0;
-      text-align: center;
+      width: auto;
+      min-width: 140px;
+      padding: 10px 18px;
     }
 
+    .secondary-btn {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .secondary-btn:hover {
+      opacity: 0.95;
+    }
+
+    .primary-btn {
+      background: linear-gradient(135deg, #7fa3c6, #a2b8c8);
+      color: #0f172a;
+      border: none;
+      font-weight: 600;
+      border-radius: 8px;
+      padding: 10px 18px;
+      box-shadow: 0 6px 18px rgba(59,108,230,0.35);
+      transition: all 0.2s ease;
+    }
+
+    .primary-btn:hover {
+      background: linear-gradient(135deg, #6f95ba, #94aec3);
+      transform: translateY(-1px);
+    }
+
+    .primary-btn:disabled {
+      background: #b8c6d8;
+      color: #5a6b7c;
+      opacity: 0.75;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 16px;
+        align-items: flex-start;
+      }
+
+      .container {
+        padding: 22px 18px;
+        max-width: 100%;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      .modal-content {
+        max-height: 88vh;
+      }
+
+      .modal-header,
+      .modal-body,
+      .modal-footer {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .wave-right {
+        width: 90%;
+      }
+    }    
   </style>
 </head>
 
@@ -137,28 +376,26 @@
 
     <div class="form-group">
       <label>NAME</label>
-      <input type="text" v-model="form.name" placeholder="Enter your name">
+      <input type="text" v-model="form.name" placeholder="Enter your full name">
       <div class="note error" v-if="errors.name">{{ errors.name }}</div>
     </div>
 
     <div class="form-group">
       <label>EMAIL</label>
-      <input type="email" v-model="form.email" placeholder="Enter your organization email">
+      <input type="email" v-model="form.email" placeholder="Enter your email">
       <div class="note error" v-if="errors.email">{{ errors.email }}</div>
     </div>
 
     <div class="form-group">
       <label>PASSWORD</label>
-      <input type="password" v-model="form.password" placeholder="Enter your password">
-      <div class="note error" v-if="errors.password">{{ errors.password }}</div>
+      <input type="password" v-model="form.password" placeholder="Create a secure password">
+      <div class="note error" v-if="errors.password">{{ errors.password }}</div>      
     </div>
 
     <div class="form-group" v-if="form.password.length > 0">
       <label>CONFIRM PASSWORD</label>
       <input type="password" v-model="form.confirmPassword" placeholder="Retype your password">
-      <div class="note error" v-if="errors.confirmPassword">
-        {{ errors.confirmPassword }}
-      </div>
+      <div class="note error" v-if="errors.confirmPassword">{{ errors.confirmPassword }}</div>
     </div>
 
     <div class="form-group">
@@ -168,76 +405,183 @@
         <option>General user</option>
         <option>Administrative user</option>
       </select>
+      <div class="note error" v-if="errors.role">{{ errors.role }}</div>      
     </div>
 
     <div class="form-group">
-      <label class="terms-label">
-        <input type="checkbox" v-model="form.terms">
-        <span>
-          I accept the
-          <a href="#" @click.prevent="showTerms = true" style="color:#a2b8c8;">
-            Terms & Conditions
-          </a>
-        </span>
-      </label>
-      <div class="note error" v-if="errors.terms">
-        {{ errors.terms }}
-      </div>
+        <label class="terms-label">
+          <input
+            type="checkbox"
+            v-model="form.terms"
+          >
+          <span>
+            I have read and agree to the
+            <a href="#" @click.prevent="openTermsModal" class="terms-link">
+              Terms &amp; Conditions
+            </a>
+          </span>
+        </label>
+
+      <div class="note error" v-if="errors.terms">{{ errors.terms }}</div>
     </div>
 
     <button @click="submitForm">Sign Up</button>
 
     <img src="img2.png" alt="Wave design right" class="wave-right">
 
-    <!-- SCROLLABLE TERMS MODAL -->
     <div v-if="showTerms" class="modal">
       <div class="modal-content">
-        <h3>CyberComply – Terms & Conditions</h3>
+        <button class="close-icon" @click="closeTermsModal">✕</button>
 
-        <p><strong>1. Acceptance of Terms</strong><br>
-        By creating an account on CyberComply, you acknowledge that you have read, understood,
-        and agreed to comply with these Terms & Conditions and all applicable cybersecurity
-        and data protection regulations.</p>
+        <div class="modal-header">
 
-        <p><strong>2. User Account Responsibility</strong><br>
-        • You are responsible for maintaining the confidentiality of your login credentials.<br>
-        • Multi-Factor Authentication (OTP verification) may be required.<br>
-        • Unauthorized access must be reported immediately.</p>
+          <h3>CyberComply Terms &amp; Conditions</h3>
 
-        <p><strong>3. Role-Based Access Control</strong><br>
-        • General Users may upload and analyse only their own documents.<br>
-        • Administrative Users must register using a valid organisational email.<br>
-        • Access to dashboards and reports is role-restricted.</p>
+          <div class="modal-subtitle">
+            Please review these terms carefully before creating your account.
+            These conditions govern access to the CyberComply compliance management platform.
+          </div>
 
-        <p><strong>4. Document Upload & Storage</strong><br>
-        • Documents are stored temporarily for compliance analysis.<br>
-        • Files are automatically deleted after processing.<br>
-        • Malware scanning and validation are performed.</p>
+        </div>
 
-        <p><strong>5. Data Protection & Encryption</strong><br>
-        • All data is encrypted via HTTPS/TLS.<br>
-        • Stored data is protected using AES-256 encryption.<br>
-        • System aligns with GDPR and PDPA regulations.</p>
+        <div
+          class="modal-body"
+          ref="termsScrollBox"
+          @scroll="handleTermsScroll"
+        >
+          <div class="terms-section">
+            <h4>1. Acceptance of Terms</h4>
+            <p>
+              By creating an account, you confirm that you have read, understood, and agreed to these
+              Terms &amp; Conditions, including platform policies relating to data usage, privacy,
+              access privileges, limitation of liability, and enforcement actions for misuse.
+            </p>
+          </div>
 
-        <p><strong>6. AI Disclaimer</strong><br>
-        Compliance results are AI-generated and for guidance only. They do not replace legal advice.</p>
+          <div class="terms-section">
+            <h4>2. Authorised Account Use</h4>
+            <p>
+              CyberComply is intended for authorised users performing legitimate compliance-related
+              activities on behalf of an organisation. You must provide accurate registration details
+              and use your account only for approved and lawful purposes.
+            </p>
+          </div>
 
-        <p><strong>7. Prohibited Activities</strong><br>
-        • Uploading malicious content<br>
-        • Attempting to bypass security mechanisms<br>
-        • Accessing other users' documents</p>
+          <div class="terms-section">
+            <h4>3. Account Security and Authentication</h4>
+            <p>
+              You are responsible for maintaining the confidentiality of your login credentials.
+              CyberComply may require password verification, one-time verification codes, or
+              multi-factor authentication to protect account access and sensitive compliance data.
+            </p>
+          </div>
 
-        <p><strong>8. Suspension</strong><br>
-        Accounts violating policies may be suspended or terminated.</p>
+          <div class="terms-section">
+            <h4>4. Role-Based Access and Privileges</h4>
+            <p>
+              Access to platform features is granted according to the role assigned to your account.
+              Users must not attempt to access restricted resources, reports, dashboards, or organisational
+              data beyond their authorised privilege level.
+            </p>
+          </div>
 
-        <p><strong>9. Updates</strong><br>
-        Continued use of the platform indicates acceptance of updated terms.</p>
+          <div class="terms-section">
+            <h4>5. Data Usage and Document Processing</h4>
+            <p>
+              Documents and information submitted through the platform may be processed for compliance
+              analysis, risk categorisation, recommendation generation, and reporting. Users must ensure
+              that all uploaded information is accurate, relevant, and authorised for submission.
+            </p>
+          </div>
 
-        <br>
-        <button @click="showTerms = false">Close</button>
+          <div class="terms-section">
+            <h4>6. Confidentiality, Storage, and Deletion</h4>
+            <p>
+              Uploaded compliance documents are handled as confidential information. Documents are stored
+              only for the period necessary to complete analysis and related processing tasks and are then
+              securely deleted in accordance with platform security requirements.
+            </p>
+          </div>
+
+          <div class="terms-section">
+            <h4>7. Security Protections</h4>
+            <p>
+              CyberComply applies technical safeguards such as encrypted communication, secure authentication,
+              controlled access, and related security measures to protect user information and organisational data.
+            </p>
+          </div>
+
+          <div class="terms-section">
+            <h4>8. Prohibited Activities</h4>
+            <ul>
+              <li>Providing false, misleading, or unauthorised registration information</li>
+              <li>Attempting to bypass authentication or security controls</li>
+              <li>Uploading malicious, corrupted, unsupported, or unlawful content</li>
+              <li>Accessing or attempting to access another user’s data without permission</li>
+              <li>Using the platform in a way that disrupts service availability, confidentiality, or integrity</li>
+            </ul>
+          </div>
+
+          <div class="terms-section">
+            <h4>9. AI-Generated Analysis Disclaimer</h4>
+            <p>
+              CyberComply provides AI-assisted compliance assessments, scores, and recommendations based on
+              uploaded documents and supported regulatory frameworks. These outputs are intended to assist users
+              and should not be treated as a substitute for independent legal, regulatory, or professional advice.
+            </p>
+          </div>
+
+          <div class="terms-section">
+            <h4>10. Suspension, Restriction, and Termination</h4>
+            <p>
+              CyberComply reserves the right to suspend, restrict, or terminate accounts where users violate
+              platform policies, misuse system resources, repeatedly fail security checks, or engage in activities
+              that threaten the platform or the confidentiality of compliance-related information.
+            </p>
+          </div>
+
+          <div class="terms-section">
+            <h4>11. Limitation of Liability</h4>
+            <p>
+              CyberComply shall not be held responsible for decisions made solely on automated system outputs,
+              inaccuracies caused by incomplete or misleading user-provided data, unsupported document formats,
+              or regulatory changes outside the system’s current supported scope.
+            </p>
+          </div>
+
+          <div class="terms-section">
+            <h4>12. Updates to Terms</h4>
+            <p>
+              These Terms &amp; Conditions may be updated to reflect legal, security, operational, or platform
+              changes. Continued use of the platform after such updates constitutes acceptance of the revised terms.
+            </p>
+          </div>
+
+          <div
+            class="scroll-notice"
+            :class="{ ready: termsScrolledToBottom }"
+          >
+            <span v-if="!termsScrolledToBottom">
+              Please scroll to the bottom of this Terms &amp; Conditions document to enable acceptance.
+            </span>
+            <span v-else>
+              You have reached the end of the Terms &amp; Conditions. You may now confirm that you have read them.
+            </span>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+
+          <button
+            class="primary-btn"
+            @click="acceptTermsFromModal"
+            :disabled="!termsScrolledToBottom"
+          >
+            I Have Read and Understood
+          </button>
+        </div>
       </div>
     </div>
-
   </div>
 
   <script>
@@ -245,6 +589,9 @@
       el: '#app',
       data: {
         showTerms: false,
+        termsRead: false,
+        termsScrolledToBottom: false,
+
         form: {
           name: '',
           email: '',
@@ -260,10 +607,49 @@
           const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           return regex.test(email);
         },
+
         validatePassword(password) {
           const regex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-\\[\]\/`~+=;']).{8,}$/;
           return regex.test(password);
         },
+
+        openTermsModal() {
+          this.showTerms = true;
+          this.termsScrolledToBottom = false;
+
+          this.$nextTick(() => {
+            const box = this.$refs.termsScrollBox;
+            if (box) {
+              box.scrollTop = 0;
+            }
+          });
+        },
+
+        closeTermsModal() {
+          this.showTerms = false;
+        },
+
+        handleTermsScroll() {
+          const box = this.$refs.termsScrollBox;
+          if (!box) return;
+
+          const threshold = 10;
+          const reachedBottom =
+            box.scrollTop + box.clientHeight >= box.scrollHeight - threshold;
+
+          if (reachedBottom) {
+            this.termsScrolledToBottom = true;
+          }
+        },
+
+        acceptTermsFromModal() {
+          if (!this.termsScrolledToBottom) return;
+
+          this.termsRead = true;
+          this.form.terms = true;
+          this.showTerms = false;
+        },       
+
         async submitForm() {
           this.errors = {};
 
@@ -280,11 +666,19 @@
               "Password must contain at least 8 characters with a minimum of 1 uppercase letter, 1 digit and 1 special character.";
           }
 
-          if (this.form.password !== this.form.confirmPassword) {
+          if (!this.form.confirmPassword) {
+            this.errors.confirmPassword = "Please confirm your password.";
+          } else if (this.form.password !== this.form.confirmPassword) {
             this.errors.confirmPassword = "Passwords do not match.";
           }
 
-          if (!this.form.terms) {
+          if (!this.form.role) {
+            this.errors.role = "Please select a role.";
+          }
+
+          if (!this.termsRead) {
+            this.errors.terms = "Please open and read the Terms & Conditions before continuing.";
+          } else if (!this.form.terms) {
             this.errors.terms = "You must accept the Terms & Conditions.";
           }
 
