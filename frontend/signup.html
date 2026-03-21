@@ -387,6 +387,109 @@
       }
     }    
 
+    .modal-subtitle {
+      margin-top: 6px;
+      color: #e0e3e9;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .modal-body {
+      padding: 20px 24px 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .terms-section {
+      margin-bottom: 18px;
+    }
+
+    .terms-section h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      color: #f3f4f6;
+    }
+
+    .terms-section p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #d1d5db;
+    }
+
+    .terms-section ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+      color: #d5d8dd;
+    }
+
+    .terms-section li {
+      margin-bottom: 6px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .scroll-notice {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(162, 184, 200, 0.08);
+      border: 1px solid rgba(162, 184, 200, 0.25);
+      color: #cdb5e1;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .scroll-notice.ready {
+      background: rgba(162, 184, 200, 0.15);
+      border: 1px solid rgba(162, 184, 200, 0.35);
+      color: #e2e8f0;
+      font-weight: 500;
+      border-radius: 10px;
+    }
+
+    .modal-footer {
+      padding: 16px 24px 22px;
+      border-top: 1px solid rgba(255,255,255,0.15);
+      background: transparent;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .modal-footer button {
+      margin-top: 0;
+      width: auto;
+      min-width: 140px;
+      padding: 10px 18px;
+    }
+
+    .primary-btn {
+      background: linear-gradient(135deg, #7fa3c6, #a2b8c8);
+      color: #0f172a;
+      border: none;
+      font-weight: 600;
+      border-radius: 8px;
+      padding: 10px 18px;
+      box-shadow: 0 6px 18px rgba(59,108,230,0.35);
+      transition: all 0.2s ease;
+    }
+
+    .primary-btn:hover {
+      background: linear-gradient(135deg, #6f95ba, #94aec3);
+      transform: translateY(-1px);
+    }
+
+    .primary-btn:disabled {
+      background: #b8c6d8;
+      color: #5a6b7c;
+      opacity: 0.75;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
   </style>
 </head>
 
@@ -503,7 +606,7 @@
         <input id="terms" type="checkbox" v-model="form.terms">
         <span>
           I accept the
-          <a href="#" @click.prevent="showTerms = true" style="color:#a2b8c8;">
+          <a href="#" @click.prevent="openTermsModal" style="color:#a2b8c8;">
             Terms & Conditions
           </a>
         </span>
@@ -687,6 +790,8 @@
       el: '#app',
       data: {
         showTerms: false,
+        termsRead: false,
+        termsScrolledToBottom: false,
         showSuccessPopup: false, 
         loading: false,
         submitted: false, 
@@ -762,6 +867,37 @@
           return null;
         },
 
+        openTermsModal() {
+          this.showTerms = true;
+          this.termsScrolledToBottom = false;
+          this.$nextTick(() => {
+            const box = this.$refs.termsScrollBox;
+            if (box) box.scrollTop = 0;
+          });
+        },
+
+        closeTermsModal() {
+          this.showTerms = false;
+        },
+
+        handleTermsScroll() {
+          const box = this.$refs.termsScrollBox;
+          if (!box) return;
+          const threshold = 10;
+          const reachedBottom =
+            box.scrollTop + box.clientHeight >= box.scrollHeight - threshold;
+          if (reachedBottom) {
+            this.termsScrolledToBottom = true;
+          }
+        },
+
+        acceptTermsFromModal() {
+          if (!this.termsScrolledToBottom) return;
+          this.termsRead = true;
+          this.form.terms = true;
+          this.showTerms = false;
+        },
+
         async submitForm() {
           if (this.loading) return;
 
@@ -805,7 +941,9 @@
             this.errors.role = "Please select a role.";
           }
 
-          if (!this.form.terms) {
+          if (!this.termsRead) {
+            this.errors.terms = "Please open and read the Terms & Conditions before continuing.";
+          } else if (!this.form.terms) {
             this.errors.terms = "You must accept the Terms & Conditions.";
           }
 

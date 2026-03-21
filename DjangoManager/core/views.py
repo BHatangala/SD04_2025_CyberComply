@@ -2153,29 +2153,62 @@ def get_recommendations(request):
 def list_reports(request):
     """
     GET /api/reports/
-    Returns all reports ordered by generated_at descending.
+    Returns reports split into last_7_days / last_30_days, ordered by
+    generated_at descending.  Requires a valid Bearer token.
     """
     if request.method != "GET":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
 
-    reports = Report.objects.select_related("result").order_by("-generated_at")
-    data = []
-    for r in reports:
-        snapshot = r.report_snapshot or {}
-        display_name = snapshot.get("company", r.report_s3_key)
-        framework = snapshot.get("framework", "")
-        if framework:
-            display_name = f"{display_name} — {framework}"
-        data.append({
-            "report_id": str(r.report_id),
-            "display_name": display_name,
-            "report_s3_key": r.report_s3_key,
-            "file_size": r.file_size,
-            "generated_at": r.generated_at.isoformat(),
-            "expires_at": r.expires_at.isoformat(),
-        })
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
 
-    return JsonResponse({"reports": data}, status=200)
+    now       = timezone.now()
+    cutoff_7  = now - timedelta(days=7)
+    cutoff_30 = now - timedelta(days=30)
+
+    # Admins see all reports for their org; general users see only their own
+    if profile.role == UserProfile.Role.ADMIN and profile.org_id:
+        qs = Report.objects.select_related(
+            "result__document__org"
+        ).filter(
+            result__document__user__org=profile.org,
+            generated_at__gte=cutoff_30
+        )
+    else:
+        qs = Report.objects.select_related(
+            "result__document__org"
+        ).filter(
+            result__document__user=profile,
+            generated_at__gte=cutoff_30
+        )
+
+    qs = qs.order_by("-generated_at")
+
+    def _serialize(r):
+        snapshot = r.report_snapshot or {}
+        meta     = snapshot.get("metadata", {})
+        company  = meta.get("company", "").strip()
+        filename = meta.get("file_analyzed", r.report_s3_key).strip()
+        # Admin uploads always have a company name; general users do not
+        if company:
+            display_name = f"{company} — {filename}"
+        else:
+            display_name = filename
+        return {
+            "report_id":    str(r.report_id),
+            "display_name": display_name,
+            "generated_at": r.generated_at.isoformat(),
+            "expires_at":   r.expires_at.isoformat(),
+        }
+
+    last_7_days  = [_serialize(r) for r in qs if r.generated_at >= cutoff_7]
+    last_30_days = [_serialize(r) for r in qs if r.generated_at < cutoff_7]
+
+    return JsonResponse(
+        {"last_7_days": last_7_days, "last_30_days": last_30_days},
+        status=200
+    )
 
 
 # ──────────────────────────────────────────────
@@ -2271,6 +2304,43 @@ def get_report(request, report_id):
         "generated_at": report.generated_at.isoformat(),
         "expires_at": report.expires_at.isoformat()
     }, status=200)
+
+
+# ──────────────────────────────────────────────
+# Reports — Delete
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def delete_report(request, report_id):
+    """
+    DELETE /api/reports/<report_id>/
+    Hard-deletes the Report row.  Only the owner or an org admin may delete.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    try:
+        report = Report.objects.select_related(
+            "result__document"
+        ).get(report_id=report_id)
+    except Report.DoesNotExist:
+        return JsonResponse({"detail": "Report not found"}, status=404)
+
+    doc = report.result.document
+    is_owner    = str(doc.user_id) == str(profile.user_id)
+    is_org_admin = (
+        profile.role == UserProfile.Role.ADMIN
+        and doc.org_id is not None
+        and str(doc.org_id) == str(profile.org_id)
+    )
+    if not is_owner and not is_org_admin:
+        return JsonResponse({"detail": "You do not have permission to delete this report"}, status=403)
+
+    _record_audit_log(profile, "DELETE_REPORT", "report", report.report_id, True, request)
+    report.delete()
+    return JsonResponse({"detail": "Report deleted"}, status=200)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

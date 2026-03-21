@@ -27,6 +27,7 @@ urlpatterns = [
     path("api/recommendations/", views.get_recommendations, name="get_recommendations"),
     path("api/reports/", views.list_reports, name="list_reports"),
     path("api/reports/generate/", views.generate_report, name="generate_report"),
+    path("api/reports/<uuid:report_id>/delete/", views.delete_report, name="delete_report"),
     path("api/reports/<uuid:report_id>/", views.get_report, name="get_report"),
 
     # ── Analysis Result API ───────────────────────────────────────────────

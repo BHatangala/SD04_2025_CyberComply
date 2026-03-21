@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Report Viewing</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="sidebar_component.js"></script>
     <style>
       * {
@@ -31,10 +32,7 @@
         padding: 15px 30px;
         display: flex;
         align-items: center;
-        position: fixed;       
-        top: 0;                
-        left: 0;                
-        width: 100%;            
+        position: relative;
         z-index: 100;
     }
 
@@ -186,7 +184,6 @@
         text-align: center;
         font-size: 28px;
         font-weight: bold;
-        margin-top: 55px;
         margin-bottom: 20px;
         color: #ffffff;
     }
@@ -290,7 +287,6 @@
     /* Logo */
     .logo {
         text-align: center;
-        margin-top: 55px;
         margin-bottom: 60px;
     }
 
@@ -323,284 +319,505 @@
 </head>
 
 <body>
-    <div id="app">
+<div id="app">
 
-        <!-- Top Header -->
-        <div class="top-header">
-            <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
-            <div class="user-profile" @click="showProfile">
-                <svg viewBox="0 0 24 24">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
+  <!-- Top Header -->
+  <div class="top-header">
+      <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
+      <div class="user-profile" @click="showProfile">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
+      </div>
+  </div>
+
+  <!-- Back Arrow -->
+   <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←
+   </div>
+
+  <!-- Home Button -->
+   <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goHome">
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="#8b9dc3">
+        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+    </svg>
+  </div>
+
+  <!-- Sidebar -->
+  <cybercomply-sidebar
+      ref="sidebar"
+      :sidebar-open="sidebarOpen"
+      @toggle="sidebarOpen = !sidebarOpen"
+  ></cybercomply-sidebar>
+
+    <!-- Main Content -->
+    <div class="report-viewer" :class="{ shifted: sidebarOpen }">
+        <h2 class="report-title">{{ currentReportName || 'Select a report' }}</h2>
+        <div class="pdf-container" style="padding: 24px; overflow-y: auto;">
+            <div v-if="isGenerating" style="color:#6b7a99; text-align:center; margin-top:40px;">
+                Generating report…
             </div>
-        </div>
-
-        <!-- Back Arrow -->
-        <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←
-        </div>
-
-        <!-- Home Button -->
-        <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goHome">
-            <svg viewBox="0 0 24 24" width="30" height="30" fill="#8b9dc3">
-                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-            </svg>
-        </div>
-
-
-        <!-- Sidebar 
-        <cybercomply-sidebar
-            :sidebar-open="sidebarOpen"
-            @toggle="sidebarOpen = !sidebarOpen"
-        ></cybercomply-sidebar> -->
-        <!-- Sidebar -->
-        <div class="sidebar" :class="{ open: sidebarOpen }">
-            <!-- Icon Bar (Search and Plus) -->
-            <div class="sidebar-icon-bar">
-                <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                    </svg>
-                </div>
-                <div class="sidebar-icon" @click="goHome" title="Start new analysis">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                    </svg>
-                </div>
+            <div v-else-if="!currentSnapshot" style="color:#6b7a99; text-align:center; margin-top:40px;">
+                Please select a report from the sidebar to view its content.
             </div>
-
-            <!-- Search Input (Hidden by default) -->
-            <div class="search-container" :class="{ active: searchActive }">
-                <input 
-                    type="text" 
-                    class="search-input" 
-                    v-model="searchQuery" 
-                    placeholder="Search documents..."
-                    @input="filterReports"
-                >
-            </div>  
-            
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                    </svg>
-                    LAST 7 DAYS
+            <div v-else>
+                <div style="margin-bottom:16px;"><strong>File:</strong> {{ currentSnapshot.metadata?.file_analyzed || '—' }}</div>
+                <div style="margin-bottom:16px;"><strong>Company:</strong> {{ currentSnapshot.metadata?.company || '—' }}</div>
+                <div style="margin-bottom:16px;"><strong>Compliance Score:</strong> {{ currentSnapshot.compliance?.compliance_score ?? '—' }}%</div>
+                <div style="margin-bottom:16px;">
+                    <strong>Risk Level:</strong> 
+                    {{ currentSnapshot.risks?.status ? currentSnapshot.risks.status.charAt(0).toUpperCase() + currentSnapshot.risks.status.slice(1) : '—' }} </div>
+                <div v-if="currentSnapshot.risks?.factors?.length" style="margin-bottom:16px;">
+                    <strong>Risk Factors:</strong>
+                    <ul style="margin-top:8px; padding-left:20px;">
+                        <li v-for="(f, i) in currentSnapshot.risks.factors" :key="i">{{ f }}</li>
+                    </ul>
                 </div>
-                <div v-if="filteredLast7Days.length === 0" class="no-results">
-                    No results to display
+                <div v-if="currentSnapshot.recommendations?.top_action" style="margin-bottom:16px;">
+                    <strong>Top Recommendation:</strong> {{ currentSnapshot.recommendations.top_action }}
                 </div>
-                <div v-else>
-                <div
-                    v-for="report in filteredLast7Days"
-                    :key="report.report_id"
-                    class="sidebar-item"
-                    @click="openReport(report)"
-                >
-                    {{ report.display_name }}
-                </div>
-                </div>
-            </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-                    </svg>
-                    LAST 30 DAYS
-                </div>
-                <div v-if="filteredLast30Days.length === 0" class="no-results">
-                    No results to display
-                </div>
-                <div v-else>
-                    <div
-                        v-for="report in filteredLast30Days"
-                        :key="report.report_id"
-                        class="sidebar-item"
-                        @click="openReport(report)"
-                    >
-                        {{ report.display_name }}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Content -->
-        <div class="report-viewer" :class="{ shifted: sidebarOpen }">
-            <h2 class="report-title">{{ currentReport || 'Select a report' }}</h2>
-            <div class="pdf-container" style="padding: 24px; overflow-y: auto;">
-                <div v-if="!currentSnapshot" style="color:#6b7a99; text-align:center; margin-top:40px;">
-                    Please select a report from the sidebar to view its content.
-                </div>
-                <div v-else>
-                    <div style="margin-bottom:16px;"><strong>File:</strong> {{ currentSnapshot.metadata?.file_analyzed || '—' }}</div>
-                    <div style="margin-bottom:16px;"><strong>Company:</strong> {{ currentSnapshot.metadata?.company || '—' }}</div>
-                    <div style="margin-bottom:16px;"><strong>Compliance Score:</strong> {{ currentSnapshot.compliance?.compliance_score ?? '—' }}%</div>
-                    <div style="margin-bottom:16px;"><strong>Risk Level:</strong> {{ currentSnapshot.risks?.status || '—' }}</div>
-                    <div v-if="currentSnapshot.risks?.factors?.length" style="margin-bottom:16px;">
-                        <strong>Risk Factors:</strong>
-                        <ul style="margin-top:8px; padding-left:20px;">
-                            <li v-for="(f, i) in currentSnapshot.risks.factors" :key="i">{{ f }}</li>
-                        </ul>
-                    </div>
-                    <div v-if="currentSnapshot.recommendations?.top_action" style="margin-bottom:16px;">
-                        <strong>Top Recommendation:</strong> {{ currentSnapshot.recommendations.top_action }}
-                    </div>
-                    <div v-if="currentSnapshot.compliance?.details?.length" style="margin-top:20px;">
-                        <strong>Compliance Details:</strong>
-                        <div v-for="(d, i) in currentSnapshot.compliance.details" :key="i"
-                            style="margin-top:12px; padding:12px; background:#1a2845; border-radius:8px;">
-                            <div><strong>{{ d.clause }}</strong> — <span :style="{ color: d.status === 'compliant' ? '#4caf50' : '#f44336' }">{{ d.status }}</span></div>
-                            <div style="margin-top:4px; font-size:13px; color:#c5d0e6;">{{ d.reasoning }}</div>
-                            <div style="margin-top:4px; font-size:12px; color:#8b9dc3;">Risk: {{ d.risk_level }} | Confidence: {{ d.confidence }}%</div>
+                <div v-if="currentSnapshot.compliance?.details?.length" style="margin-top:20px;">
+                    <strong>Compliance Details:</strong>
+                    <div v-for="(d, i) in currentSnapshot.compliance.details" :key="i"
+                         style="margin-top:12px; padding:12px; background:#1a2845; border-radius:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <strong style="color:#ffffff;">{{ d.clause }}</strong>
+                            <span style="flex-shrink:0; margin-left:12px;" :style="{ color: d.status === 'compliant' ? '#4caf50' : (d.status === 'partial' ? '#ff9800' : '#f44336') }">
+                                {{ d.status === 'compliant' ? 'Compliant' : d.status === 'non-compliant' || d.status === 'non_compliant' ? 'Non-Compliant' : d.status === 'partial' ? 'Partial' : d.status }}</span>
                         </div>
+                        <div style="margin-top:4px; font-size:13px; color:#c5d0e6;">{{ d.reasoning }}</div>
+                        <div style="margin-top:4px; font-size:12px; color:#8b9dc3;">Risk: {{ d.risk_level ? d.risk_level.charAt(0).toUpperCase() + d.risk_level.slice(1) : '—' }} | Confidence: {{ d.confidence }}%</div>
                     </div>
                 </div>
             </div>
-            <p class="report-notice">Note: Reports are automatically deleted after 30 days.</p>
         </div>
-
-        <!-- Share & Download Buttons -->
-        <div class="report-actions" :class="{ shifted: sidebarOpen }">
-
-            <!-- Download Button -->
-            <div class="action-btn-wrapper">
-                <button 
-                class="download-btn" 
-                :class="{ locked: !isAdmin }"
-                @click="isAdmin ? downloadReport() : null" 
-                title="Download Report">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
-                    <path d="M5 20h14v-2H5v2zm7-18v12l4-4h-3V2h-2v8H8l4 4z"/>
-                </svg>
-                </button>
-                <div v-if="!isAdmin" class="lock-tooltip">
-                Download option is only available for administrative users
-                </div>
-            </div>
-
-            <!-- Share Button -->
-            <div class="action-btn-wrapper">
-                <button 
-                class="share-btn" 
-                :class="{ locked: !isAdmin }"
-                @click="isAdmin ? shareReport() : null" 
-                title="Share Report">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
-                    <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11c.53.5 1.23.81 2.07.81 1.66 0 3-1.34 3-3S19.66 2 18 2s-3 1.34-3 3c0 .24.03.47.09.7l-7.02 4.11c-.53-.5-1.23-.81-2.07-.81-1.66 0-3 1.34-3 3s1.34 3 3 3c.84 0 1.54-.31 2.07-.81l7.13 4.16c-.06.21-.1.43-.1.65 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/>
-                </svg>
-                </button>
-                <div v-if="!isAdmin" class="lock-tooltip">
-                Share option is only available for administrative users
-                </div>
-            </div>
-        </div>
-
-        <!-- Wavy Background -->
-        <div class="wavy-background">
-            <img src="img1.png" alt="Wavy Design">
-        </div> 
+        <p class="report-notice">Note: Reports are automatically deleted after 30 days.</p>
     </div>
 
-    <script>
-        const { createApp } = Vue;
+    <!-- Share & Download Buttons -->
+    <div class="report-actions" :class="{ shifted: sidebarOpen }">
 
-createApp({
-    data() {
-        return {
-        sidebarOpen: true,
-        currentReport: '',
-        currentSnapshot: null,
-        isAdmin: false
-        }
-    },
-    async mounted() {
-        await this.fetchReports();
-        const params = new URLSearchParams(window.location.search);
-        const reportId = params.get('report_id');
-        if (reportId) {
-        const report = [...this.last7Days, ...this.last30Days].find(r => r.report_id === reportId);
-        if (report) this.openReport(report);
-        }
-        this.isAdmin = localStorage.getItem('role') === 'ADMINISTRATIVE_USER';
-    },
-    methods: {
-        async fetchReports() {
-        try {
-            const res = await fetch('http://127.0.0.1:8000/api/reports/');
-            if (!res.ok) return;
-            const data = await res.json();
-            const now = new Date();
-            const cutoff7 = new Date(now - 7 * 24 * 60 * 60 * 1000);
-            const cutoff30 = new Date(now - 30 * 24 * 60 * 60 * 1000);
-            this.last7Days = data.reports.filter(r => new Date(r.generated_at) >= cutoff7);
-            this.last30Days = data.reports.filter(r => new Date(r.generated_at) >= cutoff30 && new Date(r.generated_at) < cutoff7);
-            this.filteredLast7Days = [...this.last7Days];
-            this.filteredLast30Days = [...this.last30Days];
-        } catch (e) {
-            console.error('Failed to load reports:', e);
-        }
-        },
-        toggleSidebar() {
-        this.sidebarOpen = !this.sidebarOpen;
-        },
-        showProfile() {
-        window.location.href = 'profile.html';
-        },
-        goBack() {
-        window.history.back();
-        },
-        goHome() {
-        window.location.href = 'home.html';
-        },
-        async openReport(report) {
-            this.currentReport = report.display_name;
-            this.currentSnapshot = null;
-            try {
-                const res = await fetch(`http://127.0.0.1:8000/api/reports/${report.report_id}/`);
-                if (!res.ok) return;
-                const data = await res.json();
-                this.currentSnapshot = data.report_snapshot;
-            } catch (e) {
-                console.error('Failed to load report:', e);
-            }
-        },
-        //download
-            downloadReport() {
-            if (!this.currentReport) {
-                alert('Please select a report first.');
-                return;
-            }
-            const content = this.currentSnapshot ? JSON.stringify(this.currentSnapshot, null, 2) : "No content available";
-            const blob = new Blob([content], { type: "application/pdf" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${this.currentReport}.pdf`;
-            a.click();
-            URL.revokeObjectURL(url);
-        },
-        //share
-        shareReport() {
-            if (!this.currentReport) {
-                alert('Please select a report first.');
-                return;
-            }
-            const dummyUrl = `https://yourapp.com/reports/${encodeURIComponent(this.currentReport)}?token=ABC123`;
-            if (navigator.share) {
-                navigator.share({
-                title: this.currentReport,
-                text: 'Check out this report!',
-                url: dummyUrl
-                }).then(() => console.log('Report shared successfully'))
-                .catch(err => console.error('Share failed', err));
-            } else {
-                navigator.clipboard.writeText(dummyUrl)
-                .then(() => alert('Share link copied to clipboard!'))
-                .catch(() => alert('Unable to copy link'));
-            }
-        }
+      <!-- Download Button -->
+      <div class="action-btn-wrapper">
+        <button 
+          class="download-btn" 
+          :class="{ locked: !isAdmin }"
+          @click="isAdmin ? downloadReport() : null" 
+          title="Download Report">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
+              <path d="M5 20h14v-2H5v2zm7-18v12l4-4h-3V2h-2v8H8l4 4z"/>
+          </svg>
+        </button>
+        <div v-if="!isAdmin" class="lock-tooltip">
+          Download option is only available for administrative users
+        </div>
+      </div>
+
+      <!-- Share Button -->
+      <div class="action-btn-wrapper">
+        <button 
+          class="share-btn" 
+          :class="{ locked: !isAdmin }"
+          @click="isAdmin ? shareReport() : null" 
+          title="Share Report">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
+            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11c.53.5 1.23.81 2.07.81 1.66 0 3-1.34 3-3S19.66 2 18 2s-3 1.34-3 3c0 .24.03.47.09.7l-7.02 4.11c-.53-.5-1.23-.81-2.07-.81-1.66 0-3 1.34-3 3s1.34 3 3 3c.84 0 1.54-.31 2.07-.81l7.13 4.16c-.06.21-.1.43-.1.65 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/>
+          </svg>
+        </button>
+        <div v-if="!isAdmin" class="lock-tooltip">
+          Share option is only available for administrative users
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Wavy Background -->
+  <div class="wavy-background">
+      <img src="img1.png" alt="Wavy Design">
+  </div> 
+
+</div>
+
+<script>
+const { createApp } = Vue;
+
+const BASE = 'http://127.0.0.1:8000/ai';
+
+const app = createApp({
+  data() {
+    return {
+      sidebarOpen: false,
+      isAdmin: false,
+      isGenerating: false,
+      currentReportName: '',
+      currentSnapshot: null
     }
+  },
+
+  async mounted() {
+    const token = sessionStorage.getItem('authToken');
+    if (!token) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    // Resolve admin flag
+    this.isAdmin = sessionStorage.getItem('userRole') === 'ADMINISTRATIVE_USER';
+
+    const params   = new URLSearchParams(window.location.search);
+    const reportId = params.get('report_id');
+    const generate = params.get('generate');  // 'true' when coming from document_analysis
+
+    if (generate === 'true') {
+      // ── Generate a new report from the latest saved analysis result ──
+      await this.generateReport(token);
+    } else if (reportId) {
+      // ── Load an existing report chosen from the sidebar ──
+      await this.loadReport(reportId, token);
+    }
+  },
+
+  methods: {
+    showProfile() { window.location.href = 'profile.html'; },
+    goBack()      { window.history.back(); },
+    goHome()      { window.location.href = 'home.html'; },
+
+    // ── Called when arriving from "Generate Reports" on document_analysis.html ──
+    async generateReport(token) {
+      this.isGenerating = true;
+
+      // We need the result_id and its raw_output to build the snapshot
+      const resultId = sessionStorage.getItem('latestResultId');
+      if (!resultId) {
+        this.isGenerating = false;
+        return;
+      }
+
+      try {
+        // Fetch the full analysis result to get raw_output (the AI payload)
+        const resAnalysis = await fetch(`${BASE}/api/analysis/${resultId}/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resAnalysis.ok) {
+          this.isGenerating = false;
+          return;
+        }
+        const analysis = await resAnalysis.json();
+
+        // Build snapshot — this is what gets stored in report_snapshot
+        // and later rendered in the viewer
+        const snapshot = analysis.raw_output || {};
+
+        const payload = {
+          result_id:       resultId,
+          report_snapshot: snapshot,
+          report_s3_key:   analysis.original_filename || resultId,
+          file_size:       JSON.stringify(snapshot).length,
+          expires_in_days: 30
+        };
+
+        const resGenerate = await fetch(`${BASE}/api/reports/generate/`, {
+          method:  'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!resGenerate.ok) {
+          console.error('Failed to generate report:', await resGenerate.text());
+          this.isGenerating = false;
+          return;
+        }
+
+        const generated = await resGenerate.json();
+        // Replace URL so a refresh doesn't re-generate
+        window.history.replaceState(
+          {}, '',
+          `report_viewing.html?report_id=${generated.report_id}`
+        );
+
+        // Now display it
+        await this.loadReport(generated.report_id, token);
+
+        // Tell the sidebar component to re-fetch so the new report appears immediately
+        await this.$nextTick();
+        if (this.$refs.sidebar) {
+          this.$refs.sidebar.refreshReports();
+        }
+
+      } catch (e) {
+        console.error('generateReport error:', e);
+      } finally {
+        this.isGenerating = false;
+      }
+    },
+
+    // ── Load and display an existing report by ID ──
+    async loadReport(reportId, token) {
+      try {
+        const res = await fetch(`${BASE}/api/reports/${reportId}/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        this.currentSnapshot  = data.report_snapshot;
+        // Build display name from snapshot metadata
+        const meta    = (data.report_snapshot || {}).metadata || {};
+        const company = (meta.company || '').trim();
+        const file    = (meta.file_analyzed || '').trim();
+        this.currentReportName = company ? `${company} — ${file}` : file || 'Report';
+      } catch (e) {
+        console.error('loadReport error:', e);
+      }
+    },
+
+    downloadReport() {
+      if (!this.currentSnapshot) {
+        alert('Please select a report first.');
+        return;
+      }
+ 
+      const { jsPDF } = window.jspdf;
+      const doc  = new jsPDF({ unit: 'mm', format: 'a4' });
+      const snap = this.currentSnapshot;
+      const meta = snap.metadata || {};
+ 
+      const pageW      = doc.internal.pageSize.getWidth();
+      const margin     = 15;
+      const contentW   = pageW - margin * 2;
+      let   y          = 20;
+ 
+      // ── Colour palette ──
+      const DARK_BG    = [16,  23,  38];   // #101726
+      const HEADER_BG  = [26,  40,  69];   // #1a2845
+      const ACCENT     = [74,  143, 231];  // #4a8fe7
+      const WHITE      = [255, 255, 255];
+      const LIGHT_GREY = [197, 208, 230];  // #c5d0e6
+      const GREEN      = [76,  175, 80];
+      const RED        = [244, 67,  54];
+      const CARD_BG    = [20,  32,  56];   // #141c34 approx
+ 
+      // ── Helper: add a new page with the same dark background ──
+      const addPage = () => {
+        doc.addPage();
+        doc.setFillColor(...DARK_BG);
+        doc.rect(0, 0, pageW, doc.internal.pageSize.getHeight(), 'F');
+        y = 20;
+      };
+ 
+      // ── Helper: wrap long text and return new y ──
+      const writeWrapped = (text, x, startY, maxW, lineH, colour) => {
+        doc.setTextColor(...colour);
+        const lines = doc.splitTextToSize(String(text), maxW);
+        lines.forEach(line => {
+          if (startY > 270) { addPage(); startY = y; }
+          doc.text(line, x, startY);
+          startY += lineH;
+        });
+        return startY;
+      };
+
+      const statusLabel = (s) => {
+        if (s === 'compliant')                                return 'Compliant';
+        if (s === 'non-compliant' || s === 'non_compliant')   return 'Non-Compliant';
+        if (s === 'partial')                                  return 'Partial';
+        return s;
+      };
+ 
+      // ── Dark page background ──
+      doc.setFillColor(...DARK_BG);
+      doc.rect(0, 0, pageW, doc.internal.pageSize.getHeight(), 'F');
+ 
+      // ── Header banner ──
+      doc.setFillColor(...HEADER_BG);
+      doc.rect(0, 0, pageW, 28, 'F');
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...WHITE);
+      doc.text('CYBERCOMPLY', margin, 12);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...LIGHT_GREY);
+      doc.text('COMPLIANCE ANALYSIS REPORT', margin, 20);
+      y = 36;
+ 
+      // ── Title line ──
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...ACCENT);
+      const title = this.currentReportName || 'Report';
+      doc.text(title, margin, y);
+      y += 10;
+ 
+      // ── Thin accent rule ──
+      doc.setDrawColor(...ACCENT);
+      doc.setLineWidth(0.4);
+      doc.line(margin, y, pageW - margin, y);
+      y += 8;
+ 
+      // ── Summary row ──
+      const score      = snap.compliance?.compliance_score ?? '—';
+     const riskStatus = snap.risks?.status ? snap.risks.status.charAt(0).toUpperCase() + snap.risks.status.slice(1) : '—';
+ 
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...LIGHT_GREY);
+      if (meta.company) {
+        doc.text('Company:', margin, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...WHITE);
+        doc.text(meta.company, margin + 22, y);
+        y += 6;
+      }
+      if (meta.file_analyzed) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...LIGHT_GREY);
+        doc.text('File:', margin, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...WHITE);
+        doc.text(meta.file_analyzed, margin + 22, y);
+        y += 6;
+      }
+ 
+      // Score + Risk on one row
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...LIGHT_GREY);
+      doc.text('Score:', margin, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...ACCENT);
+      doc.text(`${score}%`, margin + 22, y);
+ 
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...LIGHT_GREY);
+      doc.text('Risk:', margin + 55, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...WHITE);
+      doc.text(riskStatus, margin + 70, y);
+      y += 10;
+ 
+      // ── Risk Factors ──
+      const factors = snap.risks?.factors || [];
+      if (factors.length) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(...ACCENT);
+        doc.text('Risk Factors', margin, y);
+        y += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        factors.forEach(f => {
+          if (y > 270) addPage();
+          doc.setTextColor(...LIGHT_GREY);
+          doc.text(`•  ${f}`, margin + 3, y);
+          y += 5;
+        });
+        y += 4;
+      }
+ 
+      // ── Top Recommendation ──
+      const topAction = snap.recommendations?.top_action;
+      if (topAction) {
+        if (y > 260) addPage();
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(...ACCENT);
+        doc.text('Top Recommendation', margin, y);
+        y += 5;
+        doc.setFontSize(9);
+        y = writeWrapped(topAction, margin + 3, y, contentW - 3, 5, LIGHT_GREY);
+        y += 4;
+      }
+ 
+      // ── Compliance Details ──
+      const details = snap.compliance?.details || [];
+      if (details.length) {
+        if (y > 250) addPage();
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(...ACCENT);
+        doc.text('Compliance Details', margin, y);
+        y += 7;
+ 
+        details.forEach(d => {
+          if (y > 255) addPage();
+ 
+          // Card background
+          const cardH   = 28 + Math.ceil(doc.splitTextToSize(String(d.reasoning), contentW - 6).length * 4.5);
+          const safeH   = Math.min(cardH, 60);
+          doc.setFillColor(...CARD_BG);
+          doc.roundedRect(margin, y - 4, contentW, safeH, 2, 2, 'F');
+ 
+          // Clause + status
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(...WHITE);
+          const clauseLines = doc.splitTextToSize(d.clause, contentW - 40);
+          doc.text(clauseLines, margin + 3, y + 2);
+ 
+          const statusColour = d.status === 'compliant' ? GREEN : d.status === 'partial' ? [255, 152, 0] : RED;
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(...statusColour);
+          doc.text(statusLabel(d.status), pageW - margin - 3, y + 2, { align: 'right' });
+          y += clauseLines.length * 4.5 + 4;
+ 
+          // Risk + Confidence
+          if (y > 270) addPage();
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(...LIGHT_GREY);
+          doc.text(`Risk: ${d.risk_level ? d.risk_level.charAt(0).toUpperCase() + d.risk_level.slice(1) : '—'}   Confidence: ${d.confidence}%`, margin + 3, y);
+          y += 5;
+ 
+          // Reasoning
+          if (y > 270) addPage();
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          y = writeWrapped(d.reasoning, margin + 3, y, contentW - 6, 4.5, LIGHT_GREY);
+          y += 6;
+        });
+      }
+ 
+      // ── Footer on every page ──
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.setFontSize(7);
+        doc.setTextColor(...LIGHT_GREY);
+        doc.text(
+          `CyberComply — Generated ${new Date().toLocaleDateString()}   |   Page ${p} of ${totalPages}`,
+          pageW / 2, doc.internal.pageSize.getHeight() - 8,
+          { align: 'center' }
+        );
+      }
+ 
+      doc.save(`${this.currentReportName || 'report'}.pdf`);
+    },
+ 
+    //share
+    shareReport() {
+      if (!this.currentSnapshot) {
+        alert('Please select a report first.');
+        return;
+      }
+      const params = new URLSearchParams(window.location.search);
+      const reportId = params.get('report_id') || '';
+      const shareUrl = `${window.location.origin}${window.location.pathname}?report_id=${reportId}`;
+      if (navigator.share) {
+        navigator.share({
+          title: this.currentReportName,
+          text: 'Check out this compliance report!',
+          url: shareUrl
+        }).catch(err => console.error('Share failed', err));
+      } else {
+        navigator.clipboard.writeText(shareUrl)
+          .then(() => alert('Share link copied to clipboard!'))
+          .catch(() => alert('Unable to copy link'));
+      }
+    }
+  }
 });
+
 registerSidebarComponent(app);
 app.mount('#app');
 </script>

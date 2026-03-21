@@ -602,7 +602,6 @@
                 </div>
                 <div class="document-title">DOCUMENT ANALYSIS</div>
                 <div class="document-subtitle">{{ analysedCompany }} — COMPLIANCE ANALYSIS REPORT</div>
-                <div class="document-subtitle">{{ analysedCompany }} — COMPLIANCE ANALYSIS REPORT</div>
             </div>
 
             <!-- Content Container -->
@@ -622,11 +621,9 @@
                     </div>
                     <div class="compliance-details">
                         <div class="compliance-item">{{ complianceScore }}% &nbsp;—&nbsp; {{ complianceLabel }}</div>
-                        <div class="compliance-item">{{ complianceScore }}% &nbsp;—&nbsp; {{ complianceLabel }}</div>
                         <div class="compliance-bar-wrapper">
                             <div class="compliance-bar-label">COMPLIANCE SCORE</div>
                             <div class="compliance-bar-track">
-                                <div class="compliance-bar-fill" :style="{ width: barWidth }"></div>
                                 <div class="compliance-bar-fill" :style="{ width: barWidth }"></div>
                             </div>
                         </div>
@@ -650,21 +647,6 @@
                         </button>
                     </div>
                     <div class="recommendations-list">
-                        <div class="recommendation-item" v-if="topRecommendation">
-                            {{ topRecommendation }}
-                        </div>
-                        <!-- Per-clause findings from AI -->
-                        <div
-                            class="recommendation-item"
-                            v-for="detail in complianceDetails"
-                            :key="detail.requirement_id"
-                        >
-                            <strong>{{ detail.clause }}</strong>
-                            <span>{{ detail.reasoning }}</span>
-                        </div>
-                        <div v-if="!topRecommendation && complianceDetails.length === 0" class="recommendation-item">
-                            No recommendations available.
-                        </div>
                         <div class="recommendation-item" v-if="topRecommendation">
                             {{ topRecommendation }}
                         </div>
@@ -743,7 +725,7 @@
 
         const BASE = 'http://127.0.0.1:8000/ai';
 
-        createApp({
+        const app = createApp({
             data() {
                 return {
                     sidebarOpen: true,
@@ -805,7 +787,11 @@
                     this.analysedFilename = data.original_filename || 'Document Analysis';
                     this.analysedCompany  = data.org || '';
                     this.complianceScore  = Math.round(data.compliance_score ?? 0);
-                    this.complianceLabel  = data.compliance_label || 'Unknown';
+                    this.complianceLabel  = data.compliance_label || (
+                        this.complianceScore >= 75 ? 'High Compliance Level' :
+                        this.complianceScore >= 40 ? 'Medium Compliance Level' :
+                                                     'Low Compliance Level'
+                    );
 
                     // Per-clause details for the Recommendations panel
                     this.complianceDetails = (
@@ -897,7 +883,7 @@
                 },
                 // ── Generate Reports: open to all ──
                 generateReports() {
-                    window.location.href = 'report_viewing.html';
+                    window.location.href = 'report_viewing.html?generate=true';
                 },
 
                 showAccessDenied() {

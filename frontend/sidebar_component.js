@@ -31,22 +31,8 @@
 
 // ── Default mock data (seeded into localStorage on first run) ────────────────
 const DEFAULT_REPORTS = {
-  last7Days: [
-    { id: 1, name: 'Curtin Report'  },
-    { id: 2, name: 'IFS Report'     },
-    { id: 3, name: 'Pearson Report' },
-    { id: 4, name: 'Wiley Report'   }
-  ],
-  last30Days: [
-    { id: 5,  name: 'Example Report A' },
-    { id: 6,  name: 'Example Report B' },
-    { id: 7,  name: 'Example Report C' },
-    { id: 8,  name: 'Example Report D' },
-    { id: 9,  name: 'Example Report E' },
-    { id: 10, name: 'Example Report F' },
-    { id: 11, name: 'Example Report G' },
-    { id: 12, name: 'Example Report H' }
-  ]
+  last7Days: [],
+  last30Days: []
 };
 
 const STORAGE_KEY = 'cybercomply_reports';
@@ -117,11 +103,11 @@ const CyberComplySidebar = {
           <div v-else>
             <div
               v-for="report in filteredLast7Days"
-              :key="report.id"
+              :key="report.report_id"
               class="sidebar-item"
             >
-              <span class="sidebar-item-name" @click="openReport(report.name)">
-                {{ report.name }}
+              <span class="sidebar-item-name" @click="openReport(report)">
+                {{ report.display_name }}
               </span>
               <span
                 class="sidebar-item-delete"
@@ -148,11 +134,11 @@ const CyberComplySidebar = {
           <div v-else>
             <div
               v-for="report in filteredLast30Days"
-              :key="report.id"
+              :key="report.report_id"
               class="sidebar-item"
             >
-              <span class="sidebar-item-name" @click="openReport(report.name)">
-                {{ report.name }}
+              <span class="sidebar-item-name" @click="openReport(report)">
+                {{ report.display_name }}
               </span>
               <span
                 class="sidebar-item-delete"
@@ -171,7 +157,7 @@ const CyberComplySidebar = {
           <div class="cc-modal-icon">🗑️</div>
           <h3>Delete Report?</h3>
           <p>
-            <strong>{{ deleteModal.report ? deleteModal.report.name : '' }}</strong>
+            <strong>{{ deleteModal.report ? deleteModal.report.display_name : '' }}</strong>
             will be permanently removed. This action cannot be undone.
           </p>
           <div class="cc-modal-actions">
@@ -207,45 +193,28 @@ const CyberComplySidebar = {
   methods: {
     // ── Data loading ──────────────────────────────────────────────────────────
 
-    loadReports() {
-      /*
-       * TODO: Replace this localStorage read with a real API call when the
-       * backend reports table is ready, e.g.:
-       *   const res  = await fetch('/api/reports', { headers: { Authorization: `Bearer ${token}` } });
-       *   const data = await res.json();
-       *   this.last7Days  = data.last7Days;
-       *   this.last30Days = data.last30Days;
-       */
-      let stored = null;
+    async loadReports() {
+      const token = sessionStorage.getItem('authToken');
+      if (!token) return;
       try {
-        stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      } catch (_) {
-        stored = null;
+        const res = await fetch('http://127.0.0.1:8000/ai/api/reports/', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        // Each item: { report_id, display_name, generated_at, expires_at }
+        this.last7Days  = data.last_7_days  || [];
+        this.last30Days = data.last_30_days || [];
+        this.filteredLast7Days  = [...this.last7Days];
+        this.filteredLast30Days = [...this.last30Days];
+      } catch (e) {
+        console.warn('Sidebar: could not load reports:', e);
       }
-
-      // Seed defaults on first run
-      if (!stored) {
-        stored = DEFAULT_REPORTS;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
-      }
-
-      this.last7Days  = stored.last7Days  || [];
-      this.last30Days = stored.last30Days || [];
-      this.filteredLast7Days  = [...this.last7Days];
-      this.filteredLast30Days = [...this.last30Days];
     },
 
-    saveReports() {
-      /*
-       * Persists the current in-memory list back to localStorage so all tabs /
-       * pages see the same state immediately without a server round-trip.
-       *
-       * TODO: Remove this once the backend DELETE endpoint is wired in.
-       */
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        last7Days:  this.last7Days,
-        last30Days: this.last30Days
-      }));
+    // ── Public: called by the parent page after a new report is generated ────
+    refreshReports() {
+      this.loadReports();
     },
 
     // ── Navigation ────────────────────────────────────────────────────────────
@@ -254,8 +223,9 @@ const CyberComplySidebar = {
       window.location.href = 'home.html';
     },
 
-    openReport(reportName) {
-      window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
+    openReport(report) {
+      // report is { report_id, display_name, ... }
+      window.location.href = `report_viewing.html?report_id=${encodeURIComponent(report.report_id)}`;
     },
 
     // ── Search / filter ───────────────────────────────────────────────────────
@@ -274,8 +244,8 @@ const CyberComplySidebar = {
         this.filteredLast7Days  = [...this.last7Days];
         this.filteredLast30Days = [...this.last30Days];
       } else {
-        this.filteredLast7Days  = this.last7Days.filter(r  => r.name.toLowerCase().includes(q));
-        this.filteredLast30Days = this.last30Days.filter(r => r.name.toLowerCase().includes(q));
+        this.filteredLast7Days  = this.last7Days.filter(r  => r.display_name.toLowerCase().includes(q));
+        this.filteredLast30Days = this.last30Days.filter(r => r.display_name.toLowerCase().includes(q));
       }
     },
 
@@ -289,28 +259,30 @@ const CyberComplySidebar = {
       this.deleteModal = { visible: false, report: null, bucket: null };
     },
 
-    executeDelete() {
+    async executeDelete() {
       const { report, bucket } = this.deleteModal;
       if (!report || !bucket) return;
 
-      /*
-       * TODO: Replace the localStorage removal below with a real API call:
-       *   await fetch(`/api/reports/${report.id}`, {
-       *     method:  'DELETE',
-       *     headers: { Authorization: `Bearer ${token}` }
-       *   });
-       */
+      const token = sessionStorage.getItem('authToken');
+      try {
+        const res = await fetch(
+          `http://127.0.0.1:8000/ai/api/reports/${report.report_id}/delete/`,
+          {
+            method:  'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+          }
+        );
+        if (!res.ok) {
+          console.error('Delete failed:', await res.text());
+        }
+      } catch (e) {
+        console.error('Delete request failed:', e);
+      }
 
-      // Remove from the master list
-      this[bucket] = this[bucket].filter(r => r.id !== report.id);
-
-      // Persist the updated list
-      this.saveReports();
-
-      // Re-apply any active search filter
+      // Remove from in-memory list and re-filter regardless of server outcome
+      // so the UI updates immediately
+      this[bucket] = this[bucket].filter(r => r.report_id !== report.report_id);
       this.filterReports();
-
-      // Close modal
       this.cancelDelete();
     }
   }
