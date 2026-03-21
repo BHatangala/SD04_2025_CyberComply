@@ -456,3 +456,35 @@ class DeletionRequest(models.Model):
  
     def __str__(self):
         return f"{self.user_email_snapshot} — {self.request_type} — {self.status}"
+    
+# =========================
+# Table: report_share
+# =========================
+class ReportShare(models.Model):
+
+    share_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    report = models.ForeignKey(
+        'Report',
+        on_delete=models.CASCADE,
+        related_name='shares'
+    )
+
+    shared_by = models.ForeignKey(
+        'UserProfile',
+        on_delete=models.CASCADE,
+        related_name='shared_reports'
+    )
+
+    shared_with_email = models.EmailField()
+
+    access_token = models.CharField(max_length=255, unique=True)
+
+    expires_at = models.DateTimeField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'report_shares'

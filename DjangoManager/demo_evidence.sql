@@ -654,6 +654,165 @@ FROM report_downloads
 WHERE downloaded_at >= NOW() - INTERVAL '1 hour'
 ORDER BY downloaded_at DESC;
 
+-- ==============================
+-- 10. REPORT SHARING FUNCTIONALITY
+-- ==============================
+\echo ''
+\echo ''
+\echo ''
+\echo '=============================='
+\echo '10. REPORT DOWNLOAD TRACKING'
+\echo '=============================='
+
+\echo ''
+\echo '10.1 Valid Insert - Share a report successfully'
+\echo ''
+
+INSERT INTO report_shares (
+    share_id,
+    report_id,
+    shared_by_id,
+    shared_with_email,
+    access_token,
+    expires_at,
+    is_active
+)
+VALUES (
+    gen_random_uuid(),
+    (SELECT report_id FROM reports LIMIT 1),
+    (SELECT user_id FROM user_profile LIMIT 1),
+    'recipient@example.com',
+    'token_123456',
+    NOW() + INTERVAL '7 days',
+    TRUE
+);
+
+\echo ''
+\echo '10.2 Valid Select - View all shared reports'
+\echo ''
+
+SELECT
+    rs.share_id,
+    rs.report_id,
+    au.username AS shared_by,
+    rs.shared_with_email,
+    rs.access_token,
+    rs.expires_at,
+    rs.is_active
+FROM report_shares rs
+JOIN user_profile up ON up.user_id = rs.shared_by_id
+JOIN auth_user au ON au.id = up.auth_user_id
+ORDER BY rs.created_at DESC;
+
+\echo ''
+\echo '10.3 Valid Select - Only active (non-expired) shares'
+\echo ''
+
+SELECT *
+FROM report_shares
+WHERE is_active = TRUE
+  AND expires_at > NOW();
+
+\echo ''
+\echo '10.4 Valid Update - Deactivate a share link'
+\echo ''
+
+UPDATE report_shares
+SET is_active = FALSE
+WHERE access_token = 'token_123456';
+
+SELECT access_token, is_active FROM report_shares
+WHERE access_token = 'token_123456';
+
+\echo ''
+\echo '10.5 Invalid Insert - Missing shared_with_email (NOT NULL violation)'
+\echo 'Expected: ERROR'
+\echo ''
+
+INSERT INTO report_shares (
+    share_id,
+    report_id,
+    shared_by_id,
+    access_token,
+    expires_at
+)
+VALUES (
+    gen_random_uuid(),
+    (SELECT report_id FROM reports LIMIT 1),
+    (SELECT user_id FROM user_profile LIMIT 1),
+    'invalid_token_1',
+    NOW() + INTERVAL '7 days'
+);
+
+\echo ''
+\echo '10.6 Invalid Insert - Duplicate access_token (UNIQUE constraint)'
+\echo 'Expected: ERROR'
+\echo ''
+
+INSERT INTO report_shares (
+    share_id,
+    report_id,
+    shared_by_id,
+    shared_with_email,
+    access_token,
+    expires_at
+)
+VALUES (
+    gen_random_uuid(),
+    (SELECT report_id FROM reports LIMIT 1),
+    (SELECT user_id FROM user_profile LIMIT 1),
+    'test@example.com',
+    'token_123456', -- duplicate token
+    NOW() + INTERVAL '7 days'
+);
+
+\echo ''
+\echo '10.7 Invalid Insert - Non-existent report_id (FK violation)'
+\echo 'Expected: ERROR'
+\echo ''
+
+INSERT INTO report_shares (
+    share_id,
+    report_id,
+    shared_by_id,
+    shared_with_email,
+    access_token,
+    expires_at
+)
+VALUES (
+    gen_random_uuid(),
+    '00000000-0000-0000-0000-000000000000',
+    (SELECT user_id FROM user_profile LIMIT 1),
+    'fake@example.com',
+    'invalid_token_2',
+    NOW() + INTERVAL '7 days'
+);
+
+\echo ''
+\echo '10.8 Invalid Insert - Expiry in the past (logical error case)'
+\echo 'Expected: Allowed by DB but logically incorrect'
+\echo ''
+
+INSERT INTO report_shares (
+    share_id,
+    report_id,
+    shared_by_id,
+    shared_with_email,
+    access_token,
+    expires_at
+)
+VALUES (
+    gen_random_uuid(),
+    (SELECT report_id FROM reports LIMIT 1),
+    (SELECT user_id FROM user_profile LIMIT 1),
+    'expired@example.com',
+    'expired_token',
+    NOW() - INTERVAL '1 day'
+);
+
+SELECT access_token, expires_at FROM report_shares
+WHERE access_token = 'expired_token';
+
 \echo ''
 \echo '=============================='
 \echo 'END OF DEMO SCRIPT (REPORTS)'

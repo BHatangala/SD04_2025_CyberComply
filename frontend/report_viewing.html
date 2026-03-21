@@ -847,24 +847,69 @@ const app = createApp({
     },
  
     //share
-    shareReport() {
+    async shareReport() {
       if (!this.currentSnapshot) {
         alert('Please select a report first.');
         return;
       }
-      const params = new URLSearchParams(window.location.search);
-      const reportId = params.get('report_id') || '';
-      const shareUrl = `${window.location.origin}${window.location.pathname}?report_id=${reportId}`;
-      if (navigator.share) {
-        navigator.share({
-          title: this.currentReportName,
-          text: 'Check out this compliance report!',
-          url: shareUrl
-        }).catch(err => console.error('Share failed', err));
-      } else {
-        navigator.clipboard.writeText(shareUrl)
-          .then(() => alert('Share link copied to clipboard!'))
-          .catch(() => alert('Unable to copy link'));
+
+      try {
+        const email = localStorage.getItem('email');
+
+        if (!email) {
+          alert("User not logged in.");
+          return;
+        }
+
+        // 🔹 Get report_id from URL
+        const params = new URLSearchParams(window.location.search);
+        const reportId = params.get('report_id');
+
+        if (!reportId) {
+          alert("Report ID not found.");
+          return;
+        }
+
+        // 🔥 CALL BACKEND
+        const res = await fetch("http://127.0.0.1:8000/api/share-report/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            email: email,
+            report_id: reportId
+          })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.error || "Failed to share report");
+          return;
+        }
+
+        console.log("Share recorded:", data);
+
+        // 🔹 Build secure share URL using token
+        const shareUrl = `${window.location.origin}/report_viewing.html?token=${data.token}`;
+
+        // 🔹 Share
+        if (navigator.share) {
+          navigator.share({
+            title: this.currentReportName,
+            text: 'Check out this compliance report!',
+            url: shareUrl
+          }).catch(err => console.error('Share failed', err));
+        } else {
+          navigator.clipboard.writeText(shareUrl)
+            .then(() => alert('Secure share link copied to clipboard!'))
+            .catch(() => alert('Unable to copy link'));
+        }
+
+      } catch (error) {
+        console.error("Share error:", error);
+        alert("Something went wrong.");
       }
     }
   }

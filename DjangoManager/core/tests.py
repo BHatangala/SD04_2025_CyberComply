@@ -1405,3 +1405,70 @@ class DeletionRequestModelTest(TestCase):
         expected = "del.user@sliit.lk — ACCOUNT — PENDING"
         self.assertEqual(str(self.req_pending), expected)
  
+from django.test import TestCase
+from django.contrib.auth.models import User
+from django.utils import timezone
+from datetime import timedelta
+from core.models import (
+    Report, UserProfile, ReportShare,
+    AnalysisResult, Document
+)
+
+
+class ReportShareTest(TestCase):
+
+    def test_create_report_share(self):
+
+        # ✅ Create auth user
+        auth_user = User.objects.create_user(
+            username="test@example.com",
+            email="test@example.com",
+            password="test123"
+        )
+
+        # ✅ Create profile
+        user = UserProfile.objects.create(
+            auth_user=auth_user,
+            full_name="Test User",
+            role=UserProfile.Role.GENERAL
+        )
+
+        # ✅ Create Document (FIXED PROPERLY)
+        document = Document.objects.create(
+            user=user,
+            original_filename="sample.txt",
+            file_type="TXT",
+            s3_key="dummy-key"
+        )
+
+        # ✅ Create AnalysisResult
+        result = AnalysisResult.objects.create(
+            document=document,
+            compliance_score=85,
+            risk_level="MEDIUM",
+            raw_output={"test": "analysis"}
+        )
+
+        # ✅ Create Report
+        report = Report.objects.create(
+            result=result,
+            report_snapshot={"test": "data"},
+            report_s3_key="test-key",
+            file_size=100,
+            expires_at=timezone.now() + timedelta(days=30)
+        )
+
+        # ✅ Create ReportShare
+        share = ReportShare.objects.create(
+            report=report,
+            shared_by=user,
+            shared_with_email="receiver@example.com",
+            access_token="unique-token-123",
+            expires_at=timezone.now() + timedelta(days=7)
+        )
+
+        # ✅ Assertions
+        self.assertEqual(share.report, report)
+        self.assertEqual(share.shared_by, user)
+        self.assertEqual(share.shared_with_email, "receiver@example.com")
+        self.assertTrue(share.is_active)

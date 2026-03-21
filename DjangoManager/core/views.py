@@ -27,7 +27,7 @@ import re
 import uuid
 from botocore.exceptions import BotoCoreError, ClientError
 
-from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report, AuditLog, AdminAccessRequest, ReportDownload, DeletionRequest
+from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report, AuditLog, AdminAccessRequest, ReportDownload, DeletionRequest,ReportShare
 from .utils import validate_org_email
 
 # ──────────────────────────────────────────────
@@ -3001,3 +3001,52 @@ def download_report(request):
 
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+        
+# ──────────────────────────────────────────────
+# Reports — Share
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def share_report(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        email = data.get("email")
+        report_id = data.get("report_id")
+
+        if not email or not report_id:
+            return JsonResponse({"error": "Missing fields"}, status=400)
+
+        # 🔹 Get user profile
+        profile = UserProfile.objects.get(auth_user__email=email)
+
+        # 🔹 Get report object (IMPORTANT FIX)
+        report = Report.objects.get(report_id=report_id)
+
+        # 🔹 Generate token
+        token = str(uuid.uuid4())
+
+        # 🔹 Create share record
+        ReportShare.objects.create(
+            report=report,                     # ✅ FIXED
+            shared_by=profile,
+            shared_with_email=email,
+            access_token=token,
+            expires_at=timezone.now() + timedelta(days=7)
+        )
+
+        return JsonResponse({
+            "message": "Report shared successfully",
+            "token": token
+        })
+
+    except Report.DoesNotExist:
+        return JsonResponse({"error": "Report not found"}, status=404)
+
+    except UserProfile.DoesNotExist:
+        return JsonResponse({"error": "User not found"}, status=404)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

@@ -31,6 +31,7 @@ urlpatterns = [
     path("api/reports/<uuid:report_id>/delete/", views.delete_report, name="delete_report"),
     path("api/reports/<uuid:report_id>/", views.get_report, name="get_report"),
     path("api/download-report/", views.download_report, name="download_report"),
+    path("api/share-report/", views.share_report, name="share_report"),
 
     # ── Analysis Result API ───────────────────────────────────────────────
     path("api/analysis/save/", views.save_analysis_result, name="save_analysis_result"),
