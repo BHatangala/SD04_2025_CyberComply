@@ -27,7 +27,7 @@ import re
 import uuid
 from botocore.exceptions import BotoCoreError, ClientError
 
-from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report, AuditLog, AdminAccessRequest, ReportDownload
+from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report, AuditLog, AdminAccessRequest, ReportDownload, DeletionRequest
 from .utils import validate_org_email
 
 # ──────────────────────────────────────────────
@@ -1722,70 +1722,128 @@ def verify_delete_account_otp(request):
 def delete_account(request):
     if request.method != "POST":
         return JsonResponse({"detail": "Method not allowed"}, status=405)
-
+ 
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except Exception:
         return JsonResponse({"detail": "Invalid JSON"}, status=400)
-
+ 
     delete_token = (payload.get("delete_token") or "").strip()
-
+    reason       = (payload.get("reason") or "").strip() or None
+ 
     if not delete_token:
         return JsonResponse({"detail": "delete_token is required"}, status=400)
-
-    # Validate signed delete token
+ 
     try:
         data = signing.loads(delete_token, salt="delete-account", max_age=600)
     except SignatureExpired:
         return JsonResponse({"detail": "Delete token expired. Please request OTP again."}, status=401)
     except BadSignature:
         return JsonResponse({"detail": "Invalid delete token"}, status=401)
-
+ 
     if data.get("purpose") != "delete_account":
         return JsonResponse({"detail": "Invalid delete token"}, status=401)
-
+ 
     user_id = data.get("uid")
     if not user_id:
         return JsonResponse({"detail": "Invalid delete token"}, status=401)
-
-    # Fetch user profile
+ 
     try:
         profile = UserProfile.objects.select_related("auth_user").get(user_id=user_id)
     except ObjectDoesNotExist:
         return JsonResponse({"detail": "Invalid delete token"}, status=401)
-
+ 
     if profile.deleted_at is not None:
         return JsonResponse({"detail": "Account already deleted"}, status=400)
-
-    # Soft delete account
-    profile.deleted_at = timezone.now()
-    profile.otp_is_enabled = False
-    profile.locked_until = None
-    profile.failed_login_count = 0
-    profile.updated_at = timezone.now()
-    profile.save(update_fields=[
-        "deleted_at",
-        "otp_is_enabled",
-        "locked_until",
-        "failed_login_count",
-        "updated_at"
-    ])
-
-    # Disable account login immediately and free original email for future reuse
-    deleted_suffix = timezone.now().strftime("%Y%m%d%H%M%S")
-    profile.auth_user.username = f"deleted_{profile.user_id}_{deleted_suffix}"
-    profile.auth_user.email = f"deleted_{profile.user_id}_{deleted_suffix}@deleted.local"
-    profile.auth_user.is_active = False
-    profile.auth_user.save(update_fields=["username", "email", "is_active"])
-
-    # Invalidate remaining delete-account OTPs
-    OtpVerification.objects.filter(
+ 
+    ip             = request.META.get("REMOTE_ADDR")
+    original_email = profile.auth_user.email
+ 
+    # ── Build erasure summary BEFORE cascade deletes fire ─────────────────
+    docs_qs        = Document.objects.filter(user=profile)
+    doc_ids        = list(docs_qs.values_list("document_id", flat=True))
+    s3_keys        = list(docs_qs.values_list("s3_key", flat=True))
+    result_ids     = list(
+        AnalysisResult.objects.filter(document_id__in=doc_ids)
+        .values_list("result_id", flat=True)
+    )
+    report_s3_keys = list(
+        Report.objects.filter(result_id__in=result_ids)
+        .values_list("report_s3_key", flat=True)
+    )
+ 
+    erasure_summary = {
+        "documents_erased":        docs_qs.count(),
+        "s3_keys_deleted":         s3_keys,
+        "analysis_results_erased": len(result_ids),
+        "findings_erased":         Finding.objects.filter(result_id__in=result_ids).count(),
+        "recommendations_erased":  Recommendation.objects.filter(result_id__in=result_ids).count(),
+        "reports_erased":          Report.objects.filter(result_id__in=result_ids).count(),
+        "report_s3_keys_deleted":  report_s3_keys,
+    }
+ 
+    # ── Create DeletionRequest (PENDING) before executing deletion ────────
+    deletion_record = DeletionRequest.objects.create(
         user=profile,
-        purpose=OtpVerification.Purpose.DELETE_ACCOUNT,
-        used_at__isnull=True
-    ).update(used_at=timezone.now())
-
+        user_email_snapshot=original_email,
+        request_type=DeletionRequest.RequestType.ACCOUNT,
+        status=DeletionRequest.Status.PENDING,
+        reason=reason,
+        erasure_summary=erasure_summary,
+        ip_address=ip,
+    )
+ 
+    try:
+        with transaction.atomic():
+            now = timezone.now()
+ 
+            # Soft-delete the profile
+            profile.deleted_at         = now
+            profile.otp_is_enabled     = False
+            profile.locked_until       = None
+            profile.failed_login_count = 0
+            profile.updated_at         = now
+            profile.save(update_fields=[
+                "deleted_at", "otp_is_enabled",
+                "locked_until", "failed_login_count", "updated_at"
+            ])
+ 
+            # Anonymise auth_user immediately to free the email address
+            deleted_suffix = now.strftime("%Y%m%d%H%M%S")
+            profile.auth_user.username  = f"deleted_{profile.user_id}_{deleted_suffix}"
+            profile.auth_user.email     = f"deleted_{profile.user_id}_{deleted_suffix}@deleted.local"
+            profile.auth_user.is_active = False
+            profile.auth_user.save(update_fields=["username", "email", "is_active"])
+ 
+            # Invalidate remaining delete-account OTPs
+            OtpVerification.objects.filter(
+                user=profile,
+                purpose=OtpVerification.Purpose.DELETE_ACCOUNT,
+                used_at__isnull=True
+            ).update(used_at=now)
+ 
+            # Mark DeletionRequest COMPLETED
+            deletion_record.status       = DeletionRequest.Status.COMPLETED
+            deletion_record.completed_at = now
+            deletion_record.save(update_fields=["status", "completed_at"])
+ 
+    except Exception:
+        deletion_record.status = DeletionRequest.Status.FAILED
+        deletion_record.save(update_fields=["status"])
+        return JsonResponse(
+            {"detail": "Account deletion failed. Please try again."},
+            status=500
+        )
+ 
+    # ── Audit log (written outside the atomic block intentionally —
+    #    the profile is already soft-deleted at this point) ──────────────
+    _record_audit_log(
+        profile, "DELETE_ACCOUNT", "user_profile",
+        profile.user_id, True, request
+    )
+ 
     return JsonResponse({"detail": "Account deleted successfully"}, status=200)
+ 
 
 # ──────────────────────────────────────────────
 # Profile — Update profile (name change)
@@ -2000,6 +2058,49 @@ def verify_email_change(request):
         "detail": "Email updated successfully",
         "new_email": new_email
     }, status=200)
+
+
+# ──────────────────────────────────────────────
+# Profile — Get deletion request status  (NEW)
+# ──────────────────────────────────────────────
+ 
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_deletion_request_status(request):
+    """
+    GET /api/deletion-request/status/
+ 
+    Returns the most recent DeletionRequest for the authenticated user.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+ 
+    latest = (
+        DeletionRequest.objects
+        .filter(user=profile)
+        .order_by("-requested_at")
+        .first()
+    )
+ 
+    if not latest:
+        return JsonResponse({"detail": "No deletion request found."}, status=404)
+ 
+    return JsonResponse(
+        {
+            "deletion_id":         str(latest.deletion_id),
+            "request_type":        latest.request_type,
+            "status":              latest.status,
+            "user_email_snapshot": latest.user_email_snapshot,
+            "reason":              latest.reason,
+            "erasure_summary":     latest.erasure_summary,
+            "requested_at":        latest.requested_at.isoformat(),
+            "completed_at":        latest.completed_at.isoformat() if latest.completed_at else None,
+            "ip_address":          latest.ip_address,
+        },
+        status=200
+    )
 
 
 # ──────────────────────────────────────────────
