@@ -512,6 +512,148 @@ WHERE result_id = (SELECT result_id FROM analysis_result LIMIT 1);
 SELECT * FROM reports;
 \echo '    Expected: 0 rows for the deleted result'
 
+
+\echo ''
+\echo ''
+\echo ''
+\echo '=============================='
+\echo '9. REPORT DOWNLOAD TRACKING'
+\echo '=============================='
+
+-- ---------------------------------------
+-- 9.1 Valid Select - All download records
+-- ---------------------------------------
+\echo ''
+\echo '9.1 All Report Downloads (Latest First)'
+\echo ''
+SELECT 
+    rd.download_id,
+    rd.report_id,
+    rd.downloaded_at,
+    rd.downloaded_by_id
+FROM report_downloads rd
+ORDER BY rd.downloaded_at DESC;
+
+-- ---------------------------------------
+-- 9.2 Valid Select - Downloads per report
+-- ---------------------------------------
+\echo ''
+\echo '9.2 Download Count Per Report'
+\echo ''
+SELECT 
+    report_id,
+    COUNT(*) AS total_downloads
+FROM report_downloads
+GROUP BY report_id
+ORDER BY total_downloads DESC;
+
+-- ---------------------------------------
+-- 9.3 Valid Select - Downloads per user
+-- ---------------------------------------
+\echo ''
+\echo '9.3 Download Activity Per User'
+\echo ''
+SELECT 
+    downloaded_by_id,
+    COUNT(*) AS total_downloads
+FROM report_downloads
+GROUP BY downloaded_by_id
+ORDER BY total_downloads DESC;
+
+-- ---------------------------------------
+-- 9.4 Valid Insert - Simulated download
+-- ---------------------------------------
+\echo ''
+\echo '9.4 Valid Insert - Simulate Report Download'
+\echo ''
+INSERT INTO report_downloads (download_id, report_id, downloaded_at, downloaded_by_id)
+VALUES (
+    gen_random_uuid(),
+    (SELECT report_id FROM reports LIMIT 1),
+    NOW(),
+    (SELECT user_id FROM user_profile LIMIT 1)
+);
+
+-- ---------------------------------------
+-- 9.5 Verify Insert
+-- ---------------------------------------
+\echo ''
+\echo '9.5 Verify New Download Entry'
+\echo ''
+SELECT * FROM report_downloads
+ORDER BY downloaded_at DESC
+LIMIT 3;
+
+-- ---------------------------------------
+-- 9.6 Invalid Insert - NULL report_id
+-- ---------------------------------------
+\echo ''
+\echo '9.6 Invalid Insert - NULL report_id (violates NOT NULL constraint)'
+\echo '    Expected: ERROR'
+\echo ''
+INSERT INTO report_downloads (download_id, report_id, downloaded_at, downloaded_by_id)
+VALUES (
+    gen_random_uuid(),
+    NULL,
+    NOW(),
+    (SELECT user_id FROM user_profile LIMIT 1)
+);
+
+-- ---------------------------------------
+-- 9.7 Invalid Insert - Non-existent report_id
+-- ---------------------------------------
+\echo ''
+\echo '9.7 Invalid Insert - Invalid report_id (violates FK constraint)'
+\echo '    Expected: ERROR — foreign key violation'
+\echo ''
+INSERT INTO report_downloads (download_id, report_id, downloaded_at, downloaded_by_id)
+VALUES (
+    gen_random_uuid(),
+    '00000000-0000-0000-0000-000000000000',
+    NOW(),
+    (SELECT user_id FROM user_profile LIMIT 1)
+);
+
+-- ---------------------------------------
+-- 9.8 Invalid Insert - NULL user
+-- ---------------------------------------
+\echo ''
+\echo '9.8 Invalid Insert - NULL downloaded_by_id (violates NOT NULL constraint)'
+\echo '    Expected: ERROR'
+\echo ''
+INSERT INTO report_downloads (download_id, report_id, downloaded_at, downloaded_by_id)
+VALUES (
+    gen_random_uuid(),
+    (SELECT report_id FROM reports LIMIT 1),
+    NOW(),
+    NULL
+);
+
+-- ---------------------------------------
+-- 9.9 Analytics - Most downloaded reports
+-- ---------------------------------------
+\echo ''
+\echo '9.9 Most Downloaded Reports'
+\echo ''
+SELECT 
+    r.report_id,
+    COUNT(rd.download_id) AS download_count
+FROM reports r
+LEFT JOIN report_downloads rd ON r.report_id = rd.report_id
+GROUP BY r.report_id
+ORDER BY download_count DESC;
+
+-- ---------------------------------------
+-- 9.10 Time-based activity
+-- ---------------------------------------
+\echo ''
+\echo '9.10 Downloads in Last 1 Hour'
+\echo ''
+SELECT *
+FROM report_downloads
+WHERE downloaded_at >= NOW() - INTERVAL '1 hour'
+ORDER BY downloaded_at DESC;
+
 \echo ''
 \echo '=============================='
 \echo 'END OF DEMO SCRIPT (REPORTS)'

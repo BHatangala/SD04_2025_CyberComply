@@ -572,226 +572,278 @@ const app = createApp({
       }
     },
 
-    downloadReport() {
-      if (!this.currentSnapshot) {
-        alert('Please select a report first.');
-        return;
-      }
- 
-      const { jsPDF } = window.jspdf;
-      const doc  = new jsPDF({ unit: 'mm', format: 'a4' });
-      const snap = this.currentSnapshot;
-      const meta = snap.metadata || {};
- 
-      const pageW      = doc.internal.pageSize.getWidth();
-      const margin     = 15;
-      const contentW   = pageW - margin * 2;
-      let   y          = 20;
- 
-      // ── Colour palette ──
-      const DARK_BG    = [16,  23,  38];   // #101726
-      const HEADER_BG  = [26,  40,  69];   // #1a2845
-      const ACCENT     = [74,  143, 231];  // #4a8fe7
-      const WHITE      = [255, 255, 255];
-      const LIGHT_GREY = [197, 208, 230];  // #c5d0e6
-      const GREEN      = [76,  175, 80];
-      const RED        = [244, 67,  54];
-      const CARD_BG    = [20,  32,  56];   // #141c34 approx
- 
-      // ── Helper: add a new page with the same dark background ──
-      const addPage = () => {
-        doc.addPage();
-        doc.setFillColor(...DARK_BG);
-        doc.rect(0, 0, pageW, doc.internal.pageSize.getHeight(), 'F');
-        y = 20;
-      };
- 
-      // ── Helper: wrap long text and return new y ──
-      const writeWrapped = (text, x, startY, maxW, lineH, colour) => {
-        doc.setTextColor(...colour);
-        const lines = doc.splitTextToSize(String(text), maxW);
-        lines.forEach(line => {
-          if (startY > 270) { addPage(); startY = y; }
-          doc.text(line, x, startY);
-          startY += lineH;
-        });
-        return startY;
-      };
+    async downloadReport() {
+  if (!this.currentSnapshot) {
+    alert('Please select a report first.');
+    return;
+  }
 
-      const statusLabel = (s) => {
-        if (s === 'compliant')                                return 'Compliant';
-        if (s === 'non-compliant' || s === 'non_compliant')   return 'Non-Compliant';
-        if (s === 'partial')                                  return 'Partial';
-        return s;
-      };
- 
-      // ── Dark page background ──
-      doc.setFillColor(...DARK_BG);
-      doc.rect(0, 0, pageW, doc.internal.pageSize.getHeight(), 'F');
- 
-      // ── Header banner ──
-      doc.setFillColor(...HEADER_BG);
-      doc.rect(0, 0, pageW, 28, 'F');
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
+  try {
+    //GET report_id from URL (VERY IMPORTANT)
+    const params = new URLSearchParams(window.location.search);
+    const report_id = params.get('report_id');
+
+    if (!report_id) {
+      alert("Report ID missing.");
+      return;
+    }
+
+    //GET user email
+    const email = localStorage.getItem('email');
+
+    if (!email) {
+      alert("User not logged in.");
+      return;
+    }
+
+    //CALL BACKEND (THIS FIXES YOUR DB ISSUE)
+    const res = await fetch("http://127.0.0.1:8000/api/download-report/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email: email,
+        report_id: report_id
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || "Failed to record download");
+      return;
+    }
+
+    console.log("Download recorded:", data);
+
+
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+    const snap = this.currentSnapshot;
+    const meta = snap.metadata || {};
+
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    const contentW = pageW - margin * 2;
+
+    let y = 20;
+
+    const DARK_BG = [16, 23, 38];
+    const HEADER_BG = [26, 40, 69];
+    const CARD_BG = [20, 32, 56];
+    const ACCENT = [74, 143, 231];
+    const WHITE = [255, 255, 255];
+    const LIGHT = [197, 208, 230];
+    const GREEN = [76, 175, 80];
+    const RED = [244, 67, 54];
+    const ORANGE = [255, 152, 0];
+
+    doc.setFillColor(...DARK_BG);
+    doc.rect(0, 0, pageW, pageH, 'F');
+
+    doc.setFillColor(...HEADER_BG);
+    doc.rect(0, 0, pageW, 28, 'F');
+
+    doc.setFontSize(16);
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CYBERCOMPLY', margin, 12);
+
+    doc.setFontSize(9);
+    doc.setTextColor(...LIGHT);
+    doc.setFont('helvetica', 'normal');
+    doc.text('COMPLIANCE ANALYSIS REPORT', margin, 20);
+
+    y = 36;
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...ACCENT);
+
+    const title = this.currentReportName || 'Report';
+    doc.text(title, margin, y);
+    y += 10;
+
+    doc.setDrawColor(...ACCENT);
+    doc.line(margin, y, pageW - margin, y);
+    y += 8;
+
+    const score = snap.compliance?.compliance_score ?? '—';
+    const riskStatus = snap.risks?.status
+      ? snap.risks.status.charAt(0).toUpperCase() + snap.risks.status.slice(1)
+      : '—';
+
+    doc.setFontSize(9);
+    doc.setTextColor(...LIGHT);
+
+    if (meta.company) {
+      doc.text(`Company:`, margin, y);
       doc.setTextColor(...WHITE);
-      doc.text('CYBERCOMPLY', margin, 12);
-      doc.setFontSize(9);
+      doc.text(meta.company, margin + 25, y);
+      y += 6;
+    }
+
+    if (meta.file_analyzed) {
+      doc.setTextColor(...LIGHT);
+      doc.text(`File:`, margin, y);
+      doc.setTextColor(...WHITE);
+      doc.text(meta.file_analyzed, margin + 25, y);
+      y += 6;
+    }
+
+    doc.setTextColor(...LIGHT);
+    doc.text(`Score:`, margin, y);
+    doc.setTextColor(...ACCENT);
+    doc.text(`${score}%`, margin + 25, y);
+
+    doc.setTextColor(...LIGHT);
+    doc.text(`Risk:`, margin + 60, y);
+    doc.setTextColor(...WHITE);
+    doc.text(riskStatus, margin + 75, y);
+    y += 10;
+
+    const factors = snap.risks?.factors || [];
+    if (factors.length) {
+      doc.setTextColor(...ACCENT);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Risk Factors', margin, y);
+      y += 6;
+
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(...LIGHT_GREY);
-      doc.text('COMPLIANCE ANALYSIS REPORT', margin, 20);
-      y = 36;
- 
-      // ── Title line ──
-      doc.setFontSize(13);
+      doc.setTextColor(...LIGHT);
+
+      factors.forEach(f => {
+        doc.text(`• ${f}`, margin + 2, y);
+        y += 5;
+      });
+
+      y += 4;
+    }
+
+    const top = snap.recommendations?.top_action;
+    if (top) {
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...ACCENT);
-      const title = this.currentReportName || 'Report';
-      doc.text(title, margin, y);
-      y += 10;
- 
-      // ── Thin accent rule ──
-      doc.setDrawColor(...ACCENT);
-      doc.setLineWidth(0.4);
-      doc.line(margin, y, pageW - margin, y);
+      doc.text('Top Recommendation', margin, y);
+      y += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...LIGHT);
+
+      const lines = doc.splitTextToSize(top, contentW);
+      lines.forEach(line => {
+        doc.text(line, margin, y);
+        y += 5;
+      });
+
+      y += 6;
+    }
+
+    const details = snap.compliance?.details || [];
+
+    if (details.length) {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...ACCENT);
+      doc.text('Compliance Details', margin, y);
       y += 8;
- 
-      // ── Summary row ──
-      const score      = snap.compliance?.compliance_score ?? '—';
-     const riskStatus = snap.risks?.status ? snap.risks.status.charAt(0).toUpperCase() + snap.risks.status.slice(1) : '—';
- 
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...LIGHT_GREY);
-      if (meta.company) {
-        doc.text('Company:', margin, y);
-        doc.setFont('helvetica', 'normal');
+
+      details.forEach(d => {
+        const textLines = doc.splitTextToSize(d.reasoning, contentW - 6);
+        const cardHeight = 20 + textLines.length * 5;
+
+        doc.setFillColor(...CARD_BG);
+        doc.roundedRect(margin, y - 4, contentW, cardHeight, 3, 3, 'F');
+
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(...WHITE);
-        doc.text(meta.company, margin + 22, y);
-        y += 6;
-      }
-      if (meta.file_analyzed) {
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...LIGHT_GREY);
-        doc.text('File:', margin, y);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...WHITE);
-        doc.text(meta.file_analyzed, margin + 22, y);
-        y += 6;
-      }
- 
-      // Score + Risk on one row
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...LIGHT_GREY);
-      doc.text('Score:', margin, y);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(...ACCENT);
-      doc.text(`${score}%`, margin + 22, y);
- 
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...LIGHT_GREY);
-      doc.text('Risk:', margin + 55, y);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(...WHITE);
-      doc.text(riskStatus, margin + 70, y);
-      y += 10;
- 
-      // ── Risk Factors ──
-      const factors = snap.risks?.factors || [];
-      if (factors.length) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(...ACCENT);
-        doc.text('Risk Factors', margin, y);
-        y += 5;
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        factors.forEach(f => {
-          if (y > 270) addPage();
-          doc.setTextColor(...LIGHT_GREY);
-          doc.text(`•  ${f}`, margin + 3, y);
-          y += 5;
-        });
-        y += 4;
-      }
- 
-      // ── Top Recommendation ──
-      const topAction = snap.recommendations?.top_action;
-      if (topAction) {
-        if (y > 260) addPage();
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(...ACCENT);
-        doc.text('Top Recommendation', margin, y);
-        y += 5;
-        doc.setFontSize(9);
-        y = writeWrapped(topAction, margin + 3, y, contentW - 3, 5, LIGHT_GREY);
-        y += 4;
-      }
- 
-      // ── Compliance Details ──
-      const details = snap.compliance?.details || [];
-      if (details.length) {
-        if (y > 250) addPage();
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(...ACCENT);
-        doc.text('Compliance Details', margin, y);
-        y += 7;
- 
-        details.forEach(d => {
-          if (y > 255) addPage();
- 
-          // Card background
-          const cardH   = 28 + Math.ceil(doc.splitTextToSize(String(d.reasoning), contentW - 6).length * 4.5);
-          const safeH   = Math.min(cardH, 60);
-          doc.setFillColor(...CARD_BG);
-          doc.roundedRect(margin, y - 4, contentW, safeH, 2, 2, 'F');
- 
-          // Clause + status
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(...WHITE);
-          const clauseLines = doc.splitTextToSize(d.clause, contentW - 40);
-          doc.text(clauseLines, margin + 3, y + 2);
- 
-          const statusColour = d.status === 'compliant' ? GREEN : d.status === 'partial' ? [255, 152, 0] : RED;
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(...statusColour);
-          doc.text(statusLabel(d.status), pageW - margin - 3, y + 2, { align: 'right' });
-          y += clauseLines.length * 4.5 + 4;
- 
-          // Risk + Confidence
-          if (y > 270) addPage();
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(...LIGHT_GREY);
-          doc.text(`Risk: ${d.risk_level ? d.risk_level.charAt(0).toUpperCase() + d.risk_level.slice(1) : '—'}   Confidence: ${d.confidence}%`, margin + 3, y);
-          y += 5;
- 
-          // Reasoning
-          if (y > 270) addPage();
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'normal');
-          y = writeWrapped(d.reasoning, margin + 3, y, contentW - 6, 4.5, LIGHT_GREY);
-          y += 6;
-        });
-      }
- 
-      // ── Footer on every page ──
-      const totalPages = doc.internal.getNumberOfPages();
-      for (let p = 1; p <= totalPages; p++) {
-        doc.setPage(p);
-        doc.setFontSize(7);
-        doc.setTextColor(...LIGHT_GREY);
+
+        doc.text(d.clause, margin + 3, y + 2);
+
+        let color = RED;
+        if (d.status === 'compliant') color = GREEN;
+        else if (d.status === 'partial') color = ORANGE;
+
+        doc.setTextColor(...color);
         doc.text(
-          `CyberComply — Generated ${new Date().toLocaleDateString()}   |   Page ${p} of ${totalPages}`,
-          pageW / 2, doc.internal.pageSize.getHeight() - 8,
-          { align: 'center' }
+          d.status === 'compliant' ? 'Compliant' :
+          d.status === 'partial' ? 'Partial' :
+          'Non-Compliant',
+          pageW - margin - 3,
+          y + 2,
+          { align: 'right' }
         );
+
+        y += 6;
+
+        doc.setFontSize(8);
+        doc.setTextColor(...LIGHT);
+        doc.text(
+          `Risk: ${d.risk_level || '—'}   Confidence: ${d.confidence}%`,
+          margin + 3,
+          y
+        );
+        y += 5;
+
+        textLines.forEach(line => {
+          doc.text(line, margin + 3, y);
+          y += 4.5;
+        });
+
+        y += 6;
+      });
+    }
+
+    doc.save(`${this.currentReportName || 'report'}.pdf`);
+
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong.");
+  }
+},
+    toggleSidebar() {
+      this.sidebarOpen = !this.sidebarOpen;
+    },
+    toggleSearch() {
+      this.searchActive = !this.searchActive;
+      if (!this.searchActive) {
+          this.searchQuery = '';
+          this.filterReports();
       }
- 
-      doc.save(`${this.currentReportName || 'report'}.pdf`);
+    },
+    showProfile() {
+      window.location.href = 'profile.html';
+    },
+    goBack() {
+      window.history.back();
+    },
+    goHome() {
+      window.location.href = 'home.html';
+    },
+    filterReports() {
+      const query = this.searchQuery.toLowerCase();
+      if (query === '') {
+          this.filteredLast7Days = [...this.last7Days];
+          this.filteredLast30Days = [...this.last30Days];
+      } else {
+          this.filteredLast7Days = this.last7Days.filter(r => r.display_name.toLowerCase().includes(query));
+          this.filteredLast30Days = this.last30Days.filter(r => r.display_name.toLowerCase().includes(query));
+      }
+    },
+    async openReport(report) {
+      this.currentReport = report.display_name;
+      this.currentSnapshot = null;
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/api/reports/${report.report_id}/`);
+        if (!res.ok) return;
+        const data = await res.json();
+        this.currentSnapshot = data.report_snapshot;
+      } catch (e) {
+        console.error('Failed to load report:', e);
+      }
     },
  
     //share

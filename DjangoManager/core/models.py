@@ -361,3 +361,26 @@ class AdminAccessRequest(models.Model):
     def __str__(self):
         return f"{self.user} — {self.status} ({self.org_email})"
  
+# =========================
+# Table: report_downloads
+# =========================
+class ReportDownload(models.Model):
+    download_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Which report was downloaded
+    report_id = models.UUIDField()
+
+    # Who downloaded
+    downloaded_by = models.ForeignKey(
+        UserProfile,
+        on_delete=models.PROTECT,
+        related_name="report_downloads"
+    )
+
+    downloaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "report_downloads"
+
+    def __str__(self):
+        return f"{self.downloaded_by} - {self.report_id}"

@@ -7,7 +7,7 @@ from django.db.models.deletion import ProtectedError
 import hashlib
 
 # Database Model Unit Tests.
-from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document, AnalysisResult, Recommendation, AuditLog, AdminAccessRequest
+from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document, AnalysisResult, Recommendation, AuditLog, AdminAccessRequest, ReportDownload
 
 class CoreModelsTest(TestCase):
     def setUp(self):
@@ -1078,3 +1078,37 @@ class AdminAccessRequestModelTest(TestCase):
         # String representation includes user, status and org_email
         expected = f"{self.profile} — PENDING (admin.req@cybercomply.lk)"
         self.assertEqual(str(self.req1), expected)
+
+# -----------------------------------------------------
+# ReportDownload tests
+# -----------------------------------------------------
+import uuid
+
+def test_report_download_create_and_count(self):
+    download = ReportDownload.objects.create(
+        downloaded_by=self.profile1,
+        report_id=uuid.uuid4()
+    )
+
+    self.assertEqual(ReportDownload.objects.count(), 1)
+
+
+def test_report_download_fk_relationship(self):
+    report_id = uuid.uuid4()
+
+    download = ReportDownload.objects.create(
+        downloaded_by=self.profile1,
+        report_id=report_id
+    )
+
+    self.assertEqual(download.downloaded_by, self.profile1)
+    self.assertEqual(download.report_id, report_id)
+
+
+def test_report_download_timestamp_auto(self):
+    download = ReportDownload.objects.create(
+        downloaded_by=self.profile1,
+        report_id=uuid.uuid4()
+    )
+
+    self.assertIsNotNone(download.downloaded_at)

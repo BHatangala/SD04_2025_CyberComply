@@ -24,9 +24,10 @@ import tempfile
 import os
 import boto3
 import re
+import uuid
 from botocore.exceptions import BotoCoreError, ClientError
 
-from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report, AuditLog, AdminAccessRequest
+from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report, AuditLog, AdminAccessRequest, ReportDownload
 from .utils import validate_org_email
 
 # ──────────────────────────────────────────────
@@ -2868,3 +2869,34 @@ def get_admin_access_status(request):
         },
         status=200
     )
+
+# ──────────────────────────────────────────────
+# Reports — Download
+# ──────────────────────────────────────────────
+@csrf_exempt
+def download_report(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+
+            email = data.get("email")
+            report_id = data.get("report_id")
+
+            if not email or not report_id:
+                return JsonResponse({"error": "Missing data"}, status=400)
+
+            # 🔥 THIS IS CRITICAL
+            user = UserProfile.objects.get(auth_user__email=email)
+
+            ReportDownload.objects.create(
+                downloaded_by=user,
+                report_id=report_id
+            )
+
+            return JsonResponse({"message": "Download recorded"})
+
+        except UserProfile.DoesNotExist:
+            return JsonResponse({"error": "User not found"}, status=404)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)

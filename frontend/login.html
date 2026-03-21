@@ -455,6 +455,7 @@
                         sessionStorage.setItem("userFullName", data.full_name);
                         sessionStorage.setItem("userEmail", data.email);
                         sessionStorage.setItem("userRole", data.role);
+                        localStorage.setItem("email", data.email);
 
                         // Obtain signed session token for home.html API calls
                         await fetchAndStoreSessionToken(trimmedEmail);
@@ -481,6 +482,7 @@
                     sessionStorage.setItem("userFullName", data.full_name);
                     sessionStorage.setItem("userEmail", data.email);
                     sessionStorage.setItem("userRole", data.role);
+                    localStorage.setItem("email", data.email);
 
                     // Obtain signed session token for home.html API calls
                     await fetchAndStoreSessionToken(data.email);
