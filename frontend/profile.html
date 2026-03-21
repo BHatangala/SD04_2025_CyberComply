@@ -429,6 +429,169 @@
             color: #ff6b6b;
         }
 
+        /* === DELETE CONFIRMATION MODAL === */
+        .delete-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.78);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+            backdrop-filter: blur(4px);
+            animation: fadeIn 0.2s ease;
+        }
+        
+        .delete-modal {
+            background: linear-gradient(145deg, #1a2845 0%, #162038 100%);
+            border: 1px solid rgba(255, 100, 100, 0.25);
+            border-radius: 16px;
+            padding: 36px 40px;
+            max-width: 460px;
+            width: 92%;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(220, 60, 60, 0.08);
+            animation: popIn 0.22s ease;
+        }
+        
+        .delete-modal-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #f87171;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+        
+        .delete-modal-subtitle {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+        
+        .delete-modal-summary {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 22px;
+        }
+        
+        .delete-modal-summary-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+        
+        .delete-modal-summary-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: #cbd5e1;
+            margin-bottom: 8px;
+        }
+        
+        .delete-modal-summary-item:last-child { margin-bottom: 0; }
+        
+        .delete-modal-summary-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #f87171;
+            flex-shrink: 0;
+        }
+        
+        .delete-modal-reason {
+            margin-bottom: 24px;
+        }
+        
+        .delete-modal-reason label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .delete-modal-reason select {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .delete-modal-reason select:focus {
+            border-color: rgba(248, 113, 113, 0.5);
+        }
+        
+        .delete-modal-reason select option {
+            background: #1a2845;
+        }
+        
+        .delete-modal-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .delete-modal-cancel {
+            flex: 1;
+            padding: 12px;
+            background: transparent;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #94a3b8;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .delete-modal-cancel:hover {
+            border-color: #64748b;
+            color: #e2e8f0;
+            background: rgba(255, 255, 255, 0.04);
+        }
+        
+        .delete-modal-confirm {
+            flex: 1;
+            padding: 12px;
+            background: #dc2626;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+        }
+        
+        .delete-modal-confirm:hover {
+            background: #b91c1c;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(220, 38, 38, 0.4);
+        }
+        
+        .delete-modal-confirm:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn  { from { transform: scale(0.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
         /* === RESPONSIVE DESIGN === */
         @media screen and (max-width: 1200px) {
             .sidebar {
@@ -542,6 +705,66 @@
             </div>
         </div>
 
+        <!-- Delete Account Confirmation Modal -->
+        <div v-if="showDeleteModal" class="delete-modal-overlay" @click.self="showDeleteModal = false">
+            <div class="delete-modal">
+                <div class="delete-modal-title">⚠ Delete Account</div>
+                <div class="delete-modal-subtitle">
+                    This action is permanent and cannot be undone. The following data will be permanently erased from our systems.
+                </div>
+        
+                <div class="delete-modal-summary">
+                    <div class="delete-modal-summary-title">What will be deleted</div>
+                    <div class="delete-modal-summary-item">
+                        <span class="delete-modal-summary-dot"></span>
+                        Your account and all login records
+                    </div>
+                    <div class="delete-modal-summary-item">
+                        <span class="delete-modal-summary-dot"></span>
+                        All uploaded documents and associated metadata
+                    </div>
+                    <div class="delete-modal-summary-item">
+                        <span class="delete-modal-summary-dot"></span>
+                        All compliance analysis results and findings
+                    </div>
+                    <div class="delete-modal-summary-item">
+                        <span class="delete-modal-summary-dot"></span>
+                        All recommendations and generated reports
+                    </div>
+                    <div class="delete-modal-summary-item">
+                        <span class="delete-modal-summary-dot"></span>
+                        All admin access privileges associated with your account
+                    </div>
+                </div>
+        
+                <div class="delete-modal-reason">
+                    <label>Reason for leaving (optional)</label>
+                    <select v-model="deleteReason">
+                        <option value="">Prefer not to say</option>
+                        <option value="Switching to a different platform.">Switching to a different platform</option>
+                        <option value="No longer need the service.">No longer need the service</option>
+                        <option value="Privacy concerns.">Privacy concerns</option>
+                        <option value="Too expensive.">Too expensive</option>
+                        <option value="Missing features I need.">Missing features I need</option>
+                        <option value="Other.">Other</option>
+                    </select>
+                </div>
+        
+                <div class="delete-modal-actions">
+                    <button class="delete-modal-cancel" @click="showDeleteModal = false">
+                        Cancel
+                    </button>
+                    <button
+                        class="delete-modal-confirm"
+                        @click="confirmDeleteAccount"
+                        :disabled="deletingAccount"
+                    >
+                        {{ deletingAccount ? 'PROCESSING...' : 'DELETE MY ACCOUNT' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Webpage Background Element -->
         <div class="wavy-background">
             <img src="img5.png" alt="Curly Line Design">
@@ -571,6 +794,11 @@
                     isSaving: false,
 
                     enableTwoFactor: false, // 2FA preference
+
+                    // Delete account modal state
+                    showDeleteModal: false,
+                    deleteReason: '',
+                    deletingAccount: false
                 }
             },
 
@@ -868,31 +1096,50 @@
                 },
                 // Initiation of account deletion process
                 // Shows OTP verification modal
-                async deleteAccount() {
+                deleteAccount() {
+                    // Show the confirmation modal instead of immediately requesting OTP
+                    this.showDeleteModal = true;
+                },
+                
+                async confirmDeleteAccount() {
+                    if (this.deletingAccount) return;
+                    this.deletingAccount = true;
+                
                     try {
                         const response = await fetch('http://127.0.0.1:8000/api/request-delete-account/', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                email: this.email
-                            })
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: this.email })
                         });
-
+                
                         const data = await response.json();
-
+                
                         if (!response.ok) {
-                            alert(data.detail || 'Failed to send delete account OTP.');
+                            this.showDeleteModal = false;
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: data.detail || 'Failed to send delete account OTP.'
+                            });
                             return;
                         }
-
-                        sessionStorage.setItem("deleteAccountMessage", "A verification code has been sent to your email.");
+                
+                        // Store reason so delete_account_verify.html can pass it to the backend
+                        sessionStorage.setItem('deleteAccountReason', this.deleteReason || '');
+                        sessionStorage.setItem('deleteAccountMessage', 'A verification code has been sent to your email.');
+                        this.showDeleteModal = false;
                         window.location.href = 'delete_account_verify.html';
-
+                
                     } catch (error) {
                         console.error('Error requesting delete account OTP:', error);
-                        alert('Something went wrong while requesting the verification code.');
+                        this.showDeleteModal = false;
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Something went wrong while requesting the verification code.'
+                        });
+                    } finally {
+                        this.deletingAccount = false;
                     }
                 },
                 
