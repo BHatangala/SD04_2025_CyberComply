@@ -261,6 +261,7 @@
 
                             <div>
                                 <a href="forgot_password.html"
+                                    @click.prevent="goToForgotPassword"
                                     class="text-sm text-white font-medium hover:text-blue-300 transition-colors tracking-wide">
                                     Forgot Password?
                                 </a>
@@ -366,6 +367,12 @@
                         // redirect back to login if needed.
                         console.warn("Could not obtain session token:", err);
                     }
+                };
+
+                // Set direction before navigating to forgot password page
+                const goToForgotPassword = () => {
+                    sessionStorage.setItem("navDirection", "right");
+                    window.location.href = "forgot_password.html";
                 };
 
                 // Step 1: Login (email+password)
@@ -492,6 +499,7 @@
                     message,
                     handleLogin,
                     handleOtpVerified,
+                    goToForgotPassword,
 
                     loading,
                     showPassword,
