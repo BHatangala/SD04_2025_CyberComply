@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document, AnalysisResult, Recommendation, Report, AuditLog, AdminAccessRequest, ReportDownload
+from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document, AnalysisResult, Recommendation, Report, AuditLog, AdminAccessRequest, ReportDownload, DeletionRequest
 
 # DATABASE: User Management and Authentication Related Tables
 
@@ -11,6 +11,7 @@ admin.site.register(LoginHistory)
 admin.site.register(AuditLog)
 admin.site.register(Document)
 admin.site.register(AdminAccessRequest)
+admin.site.register(DeletionRequest)
 
 # DATABASE: Reporting Tables
 

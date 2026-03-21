@@ -22,6 +22,7 @@ urlpatterns = [
     path("api/request-delete-account/", views.request_delete_account, name="request_delete_account"),
     path("api/verify-delete-account-otp/", views.verify_delete_account_otp, name="verify_delete_account_otp"),
     path("api/delete-account/", views.delete_account, name="delete_account"),
+    path("api/deletion-request/status/", views.get_deletion_request_status, name="get_deletion_request_status"),
     path("api/session-token/", views.issue_session_token, name="issue_session_token"),
     path("api/recommendations/save/", views.save_recommendations, name="save_recommendations"),
     path("api/recommendations/", views.get_recommendations, name="get_recommendations"),
