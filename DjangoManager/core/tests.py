@@ -7,7 +7,7 @@ from django.db.models.deletion import ProtectedError
 import hashlib
 
 # Database Model Unit Tests.
-from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document, AnalysisResult, Recommendation, AuditLog, AdminAccessRequest, ReportDownload
+from .models import Organization, Department, UserProfile, OtpVerification, LoginHistory, Document, AnalysisResult, Recommendation, AuditLog, AdminAccessRequest, ReportDownload, DeletionRequest
 
 class CoreModelsTest(TestCase):
     def setUp(self):
@@ -1112,3 +1112,296 @@ def test_report_download_timestamp_auto(self):
     )
 
     self.assertIsNotNone(download.downloaded_at)
+
+# -----------------------------------------------------
+# DeletionRequest model tests
+# -----------------------------------------------------
+ 
+class DeletionRequestModelTest(TestCase):
+    def setUp(self):
+        self.now = timezone.now()
+ 
+        # Auth user + profile
+        self.auth = User.objects.create_user(
+            username="del.user@sliit.lk",
+            email="del.user@sliit.lk",
+            password="SecurePass123!D"
+        )
+        self.profile = UserProfile.objects.create(
+            auth_user=self.auth,
+            full_name="Deletion Test User",
+            role=UserProfile.Role.GENERAL,
+            is_verified=True,
+        )
+ 
+        # Second profile for isolation tests
+        self.auth2 = User.objects.create_user(
+            username="del.user2@sliit.lk",
+            email="del.user2@sliit.lk",
+            password="SecurePass123!E"
+        )
+        self.profile2 = UserProfile.objects.create(
+            auth_user=self.auth2,
+            full_name="Deletion Test User Two",
+            role=UserProfile.Role.GENERAL,
+            is_verified=True,
+        )
+ 
+        # Sample erasure summary mirroring what delete_account() produces
+        self.sample_summary = {
+            "documents_erased": 2,
+            "s3_keys_deleted": ["docs/policy.pdf", "docs/report.docx"],
+            "analysis_results_erased": 2,
+            "findings_erased": 10,
+            "recommendations_erased": 5,
+            "reports_erased": 2,
+            "report_s3_keys_deleted": ["reports/fintech-iso27001.pdf"]
+        }
+ 
+        # PENDING request — no summary yet
+        self.req_pending = DeletionRequest.objects.create(
+            user=self.profile,
+            user_email_snapshot="del.user@sliit.lk",
+            request_type=DeletionRequest.RequestType.ACCOUNT,
+            status=DeletionRequest.Status.PENDING,
+            reason="Switching to a different platform.",
+            ip_address="203.143.27.18",
+        )
+ 
+        # COMPLETED request with full erasure summary
+        self.req_completed = DeletionRequest.objects.create(
+            user=self.profile,
+            user_email_snapshot="del.user@sliit.lk",
+            request_type=DeletionRequest.RequestType.ACCOUNT,
+            status=DeletionRequest.Status.COMPLETED,
+            reason="No longer needed.",
+            erasure_summary=self.sample_summary,
+            requested_at=self.now - timedelta(days=1),
+            completed_at=self.now,
+            ip_address="203.143.27.18",
+        )
+ 
+        # FAILED request
+        self.req_failed = DeletionRequest.objects.create(
+            user=self.profile2,
+            user_email_snapshot="del.user2@sliit.lk",
+            request_type=DeletionRequest.RequestType.ACCOUNT,
+            status=DeletionRequest.Status.FAILED,
+            ip_address="112.134.45.201",
+        )
+ 
+        # DATA_ONLY request
+        self.req_data_only = DeletionRequest.objects.create(
+            user=self.profile2,
+            user_email_snapshot="del.user2@sliit.lk",
+            request_type=DeletionRequest.RequestType.DATA_ONLY,
+            status=DeletionRequest.Status.PENDING,
+            ip_address="112.134.45.201",
+        )
+ 
+    # ── Basic creation ────────────────────────────────────────────────────
+ 
+    def test_deletion_request_create_and_count(self):
+        # Verify that four records were created successfully
+        self.assertEqual(DeletionRequest.objects.count(), 4)
+ 
+    def test_deletion_request_uuid_primary_key(self):
+        # Verify that deletion_id is auto-assigned as a valid UUID
+        import uuid
+        self.assertIsInstance(self.req_pending.deletion_id, uuid.UUID)
+ 
+    # ── FK: user (SET_NULL) ───────────────────────────────────────────────
+ 
+    def test_deletion_request_fk_user(self):
+        # Verify the request is correctly linked to its user profile
+        self.assertEqual(self.req_pending.user, self.profile)
+ 
+    def test_deletion_request_user_set_null_on_profile_delete(self):
+        # Deleting the profile must SET NULL on deletion_request.user so the
+        # erasure certificate row is preserved
+        profile2_id = self.profile2.user_id
+ 
+        # Remove PROTECT-guarded related records first
+        LoginHistory.objects.filter(user=self.profile2).delete()
+        OtpVerification.objects.filter(user=self.profile2).delete()
+        self.profile2.delete()
+ 
+        self.req_failed.refresh_from_db()
+        self.assertIsNone(self.req_failed.user)
+ 
+    def test_deletion_request_row_survives_after_user_delete(self):
+        # The DeletionRequest row must still exist after the user is deleted —
+        # this is what makes it a valid erasure certificate
+        profile2_id = self.profile2.user_id
+ 
+        LoginHistory.objects.filter(user=self.profile2).delete()
+        OtpVerification.objects.filter(user=self.profile2).delete()
+        self.profile2.delete()
+ 
+        surviving = DeletionRequest.objects.filter(
+            user_email_snapshot="del.user2@sliit.lk"
+        )
+        self.assertTrue(surviving.exists())
+ 
+    # ── user_email_snapshot ───────────────────────────────────────────────
+ 
+    def test_deletion_request_email_snapshot_stored(self):
+        # email snapshot is stored and retrieved correctly
+        self.assertEqual(
+            self.req_pending.user_email_snapshot,
+            "del.user@sliit.lk"
+        )
+ 
+    def test_deletion_request_email_snapshot_required(self):
+        # user_email_snapshot must not be blank
+        req = DeletionRequest(
+            user=self.profile,
+            user_email_snapshot="",
+            request_type=DeletionRequest.RequestType.ACCOUNT,
+            status=DeletionRequest.Status.PENDING,
+        )
+        with self.assertRaises(Exception):
+            req.full_clean()
+ 
+    # ── request_type ─────────────────────────────────────────────────────
+ 
+    def test_deletion_request_type_account(self):
+        # ACCOUNT request type stored correctly
+        self.assertEqual(
+            self.req_pending.request_type,
+            DeletionRequest.RequestType.ACCOUNT
+        )
+ 
+    def test_deletion_request_type_data_only(self):
+        # DATA_ONLY request type stored correctly
+        self.assertEqual(
+            self.req_data_only.request_type,
+            DeletionRequest.RequestType.DATA_ONLY
+        )
+ 
+    def test_deletion_request_invalid_type_rejected(self):
+        # Invalid request_type must fail model validation
+        req = DeletionRequest(
+            user=self.profile,
+            user_email_snapshot="del.user@sliit.lk",
+            request_type="INVALID_TYPE",
+            status=DeletionRequest.Status.PENDING,
+        )
+        with self.assertRaises(Exception):
+            req.full_clean()
+ 
+    # ── status ────────────────────────────────────────────────────────────
+ 
+    def test_deletion_request_status_pending(self):
+        # PENDING status stored correctly
+        self.assertEqual(self.req_pending.status, DeletionRequest.Status.PENDING)
+ 
+    def test_deletion_request_status_completed(self):
+        # COMPLETED status stored correctly
+        self.assertEqual(self.req_completed.status, DeletionRequest.Status.COMPLETED)
+ 
+    def test_deletion_request_status_failed(self):
+        # FAILED status stored correctly
+        self.assertEqual(self.req_failed.status, DeletionRequest.Status.FAILED)
+ 
+    def test_deletion_request_invalid_status_rejected(self):
+        # Invalid status must fail model validation
+        req = DeletionRequest(
+            user=self.profile,
+            user_email_snapshot="del.user@sliit.lk",
+            request_type=DeletionRequest.RequestType.ACCOUNT,
+            status="INVALID_STATUS",
+        )
+        with self.assertRaises(Exception):
+            req.full_clean()
+ 
+    # ── reason ────────────────────────────────────────────────────────────
+ 
+    def test_deletion_request_reason_stored(self):
+        # reason is stored and retrieved correctly when provided
+        self.assertEqual(
+            self.req_pending.reason,
+            "Switching to a different platform."
+        )
+ 
+    def test_deletion_request_reason_nullable(self):
+        # reason may be NULL when user does not provide one
+        self.assertIsNone(self.req_failed.reason)
+ 
+    # ── erasure_summary ───────────────────────────────────────────────────
+ 
+    def test_deletion_request_erasure_summary_nullable_when_pending(self):
+        # erasure_summary is NULL for a PENDING request (not yet executed)
+        self.assertIsNone(self.req_pending.erasure_summary)
+ 
+    def test_deletion_request_erasure_summary_stored_as_dict(self):
+        # erasure_summary is stored and returned as a Python dict
+        self.assertIsInstance(self.req_completed.erasure_summary, dict)
+ 
+    def test_deletion_request_erasure_summary_contains_correct_counts(self):
+        # erasure_summary stores the exact counts from the deletion
+        summary = self.req_completed.erasure_summary
+        self.assertEqual(summary["documents_erased"], 2)
+        self.assertEqual(summary["analysis_results_erased"], 2)
+        self.assertEqual(summary["findings_erased"], 10)
+        self.assertEqual(summary["recommendations_erased"], 5)
+        self.assertEqual(summary["reports_erased"], 2)
+ 
+    def test_deletion_request_erasure_summary_contains_s3_keys(self):
+        # erasure_summary stores the S3 keys that were deleted
+        summary = self.req_completed.erasure_summary
+        self.assertIn("docs/policy.pdf", summary["s3_keys_deleted"])
+        self.assertIn("reports/fintech-iso27001.pdf", summary["report_s3_keys_deleted"])
+ 
+    # ── timestamps ────────────────────────────────────────────────────────
+ 
+    def test_deletion_request_requested_at_default(self):
+        # requested_at is automatically populated
+        self.assertIsNotNone(self.req_pending.requested_at)
+ 
+    def test_deletion_request_completed_at_nullable_when_pending(self):
+        # completed_at is NULL for a request not yet completed
+        self.assertIsNone(self.req_pending.completed_at)
+ 
+    def test_deletion_request_completed_at_set_when_completed(self):
+        # completed_at is stored correctly when the request completes
+        self.assertIsNotNone(self.req_completed.completed_at)
+ 
+    # ── ip_address ────────────────────────────────────────────────────────
+ 
+    def test_deletion_request_ip_address_stored(self):
+        # ip_address is stored correctly
+        self.assertEqual(self.req_pending.ip_address, "203.143.27.18")
+ 
+    def test_deletion_request_ip_address_nullable(self):
+        # ip_address may be NULL
+        req = DeletionRequest.objects.create(
+            user=self.profile,
+            user_email_snapshot="del.user@sliit.lk",
+            request_type=DeletionRequest.RequestType.ACCOUNT,
+            status=DeletionRequest.Status.PENDING,
+            ip_address=None,
+        )
+        self.assertIsNone(req.ip_address)
+ 
+    # ── multiple requests per user ────────────────────────────────────────
+ 
+    def test_deletion_request_multiple_per_user(self):
+        # A user may have more than one deletion request (pending + completed)
+        self.assertEqual(
+            DeletionRequest.objects.filter(user=self.profile).count(), 2
+        )
+ 
+    def test_deletion_request_isolated_per_user(self):
+        # Requests for different users are not mixed
+        self.assertEqual(
+            DeletionRequest.objects.filter(user=self.profile2).count(), 2
+        )
+ 
+    # ── __str__ ───────────────────────────────────────────────────────────
+ 
+    def test_deletion_request_str(self):
+        # String representation includes email snapshot, type, and status
+        expected = "del.user@sliit.lk — ACCOUNT — PENDING"
+        self.assertEqual(str(self.req_pending), expected)
+ 

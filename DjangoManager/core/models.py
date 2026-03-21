@@ -384,3 +384,75 @@ class ReportDownload(models.Model):
 
     def __str__(self):
         return f"{self.downloaded_by} - {self.report_id}"
+
+
+# =========================
+# Table: deletion_request
+# =========================
+class DeletionRequest(models.Model):
+    class RequestType(models.TextChoices):
+        ACCOUNT   = "ACCOUNT",   "Account Deletion"
+        DATA_ONLY = "DATA_ONLY", "Data Only"
+ 
+    class Status(models.TextChoices):
+        PENDING   = "PENDING",   "Pending"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED    = "FAILED",    "Failed"
+ 
+    deletion_id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+ 
+    # SET_NULL so the erasure certificate row survives after the user row is gone
+    user                = models.ForeignKey(
+                            UserProfile,
+                            on_delete=models.SET_NULL,
+                            null=True, blank=True,
+                            related_name="deletion_requests"
+                          )
+ 
+    # Snapshot of email at request time — once auth_user is anonymised this is
+    # the only record that links the certificate back to the original identity
+    user_email_snapshot = models.CharField(max_length=255)
+ 
+    request_type        = models.CharField(
+                            max_length=10,
+                            choices=RequestType.choices,
+                            default=RequestType.ACCOUNT
+                          )
+    status              = models.CharField(
+                            max_length=10,
+                            choices=Status.choices,
+                            default=Status.PENDING
+                          )
+ 
+    # Optional reason provided by the user before confirming deletion
+    reason              = models.TextField(null=True, blank=True)
+ 
+    # JSON snapshot of exactly what was erased — counts + S3 keys
+    # Example:
+    # {
+    #   "documents_erased": 4,
+    #   "s3_keys_deleted": ["docs/policy.pdf", "docs/report.docx"],
+    #   "analysis_results_erased": 4,
+    #   "findings_erased": 23,
+    #   "recommendations_erased": 11,
+    #   "reports_erased": 4,
+    #   "report_s3_keys_deleted": ["reports/fintech-iso27001.pdf"]
+    # }
+    erasure_summary     = models.JSONField(null=True, blank=True)
+ 
+    requested_at        = models.DateTimeField(default=timezone.now)
+    completed_at        = models.DateTimeField(null=True, blank=True)
+ 
+    # IP at time of the verified deletion request
+    ip_address          = models.GenericIPAddressField(null=True, blank=True)
+ 
+    class Meta:
+        db_table = "deletion_request"
+        ordering = ["-requested_at"]
+        indexes  = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["status", "requested_at"]),
+        ]
+ 
+    def __str__(self):
+        return f"{self.user_email_snapshot} — {self.request_type} — {self.status}"
