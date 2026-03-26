@@ -26,6 +26,8 @@ import boto3
 import re
 import uuid
 from botocore.exceptions import BotoCoreError, ClientError
+import logging
+logger = logging.getLogger(__name__)
 
 from .models import UserProfile, LoginHistory, OtpVerification, Document, Organization, Department, AnalysisResult, Finding, Recommendation, Report, AuditLog, AdminAccessRequest, ReportDownload, DeletionRequest,ReportShare
 from .utils import validate_org_email
@@ -100,7 +102,7 @@ def scan_file(file_path):
             return result  # Threat detected
 
     except Exception as e:
-        return str(e)
+        return f"SCAN_ERROR:{str(e)}"
 
 
 def upload_to_s3(file_path, file_name):
@@ -125,7 +127,8 @@ def upload_to_s3(file_path, file_name):
         s3_url = f"https://{bucket_name}.s3.{settings.AWS_S3_REGION_NAME}.amazonaws.com/{file_name}"
         return s3_key, s3_url
 
-    except (BotoCoreError, ClientError):
+    except (BotoCoreError, ClientError) as e:
+        logger.error("S3 upload failed for %s: %s", file_name, str(e))
         return None, None
 
 
@@ -211,8 +214,10 @@ def upload_file(request):
 
     if profile.role == UserProfile.Role.ADMIN:
         if not company_name:
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
             return JsonResponse({'error': 'Organisation name is required.'}, status=400)
         if not department:
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
             return JsonResponse({'error': 'Department is required. Please select a department before uploading.'}, status=400)
         org, _  = Organization.objects.get_or_create(org_name=company_name)
         dept, _ = Department.objects.get_or_create(org=org, dept_name=department)
@@ -222,6 +227,7 @@ def upload_file(request):
     file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
     file_type = file_type_map.get(ext)
     if not file_type:
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
         return JsonResponse({'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'}, status=400)
 
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -231,6 +237,7 @@ def upload_file(request):
 
     try:
         if is_password_protected(temp_path, uploaded_file.name):
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
             return JsonResponse(
                 {'error': 'File rejected — password protected files are not allowed'},
                 status=400
@@ -238,14 +245,17 @@ def upload_file(request):
 
         scan_result = scan_file(temp_path)
         if scan_result is not None:
-            return JsonResponse(
-                {'error': 'File rejected — malware detected', 'detail': scan_result},
-                status=400
-            )
+            if scan_result.startswith('SCAN_ERROR:'):
+                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+                return JsonResponse({'error': 'File could not be scanned. The security scanner is temporarily unavailable. Please try again shortly.'}, status=503)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
         s3_key, s3_url = upload_to_s3(temp_path, uploaded_file.name)
         if s3_key is None:
-            return JsonResponse({'error': 'Failed to upload file to S3'}, status=500)
+            logger.error("S3 upload returned None for file %s, user %s", uploaded_file.name, profile.user_id)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            return JsonResponse({'error': 'Failed to upload file to S3. Please try again in a few minutes.'}, status=500)
 
         with open(temp_path, 'rb') as f:
             file_bytes = f.read()
@@ -572,6 +582,7 @@ def delete_file(request):
 # ──────────────────────────────────────────────
 
 @csrf_exempt
+@csrf_exempt
 def upload_from_drive(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
@@ -598,6 +609,7 @@ def upload_from_drive(request):
 
     valid_exts = ('.pdf', '.docx', '.txt')
     if not file_name.lower().endswith(valid_exts):
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
         return JsonResponse(
             {'error': f'"{file_name}" is not supported. Only PDF, DOCX and TXT files are allowed.'},
             status=400
@@ -609,8 +621,10 @@ def upload_from_drive(request):
 
     if profile.role == UserProfile.Role.ADMIN:
         if not company_name:
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
             return JsonResponse({'error': 'Organisation name is required.'}, status=400)
         if not department:
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
             return JsonResponse({'error': 'Department is required for each file.'}, status=400)
         org, _  = Organization.objects.get_or_create(org_name=company_name)
         dept, _ = Department.objects.get_or_create(org=org, dept_name=department)
@@ -623,9 +637,9 @@ def upload_from_drive(request):
     file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
     file_type = file_type_map.get(ext)
     if not file_type:
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
         return JsonResponse(
-            {'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'},
-            status=400
+            {'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'}, status=400
         )
 
     # Step 1 — Download the file from Google Drive using the OAuth token
@@ -638,15 +652,21 @@ def upload_from_drive(request):
             stream=True
         )
     except requests.exceptions.RequestException as e:
-        return JsonResponse({'error': f'Failed to reach Google Drive: {str(e)}'}, status=502)
+        logger.error("Google Drive download failed for file %s, user %s: %s", file_name, profile.user_id, str(e))
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        return JsonResponse({'error': 'Could not reach Google Drive. Please check your connection and try again.'}, status=502)
 
     if drive_response.status_code == 401:
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
         return JsonResponse({'error': 'Google access token is invalid or expired'}, status=401)
     if drive_response.status_code == 403:
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
         return JsonResponse({'error': 'Permission denied — cannot access this Google Drive file'}, status=403)
     if not drive_response.ok:
+        logger.error("Google Drive returned HTTP %s for file %s, user %s", drive_response.status_code, file_name, profile.user_id)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
         return JsonResponse(
-            {'error': f'Google Drive returned HTTP {drive_response.status_code}'},
+            {'error': 'Google Drive is temporarily unavailable. Please try again in a few minutes.'},
             status=502
         )
 
@@ -665,6 +685,7 @@ def upload_from_drive(request):
         # Step 3 — Size check (50 MB limit)
         file_size = os.path.getsize(temp_path)
         if file_size > 50 * 1024 * 1024:
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
             return JsonResponse(
                 {'error': f'"{file_name}" exceeds the 50 MB limit.'},
                 status=400
@@ -672,6 +693,7 @@ def upload_from_drive(request):
 
         # Step 4 — Password protection check
         if is_password_protected(temp_path, file_name):
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
             return JsonResponse(
                 {'error': 'File rejected — password protected files are not allowed'},
                 status=400
@@ -680,15 +702,19 @@ def upload_from_drive(request):
         # Step 5 — Malware scan
         scan_result = scan_file(temp_path)
         if scan_result is not None:
-            return JsonResponse(
-                {'error': 'File rejected — malware detected', 'detail': scan_result},
-                status=400
-            )
+            if scan_result.startswith('SCAN_ERROR:'):
+                logger.error("ClamAV scanner unavailable for file %s, user %s: %s", file_name, profile.user_id, scan_result)
+                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+                return JsonResponse({'error': 'File could not be scanned. The security scanner is temporarily unavailable. Please try again shortly.'}, status=503)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
         # Step 6 — Upload to S3
         s3_key, s3_url = upload_to_s3(temp_path, file_name)
         if s3_key is None:
-            return JsonResponse({'error': 'Failed to upload file to S3'}, status=500)
+            logger.error("S3 upload returned None for file %s, user %s", file_name, profile.user_id)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            return JsonResponse({'error': 'Failed to upload file to S3. Please try again in a few minutes.'}, status=500)
 
         # Step 6b — Store file bytes in cache so analyze_compliance can forward
         #           them to the AI without another network round-trip.
@@ -707,6 +733,8 @@ def upload_from_drive(request):
             s3_key=s3_key,
             status=Document.Status.UPLOADED,
         )
+
+        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request)
 
         # Step 7 — Stream a single SSE 'uploaded' event back to the frontend.
         #          No AI call here — analysis is deferred to the Analyse button.
@@ -730,6 +758,7 @@ def upload_from_drive(request):
         )
 
     except Exception as e:
+        logger.error("Unexpected error in upload_from_drive for file %s, user %s: %s", file_name, profile.user_id, str(e))
         return JsonResponse({'error': str(e)}, status=500)
 
     finally:

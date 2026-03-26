@@ -1172,7 +1172,6 @@
                     msg.includes('MB limit') ||
                     msg.includes('not supported') ||
                     msg.includes('Maximum 10') ||
-                    msg.includes('rejected') ||
                     msg.includes('reach the server')
                 );
             }
@@ -1391,7 +1390,7 @@
 
                     const reason = error.message.toLowerCase().includes('failed to fetch')
                         ? `Could not reach the server while uploading "${fileObj.name}". Please check your connection and try again.`
-                        : `"${fileObj.name}" was rejected — ${error.message}`;
+                        : `"${fileObj.name}" could not be stored. Our file storage is temporarily unavailable — please try again in a few minutes.`;
                     this.errorMessages.push(reason);
                 }
             },
@@ -1503,7 +1502,11 @@
                                         break;
                                     case 'error':
                                         updateStatus('error');
-                                        this.errorMessages.push(payload.message || `Error processing "${fileObj.name}".`);
+                                        const msg = payload.message || '';
+                                        const friendly = msg.includes('not running') || msg.includes('connect')
+                                            ? 'Analysis is temporarily unavailable. The AI service is not responding — please wait a moment and try again.'
+                                            : `Error processing "${fileObj.name}". Please try again.`;
+                                        this.errorMessages.push(friendly);
                                         this.isAnalysing = false;
                                         break;
                                 }
@@ -1517,7 +1520,7 @@
                     console.error(`Analysis failed for ${fileObj.name}:`, error);
                     const i = getIndex();
                     if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'error' });
-                    this.errorMessages.push(`Failed to analyse "${fileObj.name}": ${error.message}`);
+                    this.errorMessages.push(`Analysis is temporarily unavailable. The AI service is not responding — please wait a moment and try again.`);
                     this.isAnalysing = false;
                 }
             },
@@ -1599,7 +1602,7 @@
                         const i = this.uploadedFiles.indexOf(fileObj);
                         if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'error' });
                     });
-                    this.errorMessages.push(`Batch analysis failed: ${error.message}`);
+                    this.errorMessages.push(`Batch analysis is temporarily unavailable. The AI service is not responding — please wait a moment and try again.`);
                     this.isAnalysing = false;
                 }
             },
@@ -1681,7 +1684,7 @@
                     scope: GOOGLE_DRIVE_SCOPE,
                     callback: (tokenResponse) => {
                         if (tokenResponse.error) {
-                            this.errorMessages = [`Google authorisation failed: ${tokenResponse.error}`];
+                            this.errorMessages = ['Google Drive authorisation was denied. Please try again and allow access when prompted.'];
                             return;
                         }
                         this.googleAccessToken = tokenResponse.access_token;
@@ -1850,9 +1853,11 @@
                                     case 'error': {
                                         const i = getIndex();
                                         if (i !== -1) this.uploadedFiles.splice(i, 1);
-                                        this.errorMessages.push(
-                                            payload.message || `Error uploading "${fileObj.name}" from Google Drive.`
-                                        );
+                                        const msg = payload.message || '';
+                                        const friendly = msg.includes('not running') || msg.includes('unavailable')
+                                            ? `"${fileObj.name}" could not be stored. Our file storage is temporarily unavailable — please try again in a few minutes.`
+                                            : `Error uploading "${fileObj.name}" from Google Drive. Please try again.`;
+                                        this.errorMessages.push(friendly);
                                         break;
                                     }
                                 }
@@ -1869,7 +1874,7 @@
                     if (i !== -1) this.uploadedFiles.splice(i, 1);
                     const reason = error.message.toLowerCase().includes('failed to fetch')
                         ? `Could not reach the server while uploading "${fileObj.name}" from Google Drive. Please check your connection and try again.`
-                        : `"${fileObj.name}" (Google Drive) was rejected — ${error.message}`;
+                        : `"${fileObj.name}" (Google Drive) could not be stored. Our file storage is temporarily unavailable — please try again in a few minutes.`;
                     this.errorMessages.push(reason);
                 }
             },
