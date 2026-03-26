@@ -621,7 +621,12 @@ def upload_from_drive(request):
     # ── Detect file type ───────────────────────────────────────────────────
     ext = file_name.lower().rsplit('.', 1)[-1]
     file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
-    file_type = file_type_map.get(ext, 'PDF')
+    file_type = file_type_map.get(ext)
+    if not file_type:
+        return JsonResponse(
+            {'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'},
+            status=400
+        )
 
     # Step 1 — Download the file from Google Drive using the OAuth token
     download_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"

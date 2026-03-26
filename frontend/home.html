@@ -1588,6 +1588,7 @@
 
                     } catch (error) {
                         console.error(`Failed to delete "${file.name}":`, error);
+                        this.errorMessages.push(`Could not delete "${file.name}". Please try again.`);
                     }
                 }
             },
