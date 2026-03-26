@@ -151,6 +151,14 @@
             border-color: #4a8fe7;
         }
 
+        .org-input-error {
+            border-color: rgba(244, 67, 54, 0.6);
+        }
+
+        .org-input-error:focus {
+            border-color: #f44336;
+        }
+
         /* ── Upload Container ── */
         .upload-container {
             max-width: 800px;
@@ -811,9 +819,11 @@
             <div class="org-label">ORGANISATION</div>
             <input
                 class="org-input"
+                :class="{ 'org-input-error': isAdmin && errorMessages.some(m => m.includes('Organisation')) }"
                 type="text"
                 v-model="companyName"
                 placeholder="Enter organisation name…"
+                @blur="orgNameTouched = true"
             >
         </div>
 
@@ -895,7 +905,7 @@
                         {{ msg }}
                     </div>
                 </div>
-                <div class="upload-rules">
+                <div class="upload-rules" v-if="hasFileErrors">
                     <p class="upload-rules-heading">When uploading files please ensure:</p>
                     <div class="upload-rules-grid">
                         <div class="upload-rules-col">
@@ -1072,6 +1082,7 @@
 
                 // ── Admin fields ──
                 companyName: '',
+                orgNameTouched: false,
 
                 // ── Upload ──
                 isDragging: false,
@@ -1079,7 +1090,15 @@
                 errorMessages: [],
 
                 // ── Department options ──
-                departments: ['HR & Admin', 'Finance', 'IT', 'Operations'],
+                departments: [
+                    // Core business
+                    'Finance & Accounting', 'Human Resources & Administration', 'Research & Development','Legal & Compliance',
+                    'Operations', 'Procurement & Supply Chain', 'Sales & Business Development', 'Marketing & Communications',
+                    // Technology
+                    'Information Technology & Cybersecurity', 'Governance, Risk & Compliance (GRC)','Quality Assurance',
+                    // Support
+                    'Customer Service',
+                ],
 
                 // ── Analysis state ──
                 isAnalysing: false,
@@ -1143,8 +1162,19 @@
                 if (this.uploadedFiles.length === 0) return false;
                 const readyFiles = this.uploadedFiles.filter(f => f.status === 'uploaded');
                 if (readyFiles.length === 0) return false;
+                if (this.isAdmin && !this.companyName.trim()) return false;
                 if (this.isAdmin && this.hasMissingDepartments) return false;
                 return true;
+            },
+
+            hasFileErrors() {
+                return this.errorMessages.some(msg =>
+                    msg.includes('MB limit') ||
+                    msg.includes('not supported') ||
+                    msg.includes('Maximum 10') ||
+                    msg.includes('rejected') ||
+                    msg.includes('reach the server')
+                );
             }
         },
 
@@ -1190,8 +1220,6 @@
         },
 
         methods: {
-
-
             // ── Sidebar ──
             toggleSidebar() {
                 this.sidebarOpen = !this.sidebarOpen;
@@ -1239,11 +1267,35 @@
                 this.processFiles(Array.from(e.target.files));
                 e.target.value = '';
             },
+            validateOrgName() {
+                const name = this.companyName.trim();
+                if (!name) {
+                    this.errorMessages.push('Organisation name is required before uploading.');
+                    return false;
+                }
+                if (name.length < 2) {
+                    this.errorMessages.push('Organisation name must be at least 2 characters.');
+                    return false;
+                }
+                if (name.length > 200) {
+                    this.errorMessages.push('Organisation name must be 200 characters or fewer.');
+                    return false;
+                }
+                const validPattern = /^[a-zA-Z0-9\s\-&.,'/()]+$/;
+                if (!validPattern.test(name)) {
+                    this.errorMessages.push('Organisation name contains invalid characters. Use only letters, numbers, spaces, hyphens, ampersands, or punctuation.');
+                    return false;
+                }
+                this.companyName = name; // store the trimmed version
+                return true;
+            },
 
             // ── Validate files and add them to the queue ──
             processFiles(files) {
                 // Clear previous error messages each time the user picks new files
                 this.errorMessages = [];
+
+                if (this.isAdmin && !this.validateOrgName()) return;
 
                 if (this.uploadedFiles.length + files.length > 10) {
                     this.errorMessages.push(`Maximum 10 files allowed. You currently have ${this.uploadedFiles.length} file(s) uploaded.`);
@@ -1700,6 +1752,7 @@
                     this.errorMessages.push('Maximum 10 files allowed.');
                     return;
                 }
+                if (this.isAdmin && !this.validateOrgName()) return;
 
                 const fileObj = {
                     name:       fileName,
