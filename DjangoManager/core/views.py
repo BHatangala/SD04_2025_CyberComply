@@ -14,6 +14,7 @@ from django.core import signing
 from django.core.signing import BadSignature, SignatureExpired
 from django.conf import settings
 from django.core.mail import send_mail
+from django.core.cache import cache
 import random
 import hashlib
 import json, time
@@ -112,36 +113,86 @@ def upload_to_s3(file_path, file_name):
 
 
 # ──────────────────────────────────────────────
-# analyze_compliance — AWS checks first, then AI
+# OAuth Token helpers (SSM Parameter Store)
+# ──────────────────────────────────────────────
+
+def save_oauth_token(user_id: str, provider: str, token: str):
+    """Save a user's OAuth token securely to AWS SSM Parameter Store."""
+    try:
+        ssm = boto3.client(
+            'ssm',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME
+        )
+        ssm.put_parameter(
+            Name=f"/cybercomply/oauth/{user_id}/{provider}_token",
+            Value=token,
+            Type="SecureString",
+            Overwrite=True
+        )
+        return True
+    except (BotoCoreError, ClientError) as e:
+        print(f"ERROR saving OAuth token for {user_id}/{provider}: {e}")
+        return False
+    
+def get_oauth_token(user_id: str, provider: str):
+    """Retrieve a user's OAuth token from AWS SSM Parameter Store."""
+    try:
+        ssm = boto3.client(
+            'ssm',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME
+        )
+        response = ssm.get_parameter(
+            Name=f"/cybercomply/oauth/{user_id}/{provider}_token",
+            WithDecryption=True
+        )
+        return response["Parameter"]["Value"]
+    except (BotoCoreError, ClientError) as e:
+        print(f"ERROR retrieving OAuth token for {user_id}/{provider}: {e}")
+        return None
+
+
+# ──────────────────────────────────────────────
+# Phase 1 — Device upload (validate → scan → S3)
+# Called immediately when the user selects a file
+# from their device. Does NOT call the AI service.
 # ──────────────────────────────────────────────
 
 @csrf_exempt
-def analyze_compliance(request):
+def upload_file(request):
+    """
+    Receives a single file from the frontend, runs security checks, and stores
+    it in S3. Returns plain JSON so the frontend can update the file's status
+    badge to UPLOADED.
+
+    The AI analysis step is intentionally absent — it is triggered separately
+    by the Analyse button via analyze_compliance or analyze_batch.
+    """
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
 
     uploaded_file = request.FILES.get('document')
-    company_name = request.POST.get('company_name', '')
-    department = request.POST.get('department', '')
+    company_name  = request.POST.get('company_name', '')
+    department    = request.POST.get('department', '')
 
     if not uploaded_file:
         return JsonResponse({'error': 'No file provided'}, status=400)
 
-    # Step 1 — Save file temporarily
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         for chunk in uploaded_file.chunks():
             temp_file.write(chunk)
         temp_path = temp_file.name
 
     try:
-        # Step 2 — Check if password protected
         if is_password_protected(temp_path, uploaded_file.name):
             return JsonResponse(
                 {'error': 'File rejected — password protected files are not allowed'},
                 status=400
             )
 
-        # Step 3 — Scan for malware
         scan_result = scan_file(temp_path)
         if scan_result is not None:
             return JsonResponse(
@@ -149,52 +200,193 @@ def analyze_compliance(request):
                 status=400
             )
 
-        # Step 4 — Upload clean file to S3
         s3_url = upload_to_s3(temp_path, uploaded_file.name)
         if s3_url is None:
             return JsonResponse({'error': 'Failed to upload file to S3'}, status=500)
 
-        # Step 5 — Reset file pointer, then stream to AI with SSE
-        uploaded_file.seek(0)
+        # Keep the file bytes in the Django cache so analyze_compliance can
+        # forward them directly to the AI without touching S3 again.
+        # TTL of 1 hour is generous — the user is expected to click Analyse
+        # within seconds/minutes of uploading.
+        with open(temp_path, 'rb') as f:
+            file_bytes = f.read()
+        cache.set(f'file_bytes_{uploaded_file.name}', file_bytes, timeout=3600)
 
-        def event_stream():
-            yield f"data: {json.dumps({'status': 'uploaded', 's3_url': s3_url})}\n\n".encode('utf-8')
-            time.sleep(2)
-
-            try:
-                files = {'file': (uploaded_file.name, uploaded_file.read(), uploaded_file.content_type)}
-                data = {'company_name': company_name, 'department': department}
-
-                yield f"data: {json.dumps({'status': 'analysing'})}\n\n".encode('utf-8')
-
-                response = requests.post(
-                    f"{AI_API_URL}/analyze",
-                    files=files,
-                    data=data,
-                    timeout=300
-                )
-                result = response.json()
-
-                yield f"data: {json.dumps({'status': 'analysed', 'result': result})}\n\n".encode('utf-8')
-
-            except requests.exceptions.ConnectionError:
-                yield f"data: {json.dumps({'status': 'error', 'message': 'AI Server is not running.'})}\n\n".encode('utf-8')
-            except Exception as e:
-                yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n".encode('utf-8')
-
-        return StreamingHttpResponse(
-            event_stream(),
-            content_type='text/event-stream',
-            headers={
-                'Cache-Control': 'no-cache',
-                'X-Accel-Buffering': 'no',
-            }
-        )
+        return JsonResponse({
+            'status':    'uploaded',
+            's3_url':    s3_url,
+            'file_name': uploaded_file.name
+        })
 
     finally:
-        # Always clean up temp file
         if os.path.exists(temp_path):
             os.unlink(temp_path)
+
+
+# ──────────────────────────────────────────────
+# Phase 2a — Analyse single file (SSE stream)
+# Triggered by the Analyse button when exactly
+# one file is ready.
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def analyze_compliance(request):
+    """
+    Triggered by the Analyse button (single file).
+    Reads file bytes from the Django cache (stored by upload_file) and forwards
+    them to the AI service as multipart/form-data — identical to the original
+    pipeline. Streams SSE events back to the frontend.
+
+    SSE events emitted:
+        data: {"status": "analysing"}
+        data: {"status": "analysed", "result": {...}}
+        data: {"status": "error",    "message": "..."}
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    file_name    = request.POST.get('file_name', '').strip()
+    company_name = request.POST.get('company_name', '')
+    department   = request.POST.get('department', '')
+
+    if not file_name:
+        return JsonResponse({'error': 'file_name is required'}, status=400)
+
+    # Retrieve the file bytes stored in cache by upload_file.
+    # No S3 round-trip needed — the bytes are already in memory.
+    file_bytes = cache.get(f'file_bytes_{file_name}')
+    if file_bytes is None:
+        return JsonResponse(
+            {'error': f'File bytes for "{file_name}" not found in cache. Please re-upload.'},
+            status=400
+        )
+
+    def event_stream():
+        try:
+            yield f"data: {json.dumps({'status': 'analysing'})}\n\n".encode('utf-8')
+
+            # Forward to AI exactly as the original — multipart/form-data with raw bytes
+            files = {'file': (file_name, file_bytes, _mime_type_for(file_name))}
+            data  = {'company_name': company_name, 'department': department}
+
+            response = requests.post(
+                f"{AI_API_URL}/analyze",
+                files=files,
+                data=data,
+                timeout=300
+            )
+            result = response.json()
+
+            yield f"data: {json.dumps({'status': 'analysed', 'result': result})}\n\n".encode('utf-8')
+
+            # Clean up cache entry once analysis is done
+            cache.delete(f'file_bytes_{file_name}')
+
+        except requests.exceptions.ConnectionError:
+            yield f"data: {json.dumps({'status': 'error', 'message': 'AI Server is not running.'})}\n\n".encode('utf-8')
+        except Exception as e:
+            yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n".encode('utf-8')
+
+    return StreamingHttpResponse(
+        event_stream(),
+        content_type='text/event-stream',
+        headers={
+            'Cache-Control':     'no-cache',
+            'X-Accel-Buffering': 'no',
+        }
+    )
+
+
+# ──────────────────────────────────────────────
+# Phase 2b — Analyse multiple files (batch)
+# Triggered by the Analyse button when two or
+# more files are ready.
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def analyze_batch(request):
+    """
+    Receives a JSON body listing already-uploaded file names plus metadata,
+    generates S3 pre-signed URLs for each, and forwards the batch to the AI
+    service in a single request.
+
+    Expected request body:
+    {
+        "company_name": "Acme Corp",
+        "files": [
+            {"file_name": "policy.pdf",  "department": "IT"},
+            {"file_name": "report.docx", "department": "Finance"}
+        ]
+    }
+
+    Response (success):  {"status": "analysed", "result": {...}}
+    Response (error):    {"error": "..."}
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body'}, status=400)
+
+    company_name = payload.get('company_name', '')
+    files        = payload.get('files', [])
+
+    if not files or not isinstance(files, list):
+        return JsonResponse({'error': 'A non-empty "files" list is required'}, status=400)
+
+    # Build multipart files list from cache — same bytes stored by upload_file
+    multipart_files = []
+    for entry in files:
+        file_name  = (entry.get('file_name') or '').strip()
+        department = (entry.get('department') or '').strip()
+
+        if not file_name:
+            return JsonResponse({'error': 'Each file entry must include a file_name'}, status=400)
+
+        file_bytes = cache.get(f'file_bytes_{file_name}')
+        if file_bytes is None:
+            return JsonResponse(
+                {'error': f'File bytes for "{file_name}" not found in cache. Please re-upload.'},
+                status=400
+            )
+
+        multipart_files.append({
+            'file_name':  file_name,
+            'department': department,
+            'file_bytes': file_bytes
+        })
+
+    try:
+        # Forward each file as multipart to the AI batch endpoint
+        files_payload = [
+            ('files', (f['file_name'], f['file_bytes'], _mime_type_for(f['file_name'])))
+            for f in multipart_files
+        ]
+        data_payload = {
+            'company_name': company_name,
+            'departments':  ','.join(f['department'] for f in multipart_files)
+        }
+
+        response = requests.post(
+            f"{AI_API_URL}/analyze-batch",
+            files=files_payload,
+            data=data_payload,
+            timeout=600
+        )
+        result = response.json()
+
+        # Clean up cache entries for all analysed files
+        for f in multipart_files:
+            cache.delete(f'file_bytes_{f["file_name"]}')
+
+        return JsonResponse({'status': 'analysed', 'result': result})
+
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({'error': 'AI Server is not running.'}, status=503)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 # ──────────────────────────────────────────────
@@ -211,7 +403,7 @@ def delete_file(request):
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
-    file_name = data.get('file_name', '').strip()
+    file_name  = data.get('file_name', '').strip()
     file_names = data.get('file_names', [])
 
     if file_name:
@@ -236,6 +428,151 @@ def delete_file(request):
 
     except (BotoCoreError, ClientError) as e:
         return JsonResponse({'error': f'Failed to delete file(s): {str(e)}'}, status=500)
+
+
+# ──────────────────────────────────────────────
+# Google Drive Upload — Phase 1 only
+# Frontend sends file_id + OAuth token; Django
+# downloads the file from Drive, scans it, and
+# stores it in S3. Stops at 'uploaded' — AI
+# analysis is triggered separately via the
+# Analyse button (analyze_compliance / analyze_batch).
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+def upload_from_drive(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    file_id      = (payload.get('file_id')      or '').strip()
+    access_token = (payload.get('access_token') or '').strip()
+    file_name    = (payload.get('file_name')    or '').strip()
+    company_name = (payload.get('company_name') or '').strip()
+    department   = (payload.get('department')   or '').strip()
+
+    if not file_id or not access_token or not file_name:
+        return JsonResponse({'error': 'file_id, access_token and file_name are required'}, status=400)
+    # Save the access token securely to AWS SSM
+    user_id = request.user.id if request.user.is_authenticated else 'anonymous'
+    save_oauth_token(user_id, 'google', access_token)
+
+    valid_exts = ('.pdf', '.docx', '.txt')
+    if not file_name.lower().endswith(valid_exts):
+        return JsonResponse(
+            {'error': f'"{file_name}" is not supported. Only PDF, DOCX and TXT files are allowed.'},
+            status=400
+        )
+
+    # Step 1 — Download the file from Google Drive using the OAuth token
+    download_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+    try:
+        drive_response = requests.get(
+            download_url,
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=60,
+            stream=True
+        )
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({'error': f'Failed to reach Google Drive: {str(e)}'}, status=502)
+
+    if drive_response.status_code == 401:
+        return JsonResponse({'error': 'Google access token is invalid or expired'}, status=401)
+    if drive_response.status_code == 403:
+        return JsonResponse({'error': 'Permission denied — cannot access this Google Drive file'}, status=403)
+    if not drive_response.ok:
+        return JsonResponse(
+            {'error': f'Google Drive returned HTTP {drive_response.status_code}'},
+            status=502
+        )
+
+    # Step 2 — Write downloaded content to a temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp:
+        for chunk in drive_response.iter_content(chunk_size=8192):
+            tmp.write(chunk)
+        temp_path = tmp.name
+
+    # streaming_started tracks whether we handed off to StreamingHttpResponse.
+    # If True, event_stream()'s finally block owns cleanup.
+    # If False (early validation failure), we clean up here.
+    streaming_started = False
+
+    try:
+        # Step 3 — Size check (50 MB limit)
+        file_size = os.path.getsize(temp_path)
+        if file_size > 50 * 1024 * 1024:
+            return JsonResponse(
+                {'error': f'"{file_name}" exceeds the 50 MB limit.'},
+                status=400
+            )
+
+        # Step 4 — Password protection check
+        if is_password_protected(temp_path, file_name):
+            return JsonResponse(
+                {'error': 'File rejected — password protected files are not allowed'},
+                status=400
+            )
+
+        # Step 5 — Malware scan
+        scan_result = scan_file(temp_path)
+        if scan_result is not None:
+            return JsonResponse(
+                {'error': 'File rejected — malware detected', 'detail': scan_result},
+                status=400
+            )
+
+        # Step 6 — Upload to S3
+        s3_url = upload_to_s3(temp_path, file_name)
+        if s3_url is None:
+            return JsonResponse({'error': 'Failed to upload file to S3'}, status=500)
+
+        # Step 6b — Store file bytes in cache so analyze_compliance can forward
+        #           them to the AI without another network round-trip.
+        with open(temp_path, 'rb') as f:
+            file_bytes = f.read()
+        cache.set(f'file_bytes_{file_name}', file_bytes, timeout=3600)
+
+        # Step 7 — Stream a single SSE 'uploaded' event back to the frontend.
+        #          No AI call here — analysis is deferred to the Analyse button.
+        def event_stream():
+            try:
+                yield f"data: {json.dumps({'status': 'uploaded', 's3_url': s3_url})}\n\n".encode('utf-8')
+            except Exception as e:
+                yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n".encode('utf-8')
+            finally:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+
+        streaming_started = True
+        return StreamingHttpResponse(
+            event_stream(),
+            content_type='text/event-stream',
+            headers={
+                'Cache-Control':     'no-cache',
+                'X-Accel-Buffering': 'no',
+            }
+        )
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+    finally:
+        if not streaming_started and os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+
+def _mime_type_for(file_name):
+    """Return the correct MIME type based on file extension."""
+    ext = file_name.lower().split('.')[-1]
+    return {
+        'pdf':  'application/pdf',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'txt':  'text/plain',
+    }.get(ext, 'application/octet-stream')
 
 
 # ──────────────────────────────────────────────
@@ -681,3 +1018,89 @@ def reset_password(request):
     profile.save(update_fields=["failed_login_count", "locked_until"])
 
     return JsonResponse({"detail": "Password reset successful"}, status=200)
+
+@csrf_exempt
+def upload_from_onedrive(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    file_id      = (payload.get('file_id') or '').strip()
+    access_token = (payload.get('access_token') or '').strip()
+    file_name    = (payload.get('file_name') or '').strip()
+    print(f"DEBUG onedrive → file_id='{file_id}' file_name='{file_name}' token_len={len(access_token)}")
+
+    if not file_id or not access_token or not file_name:
+        return JsonResponse({'error': 'Missing required fields'}, status=400)
+    
+    # Save the access token securely to AWS SSM
+    user_id = request.user.id if request.user.is_authenticated else 'anonymous'
+    save_oauth_token(user_id, 'onedrive', access_token)
+
+    # Validate file type
+    valid_exts = ('.pdf', '.docx', '.txt')
+    if not file_name.lower().endswith(valid_exts):
+        return JsonResponse({'error': 'Unsupported file type'}, status=400)
+
+    # Microsoft Graph download
+    download_url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_id}/content"
+
+    try:
+        response = requests.get(
+            download_url,
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=60,
+            stream=True
+        )
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({'error': str(e)}, status=502)
+
+    if response.status_code == 401:
+        return JsonResponse({'error': 'Invalid or expired token'}, status=401)
+
+    if not response.ok:
+        return JsonResponse({'error': f'Microsoft API error {response.status_code}'}, status=502)
+
+    # Save temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp:
+        for chunk in response.iter_content(chunk_size=8192):
+            tmp.write(chunk)
+        temp_path = tmp.name
+
+    try:
+        # Size check
+        if os.path.getsize(temp_path) > 50 * 1024 * 1024:
+            return JsonResponse({'error': 'File too large'}, status=400)
+
+        # Password check
+        if is_password_protected(temp_path, file_name):
+            return JsonResponse({'error': 'Password protected file'}, status=400)
+
+        # Malware scan
+        scan_result = scan_file(temp_path)
+        print(f"DEBUG scan_result='{scan_result}'")
+        if scan_result:
+            return JsonResponse({'error': 'Malware detected'}, status=400)
+
+        # Upload to S3
+        s3_url = upload_to_s3(temp_path, file_name)
+        if not s3_url:
+            return JsonResponse({'error': 'S3 upload failed'}, status=500)
+
+        # Cache file for analysis (IMPORTANT for your system)
+        with open(temp_path, 'rb') as f:
+            cache.set(f'file_bytes_{file_name}', f.read(), timeout=3600)
+
+        return JsonResponse({
+            "status":    "uploaded",
+            "s3_url":    s3_url,
+            "file_name": file_name      # ← add this
+        })
+
+    finally:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
