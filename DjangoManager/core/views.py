@@ -1036,6 +1036,10 @@ def upload_from_onedrive(request):
 
     if not file_id or not access_token or not file_name:
         return JsonResponse({'error': 'Missing required fields'}, status=400)
+    
+    # Save the access token securely to AWS SSM
+    user_id = request.user.id if request.user.is_authenticated else 'anonymous'
+    save_oauth_token(user_id, 'onedrive', access_token)
 
     # Validate file type
     valid_exts = ('.pdf', '.docx', '.txt')
