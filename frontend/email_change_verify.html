@@ -173,7 +173,7 @@
     <script src="otp_component.js"></script>
 
     <script>
-        const { createApp, reactive, ref, computed } = Vue;
+        const { createApp, reactive, ref, computed, onMounted } = Vue;
 
         const app = createApp({
             setup() {
@@ -181,6 +181,7 @@
                 const otp = ref('');
                 const isVerifying = ref(false);
                 const isResending = ref(false);
+                const isInitialSending = ref(false);
                 const message = reactive({ text: '', type: '' });
 
                 const maskedEmail = computed(() => {
@@ -194,6 +195,53 @@
                     e.preventDefault();
                     const text = (e.clipboardData || window.clipboardData).getData('text');
                     otp.value = text.replace(/\D/g, '').slice(0, 6);
+                };
+
+                // ==================== AUTO SEND OTP ON PAGE LOAD ====================
+                const sendInitialOtp = async () => {
+                    if (!newEmail.value) {
+                        message.text = "No pending email change found. Please go back to profile.";
+                        message.type = 'error';
+                        return;
+                    }
+
+                    isInitialSending.value = true;
+                    message.text = '';
+
+                    try {
+                        const res = await fetch('http://127.0.0.1:8000/api/request-email-change/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                current_email: sessionStorage.getItem('userEmail'),
+                                new_email: newEmail.value,
+                                resend: false   // First time request
+                            })
+                        });
+
+                        const data = await res.json();
+
+                        if (!res.ok) {
+                            message.text = data.detail || 'Failed to send verification code';
+                            message.type = 'error';
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Failed',
+                                text: message.text
+                            });
+                            return;
+                        }
+
+                        // Success - show success message
+                        message.text = 'Verification code sent to your new email!';
+                        message.type = 'success';
+
+                    } catch (err) {
+                        message.text = 'Network error while sending code. Please try resending.';
+                        message.type = 'error';
+                    } finally {
+                        isInitialSending.value = false;
+                    }
                 };
 
                 const verifyOtp = async () => {
@@ -316,6 +364,11 @@
                         isResending.value = false;
                     }
                 };
+
+                // Automatically send OTP when component mounts
+                onMounted(() => {
+                    sendInitialOtp();
+                });
 
                 return {
                     newEmail,
