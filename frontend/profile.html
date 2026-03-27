@@ -588,6 +588,66 @@
             cursor: not-allowed;
             transform: none;
         }
+
+        /* === Admin Access button lock for Admin Users === */
+        .action-button.locked {
+            cursor: not-allowed;
+            opacity: 0.55;
+            background-color: #d8dfe8;
+            color: #1a2845;
+            position: relative;
+        }
+
+        .action-button.locked:hover {
+            background-color: #d8dfe8;
+            color: #1a2845;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .action-button .btn-lock-icon {
+            width: 15px;
+            height: 15px;
+            fill: #8b9dc3;
+            flex-shrink: 0;
+        }
+
+        /* Access Denied Toast */
+        .access-toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: linear-gradient(135deg, #1a2845, #0d1420);
+            border: 1px solid rgba(74,143,231,0.5);
+            border-left: 4px solid #e74a4a;
+            color: #ffffff;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 14px;
+            letter-spacing: 0.3px;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+            white-space: nowrap;
+        }
+
+        .access-toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .access-toast svg {
+            width: 18px;
+            height: 18px;
+            fill: #e74a4a;
+            flex-shrink: 0;
+        }
         
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes popIn  { from { transform: scale(0.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -699,7 +759,17 @@
 
                 <!-- Profile Action Buttons -->
                 <div class="profile-actions">
-                    <button class="action-button" @click="grantAdminAccess">GRANT ADMIN ACCESS</button>
+                    <!-- GRANT ADMIN ACCESS BUTTON (Conditional) -->
+                    <button 
+                        class="action-button" 
+                        :class="{ locked: isAdmin }"
+                        @click="grantAdminAccess"
+                    >
+                        <svg v-if="isAdmin" class="btn-lock-icon" viewBox="0 0 24 24">
+                            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                        </svg>
+                        GRANT ADMIN ACCESS
+                    </button>
                     <button class="action-button delete" @click="deleteAccount">DELETE ACCOUNT</button>
                 </div>
             </div>
@@ -769,6 +839,14 @@
         <div class="wavy-background">
             <img src="img5.png" alt="Curly Line Design">
         </div>
+
+        <!-- Access Denied Toast -->
+        <div class="access-toast" :class="{ visible: toastVisible }">
+            <svg viewBox="0 0 24 24">
+                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+            </svg>
+            This feature is only available for General Users.
+        </div>
     </div>
 
     <script>
@@ -798,7 +876,14 @@
                     // Delete account modal state
                     showDeleteModal: false,
                     deleteReason: '',
-                    deletingAccount: false
+                    deletingAccount: false,
+
+                    // Toast for access denied (Admin Access button)
+                    toastVisible: false,
+                    toastTimer: null,
+
+                    // Admin access lock state
+                    isAdmin: false
                 }
             },
 
@@ -858,6 +943,8 @@
 
                         this.editedFullName = data.full_name;
                         this.editedEmail = data.email;
+
+                        this.isAdmin = (data.role || "").toLowerCase().includes("administrative");
 
                         sessionStorage.setItem('userFullName', data.full_name);
                         sessionStorage.setItem('userEmail', data.email);
@@ -1088,7 +1175,19 @@
                 },
                 // Navigates to admin access granting page
                 grantAdminAccess() {
+                    if (this.isAdmin) {
+                        this.showAccessDenied();
+                        return;
+                    }
+                    // Only General Users can proceed
                     window.location.href = 'adminaccess.html';
+                },
+                showAccessDenied() {
+                    if (this.toastTimer) clearTimeout(this.toastTimer);
+                    this.toastVisible = true;
+                    this.toastTimer = setTimeout(() => {
+                        this.toastVisible = false;
+                    }, 3500);
                 },
                 // Navigate to forgot password page
                 goToResetPassword() {
