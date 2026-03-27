@@ -2253,9 +2253,18 @@ def get_recommendations(request):
         return JsonResponse({"detail": "result_id is required"}, status=400)
 
     try:
-        analysis_result = AnalysisResult.objects.get(result_id=result_id)
+        analysis_result = AnalysisResult.objects.select_related("document").get(result_id=result_id)
     except AnalysisResult.DoesNotExist:
         return JsonResponse({"detail": "Analysis result not found"}, status=404)
+    
+    is_owner = str(analysis_result.document.user_id) == str(profile.user_id)
+    is_org_admin = (
+        profile.role == UserProfile.Role.ADMIN
+        and analysis_result.document.org_id is not None
+        and str(analysis_result.document.org_id) == str(profile.org_id)
+    )
+    if not is_owner and not is_org_admin:
+        return JsonResponse({"detail": "You do not have access to these recommendations"}, status=403)
 
     recommendations = Recommendation.objects.filter(
         result=analysis_result
@@ -2425,9 +2434,21 @@ def get_report(request, report_id):
     assert profile is not None
 
     try:
-        report = Report.objects.select_related("result").get(report_id=report_id)
+        report = Report.objects.select_related(
+            "result__document"
+        ).get(report_id=report_id)
     except Report.DoesNotExist:
         return JsonResponse({"detail": "Report not found"}, status=404)
+
+    doc = report.result.document
+    is_owner = str(doc.user_id) == str(profile.user_id)
+    is_org_admin = (
+        profile.role == UserProfile.Role.ADMIN
+        and doc.org_id is not None
+        and str(doc.org_id) == str(profile.org_id)
+    )
+    if not is_owner and not is_org_admin:
+        return JsonResponse({"detail": "You do not have access to this report"}, status=403)
     
     _record_audit_log(profile, "VIEW_REPORT", "report", report.report_id, True, request)
 
@@ -3010,31 +3031,51 @@ def get_admin_access_status(request):
 # ──────────────────────────────────────────────
 @csrf_exempt
 def download_report(request):
-    if request.method == "POST":
-        try:
-            data = json.loads(request.body)
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+        
+    # Use token auth instead of trusting email from body
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
 
-            email = data.get("email")
-            report_id = data.get("report_id")
+    # Only admins can download
+    if profile.role != UserProfile.Role.ADMIN:
+        return JsonResponse({"error": "Only administrative users can download reports"}, status=403)
 
-            if not email or not report_id:
-                return JsonResponse({"error": "Missing data"}, status=400)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-            # 🔥 THIS IS CRITICAL
-            user = UserProfile.objects.get(auth_user__email=email)
+    report_id = (data.get("report_id") or "").strip()
+    if not report_id:
+        return JsonResponse({"error": "report_id is required"}, status=400)
 
-            ReportDownload.objects.create(
-                downloaded_by=user,
-                report_id=report_id
-            )
+    # Verify the report exists and belongs to their org
+    try:
+        report = Report.objects.select_related(
+            "result__document__user__org"
+        ).get(report_id=report_id)
+    except Report.DoesNotExist:
+        return JsonResponse({"error": "Report not found"}, status=404)
 
-            return JsonResponse({"message": "Download recorded"})
+    doc = report.result.document
+    is_owner = str(doc.user_id) == str(profile.user_id)
+    is_org_admin = (
+        profile.org_id is not None
+        and str(doc.org_id) == str(profile.org_id)
+    )
+    if not is_owner and not is_org_admin:
+        return JsonResponse({"error": "You do not have access to this report"}, status=403)
 
-        except UserProfile.DoesNotExist:
-            return JsonResponse({"error": "User not found"}, status=404)
+    ReportDownload.objects.create(
+        downloaded_by=profile,
+        report_id=report_id
+    )
 
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+    _record_audit_log(profile, "DOWNLOAD_REPORT", "report", report.report_id, True, request)
+    return JsonResponse({"message": "Download recorded"})
         
 # ──────────────────────────────────────────────
 # Reports — Share
@@ -3045,42 +3086,48 @@ def share_report(request):
     if request.method != "POST":
         return JsonResponse({"error": "Invalid request"}, status=405)
 
+    # Use token auth instead of trusting email from body
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    # Only admins can share
+    if profile.role != UserProfile.Role.ADMIN:
+        return JsonResponse({"error": "Only administrative users can share reports"}, status=403)
+
     try:
         data = json.loads(request.body)
-        email = data.get("email")
-        report_id = data.get("report_id")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-        if not email or not report_id:
-            return JsonResponse({"error": "Missing fields"}, status=400)
+    report_id = (data.get("report_id") or "").strip()
+    if not report_id:
+        return JsonResponse({"error": "report_id is required"}, status=400)
 
-        # 🔹 Get user profile
-        profile = UserProfile.objects.get(auth_user__email=email)
-
-        # 🔹 Get report object (IMPORTANT FIX)
-        report = Report.objects.get(report_id=report_id)
-
-        # 🔹 Generate token
-        token = str(uuid.uuid4())
-
-        # 🔹 Create share record
-        ReportShare.objects.create(
-            report=report,                     # ✅ FIXED
-            shared_by=profile,
-            shared_with_email=email,
-            access_token=token,
-            expires_at=timezone.now() + timedelta(days=7)
-        )
-
-        return JsonResponse({
-            "message": "Report shared successfully",
-            "token": token
-        })
-
+    try:
+        report = Report.objects.select_related(
+            "result__document__user__org"
+        ).get(report_id=report_id)
     except Report.DoesNotExist:
         return JsonResponse({"error": "Report not found"}, status=404)
 
-    except UserProfile.DoesNotExist:
-        return JsonResponse({"error": "User not found"}, status=404)
+    doc = report.result.document
+    is_owner = str(doc.user_id) == str(profile.user_id)
+    is_org_admin = (
+        profile.org_id is not None
+        and str(doc.org_id) == str(profile.org_id)
+    )
+    if not is_owner and not is_org_admin:
+        return JsonResponse({"error": "You do not have access to this report"}, status=403)
 
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    token = str(uuid.uuid4())
+    ReportShare.objects.create(
+        report=report,
+        shared_by=profile,
+        shared_with_email=profile.auth_user.email,
+        access_token=token,
+        expires_at=timezone.now() + timedelta(days=7)
+    )
+
+    _record_audit_log(profile, "SHARE_REPORT", "report", report.report_id, True, request)
+    return JsonResponse({"message": "Report shared successfully", "token": token})
