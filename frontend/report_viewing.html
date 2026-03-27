@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Report Viewing</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="sidebar_component.js"></script>
     <style>
       * {
@@ -31,10 +32,7 @@
         padding: 15px 30px;
         display: flex;
         align-items: center;
-        position: fixed;       
-        top: 0;                
-        left: 0;                
-        width: 100%;            
+        position: relative;
         z-index: 100;
     }
 
@@ -186,7 +184,6 @@
         text-align: center;
         font-size: 28px;
         font-weight: bold;
-        margin-top: 55px;
         margin-bottom: 20px;
         color: #ffffff;
     }
@@ -290,7 +287,6 @@
     /* Logo */
     .logo {
         text-align: center;
-        margin-top: 55px;
         margin-bottom: 60px;
     }
 
@@ -318,206 +314,601 @@
         height: auto;
         display: block;
     }
-
-    /* Scrollbar Styling */
-    .sidebar::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .sidebar::-webkit-scrollbar-track {
-      background: #0d1420;
-    }
-
-    .sidebar::-webkit-scrollbar-thumb {
-      background: #2a4a7c;
-      border-radius: 3px;
-    }
-
-    .sidebar::-webkit-scrollbar-thumb:hover {
-      background: #4a8fe7;
-    }
     
     </style>
 </head>
 
 <body>
-    <div id="app">
+<div id="app">
 
-        <!-- Top Header -->
-        <div class="top-header">
-            <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
-            <div class="user-profile" @click="showProfile">
-                <svg viewBox="0 0 24 24">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
+  <!-- Top Header -->
+  <div class="top-header">
+      <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
+      <div class="user-profile" @click="showProfile">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
+      </div>
+  </div>
+
+  <!-- Back Arrow -->
+   <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←
+   </div>
+
+  <!-- Home Button -->
+   <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goHome">
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="#8b9dc3">
+        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+    </svg>
+  </div>
+
+  <!-- Sidebar -->
+  <cybercomply-sidebar
+      ref="sidebar"
+      :sidebar-open="sidebarOpen"
+      @toggle="sidebarOpen = !sidebarOpen"
+  ></cybercomply-sidebar>
+
+    <!-- Main Content -->
+    <div class="report-viewer" :class="{ shifted: sidebarOpen }">
+        <h2 class="report-title">{{ currentReportName || 'Select a report' }}</h2>
+        <div class="pdf-container" style="padding: 24px; overflow-y: auto;">
+            <div v-if="isGenerating" style="color:#6b7a99; text-align:center; margin-top:40px;">
+                Generating report…
             </div>
-        </div>
-
-        <!-- Back Arrow -->
-        <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←
-        </div>
-
-        <!-- Home Button -->
-        <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goHome">
-            <svg viewBox="0 0 24 24" width="30" height="30" fill="#8b9dc3">
-                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-            </svg>
-        </div>
-
-        <!-- Sidebar -->
-        <cybercomply-sidebar
-            :sidebar-open="sidebarOpen"
-            @toggle="sidebarOpen = !sidebarOpen"
-        ></cybercomply-sidebar>
-
-        <!-- Main Content -->
-        <div class="report-viewer" :class="{ shifted: sidebarOpen }">
-            <h2 class="report-title">{{ currentReport || 'Select a report' }}</h2>
-            <div class="pdf-container">
-                {{ currentReportContent || 'Please select a report from the sidebar to view its content.' }}
+            <div v-else-if="!currentSnapshot" style="color:#6b7a99; text-align:center; margin-top:40px;">
+                Please select a report from the sidebar to view its content.
             </div>
-            <p class="report-notice">Note: Reports are automatically deleted after 30 days.</p>
-        </div>
-
-        <!-- Share & Download Buttons -->
-        <div class="report-actions" :class="{ shifted: sidebarOpen }">
-
-            <!-- Download Button -->
-            <div class="action-btn-wrapper">
-                <button 
-                class="download-btn" 
-                :class="{ locked: !isAdmin }"
-                @click="isAdmin ? downloadReport() : null" 
-                title="Download Report">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
-                    <path d="M5 20h14v-2H5v2zm7-18v12l4-4h-3V2h-2v8H8l4 4z"/>
-                </svg>
-                </button>
-                <div v-if="!isAdmin" class="lock-tooltip">
-                Download option is only available for administrative users
+            <div v-else>
+                <div style="margin-bottom:16px;"><strong>File:</strong> {{ currentSnapshot.metadata?.file_analyzed || '—' }}</div>
+                <div style="margin-bottom:16px;"><strong>Company:</strong> {{ currentSnapshot.metadata?.company || '—' }}</div>
+                <div style="margin-bottom:16px;"><strong>Compliance Score:</strong> {{ currentSnapshot.compliance?.compliance_score ?? '—' }}%</div>
+                <div style="margin-bottom:16px;">
+                    <strong>Risk Level:</strong> 
+                    {{ currentSnapshot.risks?.status ? currentSnapshot.risks.status.charAt(0).toUpperCase() + currentSnapshot.risks.status.slice(1) : '—' }} </div>
+                <div v-if="currentSnapshot.risks?.factors?.length" style="margin-bottom:16px;">
+                    <strong>Risk Factors:</strong>
+                    <ul style="margin-top:8px; padding-left:20px;">
+                        <li v-for="(f, i) in currentSnapshot.risks.factors" :key="i">{{ f }}</li>
+                    </ul>
+                </div>
+                <div v-if="currentSnapshot.recommendations?.top_action" style="margin-bottom:16px;">
+                    <strong>Top Recommendation:</strong> {{ currentSnapshot.recommendations.top_action }}
+                </div>
+                <div v-if="currentSnapshot.compliance?.details?.length" style="margin-top:20px;">
+                    <strong>Compliance Details:</strong>
+                    <div v-for="(d, i) in currentSnapshot.compliance.details" :key="i"
+                         style="margin-top:12px; padding:12px; background:#1a2845; border-radius:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <strong style="color:#ffffff;">{{ d.clause }}</strong>
+                            <span style="flex-shrink:0; margin-left:12px;" :style="{ color: d.status === 'compliant' ? '#4caf50' : (d.status === 'partial' ? '#ff9800' : '#f44336') }">
+                                {{ d.status === 'compliant' ? 'Compliant' : d.status === 'non-compliant' || d.status === 'non_compliant' ? 'Non-Compliant' : d.status === 'partial' ? 'Partial' : d.status }}</span>
+                        </div>
+                        <div style="margin-top:4px; font-size:13px; color:#c5d0e6;">{{ d.reasoning }}</div>
+                        <div style="margin-top:4px; font-size:12px; color:#8b9dc3;">Risk: {{ d.risk_level ? d.risk_level.charAt(0).toUpperCase() + d.risk_level.slice(1) : '—' }} | Confidence: {{ d.confidence }}%</div>
+                    </div>
                 </div>
             </div>
-
-            <!-- Share Button -->
-            <div class="action-btn-wrapper">
-                <button 
-                class="share-btn" 
-                :class="{ locked: !isAdmin }"
-                @click="isAdmin ? shareReport() : null" 
-                title="Share Report">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
-                    <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11c.53.5 1.23.81 2.07.81 1.66 0 3-1.34 3-3S19.66 2 18 2s-3 1.34-3 3c0 .24.03.47.09.7l-7.02 4.11c-.53-.5-1.23-.81-2.07-.81-1.66 0-3 1.34-3 3s1.34 3 3 3c.84 0 1.54-.31 2.07-.81l7.13 4.16c-.06.21-.1.43-.1.65 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/>
-                </svg>
-                </button>
-                <div v-if="!isAdmin" class="lock-tooltip">
-                Share option is only available for administrative users
-                </div>
-            </div>
         </div>
-
-        <!-- Wavy Background -->
-        <div class="wavy-background">
-            <img src="img1.png" alt="Wavy Design">
-        </div> 
+        <p class="report-notice">Note: Reports are automatically deleted after 30 days.</p>
     </div>
 
-    <script>
-        const { createApp } = Vue;
+    <!-- Share & Download Buttons -->
+    <div class="report-actions" :class="{ shifted: sidebarOpen }">
 
-        const app = createApp({
-            data() {
-                return {
-                sidebarOpen: true,
-                currentReport:'',
-                currentReportContent:'',
-                isAdmin: false,
-                reportContents: {
-                        "Curtin Report": "Loading Curtin Report content... ",
-                        "IFS Report": "Loading IFS Report content...",
-                        "Pearson Report": "Loading Pearson Report content...",
-                        "Wiley Report": "Loading Wiley Report content...",
-                        "Example Report": "Loading Example Report content..."
-                    }
-                }
-            },
-            mounted() {
-                const params = new URLSearchParams(window.location.search);
-                const reportFromUrl = params.get('report');
+      <!-- Download Button -->
+      <div class="action-btn-wrapper">
+        <button 
+          class="download-btn" 
+          :class="{ locked: !isAdmin }"
+          @click="isAdmin ? downloadReport() : null" 
+          title="Download Report">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
+              <path d="M5 20h14v-2H5v2zm7-18v12l4-4h-3V2h-2v8H8l4 4z"/>
+          </svg>
+        </button>
+        <div v-if="!isAdmin" class="lock-tooltip">
+          Download option is only available for administrative users
+        </div>
+      </div>
 
-                if (reportFromUrl) {
-                this.openReport(reportFromUrl);
-                }
-            },
-            methods: {
-                toggleSidebar() {
-                this.sidebarOpen = !this.sidebarOpen;
-                },
-                showProfile() {
-                window.location.href = 'profile.html';
-                },
-                goBack() {
-                window.history.back();
-                },
-                goHome() {
-                window.location.href = 'home.html';
-                },
-                openReport(reportName) {
-                    this.currentReport = reportName;
-                    this.currentReportContent = this.reportContents[reportName] || `Loading ${reportName} content...`;
-                },
-                getReportUrl(reportName) {
-                    /* This function returns the URL of the PDF for embedding
-                    //This function is intentionally disabled because report PDFs are not yet
-                    // served by the backend. Once backend storage and access control are implemented,
-                    // uncomment and use this function to return actual report URLs.
-                    const reportMap = {
-                        "Curtin Report": "pdfs/curtin_report.pdf",
-                        "IFS Report": "pdfs/ifs_report.pdf",
-                        "Pearson Report": "pdfs/pearson_report.pdf",
-                        "Wiley Report": "pdfs/wiley_report.pdf",
-                        "Example Report": "pdfs/example_report.pdf"
-                    };*/
-                    return ""; /*reportMap[reportName] || "pdfs/placeholder.pdf";*/
-                },
-                //download
-                downloadReport() {
-                if (!this.currentReport) {
-                    alert('Please select a report first.');
-                    return;
-                }
-                const content = this.currentReportContent || "No content available";
-                const blob = new Blob([content], { type: "application/pdf" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${this.currentReport}.pdf`;
-                a.click();
-                URL.revokeObjectURL(url);
-                },
-                //share
-                shareReport() {
-                if (!this.currentReport) {
-                    alert('Please select a report first.');
-                    return;
-                }
-                const dummyUrl = `https://yourapp.com/reports/${encodeURIComponent(this.currentReport)}?token=ABC123`;
-                if (navigator.share) {
-                    navigator.share({
-                    title: this.currentReport,
-                    text: 'Check out this report!',
-                    url: dummyUrl
-                    }).then(() => console.log('Report shared successfully'))
-                    .catch(err => console.error('Share failed', err));
-                } else {
-                    navigator.clipboard.writeText(dummyUrl)
-                    .then(() => alert('Share link copied to clipboard!'))
-                    .catch(() => alert('Unable to copy link'));
-                }
-                }
-            }
+      <!-- Share Button -->
+      <div class="action-btn-wrapper">
+        <button 
+          class="share-btn" 
+          :class="{ locked: !isAdmin }"
+          @click="isAdmin ? shareReport() : null" 
+          title="Share Report">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
+            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11c.53.5 1.23.81 2.07.81 1.66 0 3-1.34 3-3S19.66 2 18 2s-3 1.34-3 3c0 .24.03.47.09.7l-7.02 4.11c-.53-.5-1.23-.81-2.07-.81-1.66 0-3 1.34-3 3s1.34 3 3 3c.84 0 1.54-.31 2.07-.81l7.13 4.16c-.06.21-.1.43-.1.65 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/>
+          </svg>
+        </button>
+        <div v-if="!isAdmin" class="lock-tooltip">
+          Share option is only available for administrative users
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Wavy Background -->
+  <div class="wavy-background">
+      <img src="img1.png" alt="Wavy Design">
+  </div> 
+
+</div>
+
+<script>
+const { createApp } = Vue;
+
+const BASE = 'http://127.0.0.1:8000/ai';
+
+const app = createApp({
+  data() {
+    return {
+      sidebarOpen: false,
+      isAdmin: false,
+      isGenerating: false,
+      currentReportName: '',
+      currentSnapshot: null
+    }
+  },
+
+  async mounted() {
+    const token = sessionStorage.getItem('authToken');
+    if (!token) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    // Resolve admin flag
+    this.isAdmin = sessionStorage.getItem('userRole') === 'ADMINISTRATIVE_USER';
+
+    const params   = new URLSearchParams(window.location.search);
+    const reportId = params.get('report_id');
+    const generate = params.get('generate');  // 'true' when coming from document_analysis
+
+    if (generate === 'true') {
+      // ── Generate a new report from the latest saved analysis result ──
+      await this.generateReport(token);
+    } else if (reportId) {
+      // ── Load an existing report chosen from the sidebar ──
+      await this.loadReport(reportId, token);
+    }
+  },
+
+  methods: {
+    showProfile() { window.location.href = 'profile.html'; },
+    goBack()      { window.history.back(); },
+    goHome()      { window.location.href = 'home.html'; },
+
+    // ── Called when arriving from "Generate Reports" on document_analysis.html ──
+    async generateReport(token) {
+      this.isGenerating = true;
+
+      // We need the result_id and its raw_output to build the snapshot
+      const resultId = sessionStorage.getItem('latestResultId');
+      if (!resultId) {
+        this.isGenerating = false;
+        return;
+      }
+
+      try {
+        // Fetch the full analysis result to get raw_output (the AI payload)
+        const resAnalysis = await fetch(`${BASE}/api/analysis/${resultId}/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
         });
-        registerSidebarComponent(app);
-        app.mount('#app');
-    </script>
+        if (!resAnalysis.ok) {
+          this.isGenerating = false;
+          return;
+        }
+        const analysis = await resAnalysis.json();
+
+        // Build snapshot — this is what gets stored in report_snapshot
+        // and later rendered in the viewer
+        const snapshot = analysis.raw_output || {};
+
+        const payload = {
+          result_id:       resultId,
+          report_snapshot: snapshot,
+          report_s3_key:   analysis.original_filename || resultId,
+          file_size:       JSON.stringify(snapshot).length,
+          expires_in_days: 30
+        };
+
+        const resGenerate = await fetch(`${BASE}/api/reports/generate/`, {
+          method:  'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!resGenerate.ok) {
+          console.error('Failed to generate report:', await resGenerate.text());
+          this.isGenerating = false;
+          return;
+        }
+
+        const generated = await resGenerate.json();
+        // Replace URL so a refresh doesn't re-generate
+        window.history.replaceState(
+          {}, '',
+          `report_viewing.html?report_id=${generated.report_id}`
+        );
+
+        // Now display it
+        await this.loadReport(generated.report_id, token);
+
+        // Tell the sidebar component to re-fetch so the new report appears immediately
+        await this.$nextTick();
+        if (this.$refs.sidebar) {
+          this.$refs.sidebar.refreshReports();
+        }
+
+      } catch (e) {
+        console.error('generateReport error:', e);
+      } finally {
+        this.isGenerating = false;
+      }
+    },
+
+    // ── Load and display an existing report by ID ──
+    async loadReport(reportId, token) {
+      try {
+        const res = await fetch(`${BASE}/api/reports/${reportId}/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        this.currentSnapshot  = data.report_snapshot;
+        // Build display name from snapshot metadata
+        const meta    = (data.report_snapshot || {}).metadata || {};
+        const company = (meta.company || '').trim();
+        const file    = (meta.file_analyzed || '').trim();
+        this.currentReportName = company ? `${company} — ${file}` : file || 'Report';
+      } catch (e) {
+        console.error('loadReport error:', e);
+      }
+    },
+
+    async downloadReport() {
+  if (!this.currentSnapshot) {
+    alert('Please select a report first.');
+    return;
+  }
+
+  try {
+    //GET report_id from URL (VERY IMPORTANT)
+    const params = new URLSearchParams(window.location.search);
+    const report_id = params.get('report_id');
+
+    if (!report_id) {
+      alert("Report ID missing.");
+      return;
+    }
+
+    //GET user email
+    const email = localStorage.getItem('email');
+
+    //CALL BACKEND (THIS FIXES YOUR DB ISSUE)
+    const res = await fetch("http://127.0.0.1:8000/api/download-report/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionStorage.getItem('authToken')}`
+      },
+      body: JSON.stringify({
+        report_id: report_id
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || "Failed to record download");
+      return;
+    }
+
+    console.log("Download recorded:", data);
+
+
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+    const snap = this.currentSnapshot;
+    const meta = snap.metadata || {};
+
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    const contentW = pageW - margin * 2;
+
+    let y = 20;
+
+    const DARK_BG = [16, 23, 38];
+    const HEADER_BG = [26, 40, 69];
+    const CARD_BG = [20, 32, 56];
+    const ACCENT = [74, 143, 231];
+    const WHITE = [255, 255, 255];
+    const LIGHT = [197, 208, 230];
+    const GREEN = [76, 175, 80];
+    const RED = [244, 67, 54];
+    const ORANGE = [255, 152, 0];
+
+    doc.setFillColor(...DARK_BG);
+    doc.rect(0, 0, pageW, pageH, 'F');
+
+    doc.setFillColor(...HEADER_BG);
+    doc.rect(0, 0, pageW, 28, 'F');
+
+    doc.setFontSize(16);
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CYBERCOMPLY', margin, 12);
+
+    doc.setFontSize(9);
+    doc.setTextColor(...LIGHT);
+    doc.setFont('helvetica', 'normal');
+    doc.text('COMPLIANCE ANALYSIS REPORT', margin, 20);
+
+    y = 36;
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...ACCENT);
+
+    const title = this.currentReportName || 'Report';
+    doc.text(title, margin, y);
+    y += 10;
+
+    doc.setDrawColor(...ACCENT);
+    doc.line(margin, y, pageW - margin, y);
+    y += 8;
+
+    const score = snap.compliance?.compliance_score ?? '—';
+    const riskStatus = snap.risks?.status
+      ? snap.risks.status.charAt(0).toUpperCase() + snap.risks.status.slice(1)
+      : '—';
+
+    doc.setFontSize(9);
+    doc.setTextColor(...LIGHT);
+
+    if (meta.company) {
+      doc.text(`Company:`, margin, y);
+      doc.setTextColor(...WHITE);
+      doc.text(meta.company, margin + 25, y);
+      y += 6;
+    }
+
+    if (meta.file_analyzed) {
+      doc.setTextColor(...LIGHT);
+      doc.text(`File:`, margin, y);
+      doc.setTextColor(...WHITE);
+      doc.text(meta.file_analyzed, margin + 25, y);
+      y += 6;
+    }
+
+    doc.setTextColor(...LIGHT);
+    doc.text(`Score:`, margin, y);
+    doc.setTextColor(...ACCENT);
+    doc.text(`${score}%`, margin + 25, y);
+
+    doc.setTextColor(...LIGHT);
+    doc.text(`Risk:`, margin + 60, y);
+    doc.setTextColor(...WHITE);
+    doc.text(riskStatus, margin + 75, y);
+    y += 10;
+
+    const factors = snap.risks?.factors || [];
+    if (factors.length) {
+      doc.setTextColor(...ACCENT);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Risk Factors', margin, y);
+      y += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...LIGHT);
+
+      factors.forEach(f => {
+        doc.text(`• ${f}`, margin + 2, y);
+        y += 5;
+      });
+
+      y += 4;
+    }
+
+    const top = snap.recommendations?.top_action;
+    if (top) {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...ACCENT);
+      doc.text('Top Recommendation', margin, y);
+      y += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...LIGHT);
+
+      const lines = doc.splitTextToSize(top, contentW);
+      lines.forEach(line => {
+        doc.text(line, margin, y);
+        y += 5;
+      });
+
+      y += 6;
+    }
+
+    const details = snap.compliance?.details || [];
+
+    if (details.length) {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...ACCENT);
+      doc.text('Compliance Details', margin, y);
+      y += 8;
+
+      details.forEach(d => {
+        const textLines = doc.splitTextToSize(d.reasoning, contentW - 6);
+        const cardHeight = 20 + textLines.length * 5;
+
+        doc.setFillColor(...CARD_BG);
+        doc.roundedRect(margin, y - 4, contentW, cardHeight, 3, 3, 'F');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...WHITE);
+
+        doc.text(d.clause, margin + 3, y + 2);
+
+        let color = RED;
+        if (d.status === 'compliant') color = GREEN;
+        else if (d.status === 'partial') color = ORANGE;
+
+        doc.setTextColor(...color);
+        doc.text(
+          d.status === 'compliant' ? 'Compliant' :
+          d.status === 'partial' ? 'Partial' :
+          'Non-Compliant',
+          pageW - margin - 3,
+          y + 2,
+          { align: 'right' }
+        );
+
+        y += 6;
+
+        doc.setFontSize(8);
+        doc.setTextColor(...LIGHT);
+        doc.text(
+          `Risk: ${d.risk_level || '—'}   Confidence: ${d.confidence}%`,
+          margin + 3,
+          y
+        );
+        y += 5;
+
+        textLines.forEach(line => {
+          doc.text(line, margin + 3, y);
+          y += 4.5;
+        });
+
+        y += 6;
+      });
+    }
+
+    doc.save(`${this.currentReportName || 'report'}.pdf`);
+
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong.");
+  }
+},
+    toggleSidebar() {
+      this.sidebarOpen = !this.sidebarOpen;
+    },
+    toggleSearch() {
+      this.searchActive = !this.searchActive;
+      if (!this.searchActive) {
+          this.searchQuery = '';
+          this.filterReports();
+      }
+    },
+    showProfile() {
+      window.location.href = 'profile.html';
+    },
+    goBack() {
+      window.history.back();
+    },
+    goHome() {
+      window.location.href = 'home.html';
+    },
+    filterReports() {
+      const query = this.searchQuery.toLowerCase();
+      if (query === '') {
+          this.filteredLast7Days = [...this.last7Days];
+          this.filteredLast30Days = [...this.last30Days];
+      } else {
+          this.filteredLast7Days = this.last7Days.filter(r => r.display_name.toLowerCase().includes(query));
+          this.filteredLast30Days = this.last30Days.filter(r => r.display_name.toLowerCase().includes(query));
+      }
+    },
+    async openReport(report) {
+      this.currentReport = report.display_name;
+      this.currentSnapshot = null;
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/api/reports/${report.report_id}/`, {
+          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('authToken')}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        this.currentSnapshot = data.report_snapshot;
+      } catch (e) {
+        console.error('Failed to load report:', e);
+      }
+    },
+ 
+    //share
+    async shareReport() {
+      if (!this.currentSnapshot) {
+        alert('Please select a report first.');
+        return;
+      }
+
+      try {
+
+        // 🔹 Get report_id from URL
+        const params = new URLSearchParams(window.location.search);
+        const reportId = params.get('report_id');
+
+        if (!reportId) {
+          alert("Report ID not found.");
+          return;
+        }
+
+        // 🔥 CALL BACKEND
+        const res = await fetch("http://127.0.0.1:8000/api/share-report/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${sessionStorage.getItem('authToken')}`
+          },
+          body: JSON.stringify({
+            report_id: reportId
+          })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert(data.error || "Failed to share report");
+          return;
+        }
+
+        console.log("Share recorded:", data);
+
+        // 🔹 Build secure share URL using token
+        const shareUrl = `${window.location.origin}/report_viewing.html?token=${data.token}`;
+
+        // 🔹 Share
+        if (navigator.share) {
+          navigator.share({
+            title: this.currentReportName,
+            text: 'Check out this compliance report!',
+            url: shareUrl
+          }).catch(err => console.error('Share failed', err));
+        } else {
+          navigator.clipboard.writeText(shareUrl)
+            .then(() => alert('Secure share link copied to clipboard!'))
+            .catch(() => alert('Unable to copy link'));
+        }
+
+      } catch (error) {
+        console.error("Share error:", error);
+        alert("Something went wrong.");
+      }
+    }
+  }
+});
+
+registerSidebarComponent(app);
+app.mount('#app');
+</script>
+
 </body>
 </html>

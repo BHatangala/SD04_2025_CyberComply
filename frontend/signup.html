@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Create New Account</title>
   <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     * { box-sizing: border-box; }
 
@@ -16,9 +17,6 @@
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      padding: 24px;
-      overflow-x: hidden;
-      position: relative;
     }
 
     .container {
@@ -40,18 +38,19 @@
 
     input, select {
       width: 100%;
-      padding: 10px;
-      background-color: #234561;
-      border: 1px solid #90a0b5;
-      color: #fff;
-      border-radius: 4px;
+      padding: 12px;
+      background-color: #0F3456;
+      border: 1px solid #2563EB;
+      color: #E2E8F0;
+      border-radius: 6px;
       margin-top: 5px;
+      font-size: 14px;
+      transition: all 0.3s ease;
     }
 
     input::placeholder {
-      color: #d1d5db;
-      opacity: 1;
-    }  
+      color: #94a3b8;
+    }
 
     .note {
       font-size: 12px;
@@ -60,7 +59,7 @@
 
     .error {
       color: #ff6b6b;
-    }
+    }    
 
     button {
       margin-top: 20px;
@@ -148,8 +147,7 @@
       justify-content: center;
       align-items: center;
       padding: 20px;
-      z-index: 50;
-      backdrop-filter: blur(4px);
+      animation: fadeIn 0.25s ease;
     }
 
     .modal-content {
@@ -212,6 +210,183 @@
       color: #f9fafb;
     }
 
+    /* Real-time password rules styling */
+    .password-rules {
+      margin-top: 8px;
+      padding: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(169,199,255,0.15);
+      border-radius: 4px;
+    }
+
+    .password-wrapper {
+      position: relative;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      font-size: 16px;
+      color: #cbd5e1;
+    }
+
+    /* Hover effect */
+    .toggle-password:hover {
+      color: #ffffff;
+    }
+
+    /* Click effect */
+    .toggle-password:active {
+      transform: translateY(-50%) scale(0.95);
+    }
+
+    /* Keyboard focus (accessibility) */
+    .toggle-password:focus {
+      outline: none;
+      color: #a9c7ff;
+    }
+
+    .password-wrapper input {
+      padding-right: 55px;
+    }
+
+    .rule-item {
+      font-size: 12px;
+      margin-bottom: 6px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      transition: color 0.2s ease;
+    }
+
+    .rule-item.valid {
+      color: #159544;
+    }
+
+    .rule-item.invalid {
+      color: #c13333;
+    }
+
+    /* Password rule icons */
+    .rule-item span {
+      font-weight: bold;
+      width: 18px;
+      text-align: center;
+    }
+
+    /* Green tick */
+    .rule-item.valid span {
+      color: #159544;
+    }
+
+    /* Red cross */
+    .rule-item.invalid span {
+      color: #c13333;
+    }
+
+    /* Input focus effect */
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #60A5FA;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    }
+
+    /* Button hover effect */
+    button:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+      transition: all 0.2s ease;
+    }   
+    
+    /* Disabled button style */
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }  
+
+    .success-modal-content {
+      line-height: 1.6;
+      background: #234561;
+      color: #f0f4ff;
+      padding: 24px 20px;
+      width: 100%;
+      max-width: 360px;
+      border-radius: 10px;
+      text-align: center;
+      border: 1px solid #90a0b5;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      animation: popIn 0.25s ease;
+    }
+
+    .success-modal-content h3 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      color: #ffffff;
+    }
+
+    .success-modal-content p {
+      margin: 0;
+      font-size: 14px;
+      color: #e6eef7;
+      line-height: 1.5;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0 }
+      to { opacity: 1 }
+    }
+
+    @keyframes popIn {
+      from {
+        transform: scale(0.9);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    /* Page entry animations */
+    .page-enter {
+      opacity: 0;
+    }
+
+    .enter-from-right {
+      animation: slideFromRight 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .enter-from-left {
+      animation: slideFromLeft 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    @keyframes slideFromRight {
+      from {
+        opacity: 0;
+        transform: translateX(22px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes slideFromLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-22px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }    
+
     .modal-subtitle {
       margin-top: 6px;
       color: #e0e3e9;
@@ -252,7 +427,7 @@
       margin-bottom: 6px;
       font-size: 14px;
       line-height: 1.6;
-    }    
+    }
 
     .scroll-notice {
       margin-top: 14px;
@@ -266,9 +441,9 @@
     }
 
     .scroll-notice.ready {
-      background: rgba(162, 184, 200, 0.15);   
+      background: rgba(162, 184, 200, 0.15);
       border: 1px solid rgba(162, 184, 200, 0.35);
-      color: #e2e8f0;                          
+      color: #e2e8f0;
       font-weight: 500;
       border-radius: 10px;
     }
@@ -284,28 +459,11 @@
       flex-wrap: wrap;
     }
 
-    .modal-footer-text {
-      font-size: 12px;
-      color: #475569;
-      line-height: 1.5;
-      flex: 1;
-      min-width: 220px;
-    }
-
     .modal-footer button {
       margin-top: 0;
       width: auto;
       min-width: 140px;
       padding: 10px 18px;
-    }
-
-    .secondary-btn {
-      background: #e2e8f0;
-      color: #0f172a;
-    }
-
-    .secondary-btn:hover {
-      opacity: 0.95;
     }
 
     .primary-btn {
@@ -332,36 +490,6 @@
       cursor: not-allowed;
     }
 
-    @media (max-width: 600px) {
-      body {
-        padding: 16px;
-        align-items: flex-start;
-      }
-
-      .container {
-        padding: 22px 18px;
-        max-width: 100%;
-      }
-
-      h1 {
-        font-size: 28px;
-      }
-
-      .modal-content {
-        max-height: 88vh;
-      }
-
-      .modal-header,
-      .modal-body,
-      .modal-footer {
-        padding-left: 16px;
-        padding-right: 16px;
-      }
-
-      .wave-right {
-        width: 90%;
-      }
-    }    
   </style>
 </head>
 
@@ -375,57 +503,122 @@
     </div>
 
     <div class="form-group">
-      <label>NAME</label>
-      <input type="text" v-model="form.name" placeholder="Enter your full name">
+      <label for="name">NAME</label>
+      <input id="name" type="text" v-model="form.name" placeholder="Enter your full name">
       <div class="note error" v-if="errors.name">{{ errors.name }}</div>
     </div>
 
     <div class="form-group">
-      <label>EMAIL</label>
-      <input type="email" v-model="form.email" placeholder="Enter your email">
+      <label for="email">EMAIL</label>
+      <input id="email" type="email" v-model="form.email" placeholder="Enter your email address">
       <div class="note error" v-if="errors.email">{{ errors.email }}</div>
     </div>
 
     <div class="form-group">
-      <label>PASSWORD</label>
-      <input type="password" v-model="form.password" placeholder="Create a secure password">
-      <div class="note error" v-if="errors.password">{{ errors.password }}</div>      
-    </div>
+      <label for="password">PASSWORD</label>
+      
+      <div class="password-wrapper">
+        <input
+          id="password"
+          :type="showPassword ? 'text' : 'password'"
+          v-model="form.password"
+          placeholder="Create a secure password"
+        >
+
+        <span class="toggle-password" @click="showPassword = !showPassword">
+          <i :class="showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+        </span>
+      </div>
+      <div class="note error" v-if="errors.password">{{ errors.password }}</div>
+
+      <!-- Real-time password requirement checks -->
+      <div class="password-rules" v-if="form.password.length > 0 && !allPasswordRulesValid">
+        
+        <div :class="['rule-item', passwordChecks.length ? 'valid' : 'invalid']">
+          <span>{{ passwordChecks.length ? '✓' : '✗' }}</span>
+          At least 8 characters
+        </div>
+
+        <div :class="['rule-item', passwordChecks.uppercase ? 'valid' : 'invalid']">
+          <span>{{ passwordChecks.uppercase ? '✓' : '✗' }}</span>
+          1 uppercase letter
+        </div>
+
+        <div :class="['rule-item', passwordChecks.digit ? 'valid' : 'invalid']">
+          <span>{{ passwordChecks.digit ? '✓' : '✗' }}</span>
+          1 digit
+        </div>
+
+        <div :class="['rule-item', passwordChecks.special ? 'valid' : 'invalid']">
+          <span>{{ passwordChecks.special ? '✓' : '✗' }}</span>
+          1 special character
+        </div>
+      </div>
+    </div>    
 
     <div class="form-group" v-if="form.password.length > 0">
-      <label>CONFIRM PASSWORD</label>
-      <input type="password" v-model="form.confirmPassword" placeholder="Retype your password">
-      <div class="note error" v-if="errors.confirmPassword">{{ errors.confirmPassword }}</div>
+      <label for="confirmPassword">CONFIRM PASSWORD</label>
+      
+      <div class="password-wrapper">
+        <input
+          id="confirmPassword"
+          :type="showConfirmPassword ? 'text' : 'password'"
+          v-model="form.confirmPassword"
+          placeholder="Retype your password"
+        >
+
+        <span class="toggle-password" @click="showConfirmPassword = !showConfirmPassword">
+          <i :class="showConfirmPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+        </span>
+      </div>
+
+      <div class="password-rules" v-if="form.confirmPassword.length > 0">
+        <div :class="['rule-item', passwordMatch ? 'valid' : 'invalid']">
+          <span>{{ passwordMatch ? '✓' : '✗' }}</span>
+          {{ passwordMatch ? "Passwords match" : "Passwords do not match" }}
+        </div>  
+      </div>
+
+      <div class="note error" v-if="submitted && errors.confirmPassword">
+        {{ errors.confirmPassword }}
+      </div>
     </div>
 
     <div class="form-group">
-      <label>ROLE</label>
-      <select v-model="form.role">
+      <label for="role">ROLE</label>
+      <select id="role" v-model="form.role">
         <option disabled value="">Select</option>
         <option>General user</option>
         <option>Administrative user</option>
       </select>
+
+      <!-- Role explanation note -->
+      <div class="note" v-if="form.role === 'Administrative user'">
+        Administrative access requires organization email verification.
+      </div>
+
+      <!-- Role validation error -->
       <div class="note error" v-if="errors.role">{{ errors.role }}</div>      
     </div>
 
     <div class="form-group">
-        <label class="terms-label">
-          <input
-            type="checkbox"
-            v-model="form.terms"
-          >
-          <span>
-            I have read and agree to the
-            <a href="#" @click.prevent="openTermsModal" class="terms-link">
-              Terms &amp; Conditions
-            </a>
-          </span>
-        </label>
-
-      <div class="note error" v-if="errors.terms">{{ errors.terms }}</div>
+      <label class="terms-label" for="terms">
+        <input id="terms" type="checkbox" v-model="form.terms">
+        <span>
+          I accept the
+          <a href="#" @click.prevent="openTermsModal" style="color:#a2b8c8;">
+            Terms & Conditions
+          </a>
+        </span>
+      </label>
+      <div class="note error" v-if="errors.terms">
+        {{ errors.terms }}
+      </div>
     </div>
 
-    <button @click="submitForm">Sign Up</button>
+    <button @click="submitForm" :disabled="loading">
+      {{ loading ? "Creating Account..." : "Sign Up" }}
+    </button>
 
     <img src="img2.png" alt="Wave design right" class="wave-right">
 
@@ -582,6 +775,14 @@
         </div>
       </div>
     </div>
+
+    <!-- Success Popup -->
+    <div v-if="showSuccessPopup" class="modal">
+      <div class="success-modal-content">
+        <h3>Account Created</h3>
+        <p>Your account has been created successfully. Redirecting to login...</p>
+      </div>
+    </div>  
   </div>
 
   <script>
@@ -591,6 +792,12 @@
         showTerms: false,
         termsRead: false,
         termsScrolledToBottom: false,
+        showSuccessPopup: false, 
+        loading: false,
+        submitted: false, 
+        
+        showPassword: false,
+        showConfirmPassword: false,
 
         form: {
           name: '',
@@ -602,26 +809,70 @@
         },
         errors: {}
       },
+
+      // Real-time password checks while typing
+      computed: {
+        passwordChecks() {
+          const password = this.form.password || "";
+          return {
+            length: password.length >= 8,
+            uppercase: /[A-Z]/.test(password),
+            digit: /\d/.test(password),
+            special: /[!@#$%^&*(),.?":{}|<>_\-\\[\]\/`~+=;']/.test(password)
+          };
+        },
+
+        // Check if all password rules are satisfied
+        allPasswordRulesValid() {
+          const c = this.passwordChecks;
+          return c.length && c.uppercase && c.digit && c.special;
+        },
+        
+        passwordMatch() {
+          return this.form.password.length > 0 &&
+            this.form.confirmPassword.length > 0 &&
+            this.form.password === this.form.confirmPassword;
+        }  
+      },
+
       methods: {
         validateEmail(email) {
           const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           return regex.test(email);
         },
 
-        validatePassword(password) {
-          const regex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-\\[\]\/`~+=;']).{8,}$/;
-          return regex.test(password);
+        // Full name validation matching backend expectations
+        validateFullName(name) {
+          const trimmed = name.trim();
+          const normalized = trimmed.replace(/\s+/g, ' ');
+          const regex = /^[A-Za-z'-]+(?:\s[A-Za-z'-]+)+$/;
+
+          if (!trimmed) {
+            return "Full name is required.";
+          }
+
+          if (normalized.length < 3) {
+            return "Please enter your full name (first and last name).";
+          }
+
+          if (!regex.test(normalized)) {
+            return "Please enter your full name (first and last name).";
+          }
+
+          const parts = normalized.split(' ');
+          if (parts.some(part => part.length < 2)) {
+            return "Please enter your full name (first and last name).";
+          }
+
+          return null;
         },
 
         openTermsModal() {
           this.showTerms = true;
           this.termsScrolledToBottom = false;
-
           this.$nextTick(() => {
             const box = this.$refs.termsScrollBox;
-            if (box) {
-              box.scrollTop = 0;
-            }
+            if (box) box.scrollTop = 0;
           });
         },
 
@@ -632,11 +883,9 @@
         handleTermsScroll() {
           const box = this.$refs.termsScrollBox;
           if (!box) return;
-
           const threshold = 10;
           const reachedBottom =
             box.scrollTop + box.clientHeight >= box.scrollHeight - threshold;
-
           if (reachedBottom) {
             this.termsScrolledToBottom = true;
           }
@@ -644,34 +893,50 @@
 
         acceptTermsFromModal() {
           if (!this.termsScrolledToBottom) return;
-
           this.termsRead = true;
           this.form.terms = true;
           this.showTerms = false;
-        },       
+        },
 
         async submitForm() {
+          if (this.loading) return;
+
           this.errors = {};
+          this.showSuccessPopup = false;
+          this.submitted = true;
 
-          if (!this.form.name.trim()) {
-            this.errors.name = "Name is required.";
+          const trimmedEmail = this.form.email.trim().toLowerCase();
+
+          // Full name validation
+          const nameError = this.validateFullName(this.form.name);
+          if (nameError) {
+            this.errors.name = nameError;
           }
 
-          if (!this.validateEmail(this.form.email)) {
-            this.errors.email = "Invalid email format.";
+          if (!this.validateEmail(trimmedEmail)) {
+            this.errors.email = "Please enter a valid email address.";
           }
 
-          if (!this.validatePassword(this.form.password)) {
+          if (!this.form.password) {
+            this.errors.password = "Password is required.";
+          } else if (
+            !this.passwordChecks.length ||
+            !this.passwordChecks.uppercase ||
+            !this.passwordChecks.digit ||
+            !this.passwordChecks.special
+          ) {
             this.errors.password =
               "Password must contain at least 8 characters with a minimum of 1 uppercase letter, 1 digit and 1 special character.";
           }
 
+          // Better confirm password validation
           if (!this.form.confirmPassword) {
             this.errors.confirmPassword = "Please confirm your password.";
           } else if (this.form.password !== this.form.confirmPassword) {
             this.errors.confirmPassword = "Passwords do not match.";
           }
 
+          // Role validation
           if (!this.form.role) {
             this.errors.role = "Please select a role.";
           }
@@ -684,14 +949,16 @@
 
           if (Object.keys(this.errors).length === 0) {
             try {
+              // Start loading state
+              this.loading = true;
               const response = await fetch("http://127.0.0.1:8000/api/signup/", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                  name: this.form.name,
-                  email: this.form.email,
+                  name: this.form.name.trim().replace(/\s+/g, ' '),
+                  email: trimmedEmail,
                   password: this.form.password,
                   role: this.form.role
                 })
@@ -699,27 +966,61 @@
 
               const data = await response.json();
 
+              // Improved backend error handling
               if (!response.ok) {
                 if (response.status === 409) {
                   this.errors.email = "This email is already registered. Please use a different email.";
                   this.form.password = "";
                   this.form.confirmPassword = "";
-                } else {
+                } else if (response.status === 400) {
+                  if ((data.detail || "").toLowerCase().includes("name")) {
+                    this.errors.name = data.detail;
+                  } else if ((data.detail || "").toLowerCase().includes("email")) {
+                    this.errors.email = data.detail;
+                  } else if ((data.detail || "").toLowerCase().includes("password")) {
+                    this.errors.password = data.detail;
+                  } else if ((data.detail || "").toLowerCase().includes("role")) {
+                    this.errors.role = data.detail;
+                  } else {
+                    this.errors.email = data.detail || "Signup failed. Please try again.";
+                  }
+                } else if (response.status === 500) {
                   this.errors.email = data.detail || "Signup failed. Please try again.";
+                } else {
+                  this.errors.email = "Signup failed. Please try again.";
                 }
                 return;
               }
 
-              alert("Account created successfully!");
-              window.location.href = "login.html";
+              this.submitted = false;
+              this.showSuccessPopup = true;
+
+              setTimeout(() => {
+                window.location.href = "login.html";
+              }, 2000);
 
             } catch (error) {
-              alert("Cannot connect to backend server.");
+              this.errors.email = "Cannot connect to backend server.";
+            } finally {
+              // Stop loading state
+              this.loading = false;
             }
           }
         }
       }
     });
+  </script>
+  <script>
+    const direction = sessionStorage.getItem("navDirection");
+    const body = document.body;
+
+    if (direction === "left") {
+      body.classList.add("page-enter", "enter-from-left");
+    } else if (direction === "right") {
+      body.classList.add("page-enter", "enter-from-right");
+    }
+
+    sessionStorage.removeItem("navDirection");
   </script>
 </body>
 </html>
