@@ -1035,7 +1035,7 @@
                     </div>
 
                     <!-- Microsoft OneDrive -->
-                    <div class="source-btn" @click.stop="showIntegrationModal('Microsoft OneDrive')">
+                    <div class="source-btn" @click.stop="initOneDrivePicker()">
                         <div class="source-icon">
                             <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                                 <path fill="#0364B8" d="M28.087 16.502l-.665-.386A11.047 11.047 0 0 0 21.8 14.5C15.592 14.5 10.5 19.444 10.5 25.524c0 .18.007.36.018.538l.039.66-.588.276A7.44 7.44 0 0 0 6.5 33.5c0 4.136 3.364 7.5 7.5 7.5h26c3.866 0 7-3.134 7-7 0-3.445-2.494-6.37-5.876-6.916l-.553-.088-.164-.535a11.01 11.01 0 0 0-2.32-4.459z"/>
@@ -1244,6 +1244,9 @@
     const GOOGLE_CLIENT_ID = '813213515196-8jl2875doj2uci86dgipqv7j95p96e1i.apps.googleusercontent.com';
     const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 
+    const MS_CLIENT_ID = "fe3d792d-14b8-4029-a825-0dc2063a8ead";
+    const MS_SCOPE = "Files.Read User.Read";
+
     const { createApp } = Vue;
 
     createApp({
@@ -1302,7 +1305,8 @@
 
                 // ── Google Drive state ──
                 googleAccessToken: null,   // OAuth token, held only for current session
-                pickerApiLoaded: false     // tracks whether gapi picker is ready
+                pickerApiLoaded: false,    // tracks whether gapi picker is ready
+                microsoftAccessToken: null
             };
         },
 
@@ -1332,9 +1336,20 @@
         },
 
         mounted() {
+            this.captureOneDriveToken();
             this.filteredLast7Days  = [...this.last7Days];
             this.filteredLast30Days = [...this.last30Days];
-            document.addEventListener('click', this.closeAllDropdowns);
+            if (window.location.hash.includes("access_token")) {
+                const params = new URLSearchParams(window.location.hash.substring(1));
+                const token = params.get("access_token");
+
+            if (token) {
+                this.microsoftAccessToken = token;
+                this.openOneDrivePicker();
+            }
+        }
+
+    document.addEventListener('click', this.closeAllDropdowns);
         },
 
         beforeUnmount() {
@@ -1877,6 +1892,342 @@
                         ? `Could not reach the server while uploading "${fileObj.name}" from Google Drive. Please check your connection and try again.`
                         : `"${fileObj.name}" (Google Drive) was rejected — ${error.message}`;
                     this.errorMessages.push(reason);
+                }
+            },
+            // ── OneDrive Integration ──
+            captureOneDriveToken() {
+                const hash = window.location.hash;
+                if (hash.includes('access_token')) {
+                    const params = new URLSearchParams(hash.substring(1));
+                    const token = params.get('access_token');
+                    if (token) {
+                        this.microsoftAccessToken = token;
+                        history.replaceState(null, '', window.location.pathname);
+                        this.openOneDrivePicker();
+                    }
+                }
+            },
+
+            // Step 1: Start OAuth login
+            initOneDrivePicker() {
+                const REDIRECT_URI = "http://localhost:5500/frontend/home.html";
+                const authUrl =
+                    `https://login.microsoftonline.com/common/oauth2/v2.0/authorize` +
+                    `?client_id=${MS_CLIENT_ID}` +
+                    `&response_type=token` +
+                    `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+                    `&response_mode=fragment` +
+                    `&scope=Files.Read%20User.Read`; // ← added onedrive.readonly
+
+                window.location.href = authUrl;
+            },
+
+            // Step 2: Fetch files from OneDrive
+            openOneDrivePicker() {
+                const vueApp = this;
+                let selected = null;
+                let currentView = 'grid';
+
+                const icons = {
+                    pdf:  { bg: '#fce4e4', color: '#c0392b', label: 'PDF' },
+                    docx: { bg: '#e3f0fb', color: '#1565c0', label: 'DOC' },
+                    txt:  { bg: '#f3f3f3', color: '#555555', label: 'TXT' },
+                };
+
+                function fileIcon(type) {
+                    const ic = icons[type] || icons.txt;
+                    return `<div style="width:44px;height:52px;background:${ic.bg};border-radius:4px;display:flex;align-items:center;justify-content:center;border:0.5px solid ${ic.color}44;">
+                                <span style="font-size:10px;font-weight:600;color:${ic.color};">${ic.label}</span>
+                            </div>`;
+                }
+
+                function getFileType(name) {
+                    if (name.endsWith('.pdf'))  return 'pdf';
+                    if (name.endsWith('.docx')) return 'docx';
+                    if (name.endsWith('.txt'))  return 'txt';
+                    return 'txt';
+                }
+
+                function formatSize(bytes) {
+                    if (!bytes) return '—';
+                    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+                    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                }
+
+                function formatDate(dateStr) {
+                    if (!dateStr) return '—';
+                    const d = new Date(dateStr);
+                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }
+
+                // ── Build modal shell ──
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position:fixed; inset:0;
+                    background:rgba(0,0,0,0.6);
+                    display:flex; align-items:center; justify-content:center;
+                    z-index:9999;
+                `;
+
+                overlay.innerHTML = `
+                    <div style="background:#ffffff; border-radius:8px; width:640px; max-width:95vw;
+                                box-shadow:0 8px 32px rgba(0,0,0,0.3); overflow:hidden; display:flex; flex-direction:column;">
+
+                        <!-- Header -->
+                        <div style="background:#0078d4; padding:12px 16px; display:flex; align-items:center; gap:10px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                                <path d="M19.34 10.27A5.48 5.48 0 0 0 14 6.5a5.5 5.5 0 0 0-5.13 3.55A4 4 0 0 0 4.5 14a4 4 0 0 0 4 4h10.5a3.5 3.5 0 0 0 .34-6.73z"/>
+                            </svg>
+                            <span style="color:white; font-size:14px; font-weight:600;">OneDrive</span>
+                            <div style="margin-left:auto; display:flex; gap:12px; align-items:center;">
+                                <svg id="od-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="white" style="cursor:pointer; opacity:0.85;">
+                                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+                                </svg>
+                                <svg id="od-close-btn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" style="cursor:pointer; opacity:0.85;">
+                                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- Breadcrumb + view toggle -->
+                        <div style="display:flex; align-items:center; gap:8px; padding:10px 16px;
+                                    border-bottom:1px solid #e5e5e5; background:#fafafa;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2">
+                                <polyline points="3 9 12 3 21 9"/><polyline points="9 22 9 12 15 12 15 22"/>
+                            </svg>
+                            <span style="font-size:13px; color:#444;">My files</span>
+                            <div style="margin-left:auto; display:flex; gap:4px;">
+                                <div id="od-view-grid" style="padding:5px 7px; border-radius:4px; cursor:pointer; background:#e3f0fb;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="#0078d4">
+                                        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                                        <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                                    </svg>
+                                </div>
+                                <div id="od-view-list" style="padding:5px 7px; border-radius:4px; cursor:pointer;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2">
+                                        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+                                        <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+                                        <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- File area -->
+                        <div style="padding:16px; min-height:280px; max-height:380px; overflow-y:auto; background:#fff;">
+                            <div id="od-grid-view" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px;"></div>
+                            <div id="od-list-view" style="display:none; flex-direction:column; gap:2px;">
+                                <div style="display:grid; grid-template-columns:1fr 80px 100px; padding:6px 10px;
+                                            font-size:12px; color:#888; border-bottom:1px solid #eee; margin-bottom:4px;">
+                                    <span>Name</span><span style="text-align:right;">Size</span><span style="text-align:right;">Modified</span>
+                                </div>
+                            </div>
+                            <div id="od-loading" style="display:flex; align-items:center; justify-content:center;
+                                                        height:200px; color:#888; font-size:13px;">
+                                Loading your files...
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div style="display:flex; align-items:center; justify-content:space-between;
+                                    padding:12px 16px; border-top:1px solid #e5e5e5; background:#fafafa;">
+                            <span id="od-selected-label" style="font-size:13px; color:#888;">No file selected</span>
+                            <div style="display:flex; gap:8px;">
+                                <button id="od-cancel-btn"
+                                    style="padding:6px 20px; font-size:13px; border-radius:4px;
+                                        border:1px solid #ccc; background:#fff; color:#333; cursor:pointer;">
+                                    Cancel
+                                </button>
+                                <button id="od-open-btn" disabled
+                                    style="padding:6px 20px; font-size:13px; border-radius:4px;
+                                        border:none; background:#0078d4; color:white;
+                                        cursor:not-allowed; opacity:0.4;">
+                                    Open
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(overlay);
+
+                // ── Wire up close/cancel ──
+                const closeModal = () => document.body.removeChild(overlay);
+                overlay.querySelector('#od-close-btn').onclick = closeModal;
+                overlay.querySelector('#od-cancel-btn').onclick = closeModal;
+                overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+
+                // ── Grid / list toggle ──
+                overlay.querySelector('#od-view-grid').onclick = () => {
+                    currentView = 'grid';
+                    overlay.querySelector('#od-grid-view').style.display = 'grid';
+                    overlay.querySelector('#od-list-view').style.display = 'none';
+                    overlay.querySelector('#od-view-grid').style.background = '#e3f0fb';
+                    overlay.querySelector('#od-view-list').style.background = 'transparent';
+                };
+                overlay.querySelector('#od-view-list').onclick = () => {
+                    currentView = 'list';
+                    overlay.querySelector('#od-grid-view').style.display = 'none';
+                    overlay.querySelector('#od-list-view').style.display = 'flex';
+                    overlay.querySelector('#od-view-grid').style.background = 'transparent';
+                    overlay.querySelector('#od-view-list').style.background = '#e3f0fb';
+                };
+
+                // ── Open button ──
+                overlay.querySelector('#od-open-btn').onclick = () => {
+                    if (!selected) return;
+                    closeModal();
+                    vueApp.uploadFromOneDrive({
+                        id:   selected.id,
+                        name: selected.name,
+                        size: selected.size
+                    });
+                };
+
+                // ── Fetch files from Microsoft Graph ──
+                fetch("https://graph.microsoft.com/v1.0/me/drive/root/children", {
+                    headers: { Authorization: `Bearer ${this.microsoftAccessToken}` }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    overlay.querySelector('#od-loading').style.display = 'none';
+
+                    const validExts = ['.pdf', '.docx', '.txt'];
+                    const files = (data.value || []).filter(f =>
+                        validExts.some(ext => f.name.toLowerCase().endsWith(ext))
+                    );
+
+                    if (files.length === 0) {
+                        overlay.querySelector('#od-loading').style.display = 'flex';
+                        overlay.querySelector('#od-loading').textContent = 'No supported files (PDF, DOCX, TXT) found.';
+                        return;
+                    }
+
+                    // ── Render grid ──
+                    const gridView = overlay.querySelector('#od-grid-view');
+                    gridView.innerHTML = files.map((f, i) => `
+                        <div class="od-file-item" data-index="${i}"
+                            style="padding:10px 8px; border-radius:6px; cursor:pointer;
+                                display:flex; flex-direction:column; align-items:center;
+                                gap:8px; border:1.5px solid transparent; text-align:center;">
+                            ${fileIcon(getFileType(f.name))}
+                            <span style="font-size:11px; color:#333; line-height:1.3; word-break:break-word;">
+                                ${f.name}
+                            </span>
+                        </div>
+                    `).join('');
+
+                    // ── Render list ──
+                    const listView = overlay.querySelector('#od-list-view');
+                    files.forEach((f, i) => {
+                        const row = document.createElement('div');
+                        row.className = 'od-file-item';
+                        row.dataset.index = i;
+                        row.style.cssText = `display:grid; grid-template-columns:1fr 80px 100px;
+                            padding:8px 10px; border-radius:6px; cursor:pointer;
+                            align-items:center; gap:8px; border:1.5px solid transparent;`;
+                        row.innerHTML = `
+                            <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+                                ${fileIcon(getFileType(f.name))}
+                                <span style="font-size:13px; color:#333; white-space:nowrap;
+                                            overflow:hidden; text-overflow:ellipsis;">${f.name}</span>
+                            </div>
+                            <span style="font-size:12px; color:#888; text-align:right;">
+                                ${formatSize(f.size)}
+                            </span>
+                            <span style="font-size:12px; color:#888; text-align:right;">
+                                ${formatDate(f.lastModifiedDateTime)}
+                            </span>
+                        `;
+                        listView.appendChild(row);
+                    });
+
+                    // ── Selection logic (works for both grid + list) ──
+                    overlay.querySelectorAll('.od-file-item').forEach(el => {
+                        el.onmouseenter = () => {
+                            if (selected !== files[el.dataset.index]) {
+                                el.style.background = '#f0f6ff';
+                            }
+                        };
+                        el.onmouseleave = () => {
+                            if (selected !== files[el.dataset.index]) {
+                                el.style.background = 'transparent';
+                                el.style.borderColor = 'transparent';
+                            }
+                        };
+                        el.onclick = () => {
+                            // Clear all highlights
+                            overlay.querySelectorAll('.od-file-item').forEach(e => {
+                                e.style.background = 'transparent';
+                                e.style.borderColor = 'transparent';
+                            });
+                            // Highlight selected
+                            el.style.background = '#e3f0fb';
+                            el.style.borderColor = '#0078d4';
+
+                            selected = files[el.dataset.index];
+                            overlay.querySelector('#od-selected-label').textContent = selected.name;
+
+                            const btn = overlay.querySelector('#od-open-btn');
+                            btn.disabled = false;
+                            btn.style.opacity = '1';
+                            btn.style.cursor = 'pointer';
+                        };
+                    });
+                })
+                .catch(err => {
+                    console.error('OneDrive fetch error:', err);
+                    overlay.querySelector('#od-loading').style.display = 'flex';
+                    overlay.querySelector('#od-loading').textContent = 'Failed to load files. Please try again.';
+                });
+            },
+
+            // Step 3: Send file to backend
+            async uploadFromOneDrive(file) {
+                const fileObj = {
+                    name: file.name,
+                    size: file.size,
+                    status: 'uploading',
+                    department: '',
+                    deptOpen: false,
+                    rawFile: null,
+                    source: 'onedrive'
+                };
+
+                this.uploadedFiles.push(fileObj);
+
+                try {
+                    const response = await fetch("http://127.0.0.1:8000/ai/upload-from-onedrive/", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            file_id: file.id,
+                            access_token: this.microsoftAccessToken,
+                            file_name: file.name,
+                            company_name: this.companyName || '',
+                            department: fileObj.department || ''
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error || `Server returned HTTP ${response.status}`);
+                    }
+
+                    const i = this.uploadedFiles.indexOf(fileObj);
+                    if (i !== -1) {
+                        this.uploadedFiles[i].status = 'uploaded';
+                    }
+
+                } catch (error) {
+                    console.error("OneDrive upload error:", error);
+
+                    const i = this.uploadedFiles.indexOf(fileObj);
+                    if (i !== -1) this.uploadedFiles.splice(i, 1);
+
+                    this.errorMessages.push(`"${file.name}" failed to upload from OneDrive.`);
                 }
             },
 

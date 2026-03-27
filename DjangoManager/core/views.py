@@ -1018,3 +1018,85 @@ def reset_password(request):
     profile.save(update_fields=["failed_login_count", "locked_until"])
 
     return JsonResponse({"detail": "Password reset successful"}, status=200)
+
+@csrf_exempt
+def upload_from_onedrive(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    file_id      = (payload.get('file_id') or '').strip()
+    access_token = (payload.get('access_token') or '').strip()
+    file_name    = (payload.get('file_name') or '').strip()
+    print(f"DEBUG onedrive → file_id='{file_id}' file_name='{file_name}' token_len={len(access_token)}")
+
+    if not file_id or not access_token or not file_name:
+        return JsonResponse({'error': 'Missing required fields'}, status=400)
+
+    # Validate file type
+    valid_exts = ('.pdf', '.docx', '.txt')
+    if not file_name.lower().endswith(valid_exts):
+        return JsonResponse({'error': 'Unsupported file type'}, status=400)
+
+    # Microsoft Graph download
+    download_url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_id}/content"
+
+    try:
+        response = requests.get(
+            download_url,
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=60,
+            stream=True
+        )
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({'error': str(e)}, status=502)
+
+    if response.status_code == 401:
+        return JsonResponse({'error': 'Invalid or expired token'}, status=401)
+
+    if not response.ok:
+        return JsonResponse({'error': f'Microsoft API error {response.status_code}'}, status=502)
+
+    # Save temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp:
+        for chunk in response.iter_content(chunk_size=8192):
+            tmp.write(chunk)
+        temp_path = tmp.name
+
+    try:
+        # Size check
+        if os.path.getsize(temp_path) > 50 * 1024 * 1024:
+            return JsonResponse({'error': 'File too large'}, status=400)
+
+        # Password check
+        if is_password_protected(temp_path, file_name):
+            return JsonResponse({'error': 'Password protected file'}, status=400)
+
+        # Malware scan
+        scan_result = scan_file(temp_path)
+        print(f"DEBUG scan_result='{scan_result}'")
+        if scan_result:
+            return JsonResponse({'error': 'Malware detected'}, status=400)
+
+        # Upload to S3
+        s3_url = upload_to_s3(temp_path, file_name)
+        if not s3_url:
+            return JsonResponse({'error': 'S3 upload failed'}, status=500)
+
+        # Cache file for analysis (IMPORTANT for your system)
+        with open(temp_path, 'rb') as f:
+            cache.set(f'file_bytes_{file_name}', f.read(), timeout=3600)
+
+        return JsonResponse({
+            "status":    "uploaded",
+            "s3_url":    s3_url,
+            "file_name": file_name      # ← add this
+        })
+
+    finally:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)

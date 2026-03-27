@@ -45,4 +45,7 @@ urlpatterns = [
     # Password reset execution endpoint
     path("api/reset-password/", views.reset_password, name="reset_password"),
 
+    # OneDrive upload — same pattern as Google Drive
+    path('upload-from-onedrive/', views.upload_from_onedrive, name='upload_from_onedrive'),
+
 ]
