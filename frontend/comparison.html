@@ -614,7 +614,7 @@
                         <div>Risk Level : {{ overallRiskLevel }}</div>
                     </div>
 
-                    <div class="metric-box" style="cursor: pointer;" @click="showGraphic" v-if="userRole === 'admin'">
+                    <div class="metric-box" style="cursor: pointer;" @click="showGraphic" v-if="userRole === 'admin' && hasMultipleDepartments">
                         Graphical View
                     </div>
                 </div>
@@ -659,6 +659,7 @@
                     last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
                     filteredLast7Days: [],
                     filteredLast30Days: [],
+                    departments: [],
 
                     // ── Loaded from localStorage ──
                     hasData:          false,
@@ -674,6 +675,15 @@
                     if (this.complianceScore >= 75) return 'Low';
                     if (this.complianceScore >= 40) return 'Medium';
                     return 'High';
+                },
+
+                hasMultipleDepartments() {
+                    // If departments array exists (future case)
+                    if (this.departments && this.departments.length > 0) {
+                        return this.departments.length > 1;
+                    }
+                    // Current case: only one department
+                    return false;
                 },
 
                 // Simple recommendation list: non-compliant + partial items for the selected dept
