@@ -344,16 +344,41 @@ def analyze_compliance(request):
                 from django.utils import timezone
                 from datetime import timedelta
                 import json as _json
-                analysis_result = AnalysisResult.objects.create()
-                snapshot = {**result, 'metadata': {**result.get('metadata', {}), 'file_analyzed': file_name, 'company': company_name}}
-                snapshot_str = _json.dumps(snapshot)
-                Report.objects.create(
-                    result=analysis_result,
-                    report_snapshot=snapshot,
-                    report_s3_key=file_name,
-                    file_size=len(snapshot_str),
-                    expires_at=timezone.now() + timedelta(days=30)
-                )
+
+                # Look up the Document by s3_key (equals file_name set during upload)
+                # so AnalysisResult is properly linked to its source document.
+                document = Document.objects.filter(
+                    s3_key=file_name,
+                    deleted_at__isnull=True
+                ).order_by('-uploaded_at').first()
+
+                if document is not None:
+                    # Upsert: delete any previous result for this document first
+                    # (document is OneToOne so a second create would raise IntegrityError)
+                    AnalysisResult.objects.filter(document=document).delete()
+
+                    analysis_result = AnalysisResult.objects.create(
+                        document=document,
+                        compliance_score=max(0, min(100, int(round(float(
+                            result.get('compliance', {}).get('compliance_score', 0)
+                        ))))),
+                        risk_level=(
+                            'LOW' if float(result.get('compliance', {}).get('compliance_score', 0)) >= 75
+                            else 'MEDIUM' if float(result.get('compliance', {}).get('compliance_score', 0)) >= 40
+                            else 'HIGH'
+                        ),
+                        summary=result.get('summary') or result.get('recommendations', {}).get('top_action') or None,
+                        raw_output=result,
+                    )
+                    snapshot = {**result, 'metadata': {**result.get('metadata', {}), 'file_analyzed': file_name, 'company': company_name}}
+                    snapshot_str = _json.dumps(snapshot)
+                    Report.objects.create(
+                        result=analysis_result,
+                        report_snapshot=snapshot,
+                        report_s3_key=file_name,
+                        file_size=len(snapshot_str),
+                        expires_at=timezone.now() + timedelta(days=30)
+                    )
             except Exception:
                 pass  # non-critical — don't break the SSE stream
 
