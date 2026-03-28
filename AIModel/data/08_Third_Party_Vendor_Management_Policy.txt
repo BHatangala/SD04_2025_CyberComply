@@ -1,0 +1,27 @@
+THIRD-PARTY VENDOR MANAGEMENT POLICY
+Department: Procurement / Information Technology
+Version: 1.0 | Effective: January 2024 | Review: January 2025
+
+1. PURPOSE
+This policy establishes the process for selecting, engaging, and managing third-party vendors and suppliers that provide goods and services to Nexacore Technologies Sdn Bhd.
+
+2. VENDOR ONBOARDING
+2.1 New vendor requests are submitted to Procurement using the Vendor Request Form.
+2.2 Procurement obtains vendor business registration documents and bank details.
+2.3 Finance approves the vendor for payment processing.
+2.4 Approved vendors are added to the approved vendor register.
+
+3. VENDOR CONTRACTS
+All vendor engagements are formalised through a purchase order or service agreement. Contracts are reviewed by the Legal Department for commercial terms including payment schedules, deliverables, penalties, and termination clauses.
+
+4. VENDOR SYSTEM ACCESS
+Where vendors require system access, IT grants access upon department head request. Vendor accounts are tracked in the IT asset management system and removed when the vendor engagement ends.
+
+5. ONGOING VENDOR MANAGEMENT
+Procurement manages active vendor relationships and handles contract renewals. Annual performance reviews cover delivery, quality, and contractual compliance.
+
+6. VENDOR TERMINATION
+When a vendor engagement ends: Procurement and IT are notified, final invoices are processed, the vendor is marked inactive in the register, and IT removes system access.
+
+7. POLICY REVIEW
+This policy is reviewed annually by the Procurement Director.
