@@ -1131,7 +1131,7 @@
     const app = createApp({
         data() {
             return {
-                sidebarOpen: false,
+                sidebarOpen: true,
 
                 // ── Admin / role flag ──
                 isAdmin: false,  // initialised false; overwritten in mounted()
@@ -1719,12 +1719,23 @@
                 this.uploadedFiles[index].department = dept;
                 this.uploadedFiles[index].deptOpen   = false;
 
-                // For device files: trigger upload now that dept is selected.
-                // Google Drive / OneDrive files are uploaded immediately (dept sent separately).
                 const fileObj = this.uploadedFiles[index];
-                if (fileObj.status === 'pending' && fileObj.rawFile) {
+
+                if (fileObj.status === 'pending') {
                     fileObj.status = 'uploading';
-                    this.uploadToDjango(fileObj);
+
+                    if (fileObj.source === 'google' && fileObj._driveFileId) {
+                        // Google Drive file that was waiting for dept assignment
+                        const driveFileId = fileObj._driveFileId;
+                        const driveToken  = fileObj._driveToken;
+                        // Clear stashed credentials from the fileObj now that we're using them
+                        fileObj._driveFileId = null;
+                        fileObj._driveToken  = null;
+                        this.uploadFromDrive(fileObj, driveFileId, driveToken);
+                    } else if (fileObj.rawFile) {
+                        // Device file waiting for dept assignment
+                        this.uploadToDjango(fileObj);
+                    }
                 }
             },
             closeAllDropdowns() {
@@ -1817,24 +1828,34 @@
                     return;
                 }
                 if (this.isAdmin && !this.validateOrgName()) return;
+                this.showStorageNotice = true;
+
+                // Store the token before nulling it — needed for deferred upload (admin dept flow)
+                const capturedToken = this.googleAccessToken;
 
                 const fileObj = {
-                    name:       fileName,
-                    size:       fileSize,
-                    status:     'uploading',
-                    department: '',
-                    deptOpen:   false,
-                    rawFile:    null,
-                    source:     'google',
-                    documentId: null     // filled in from SSE 'uploaded' event
+                    name:         fileName,
+                    size:         fileSize,
+                    status:       this.isAdmin ? 'pending' : 'uploading',
+                    department:   '',
+                    deptOpen:     false,
+                    rawFile:      null,
+                    source:       'google',
+                    documentId:   null,
+                    // Stash Drive credentials so assignDepartment() can trigger the upload later.
+                    _driveFileId: fileId,
+                    _driveToken:  capturedToken
                 };
+
                 this.uploadedFiles.push(fileObj);
 
-                // Phase 1 only — sends to backend to download from Drive, scan, store in S3.
-                // AI analysis is triggered separately via the Analyse button.
-                this.uploadFromDrive(fileObj, fileId, this.googleAccessToken);
+                if (!this.isAdmin) {
+                    // General user — upload immediately, no dept needed
+                    this.uploadFromDrive(fileObj, fileId, capturedToken);
+                }
+                // Admin — upload is deferred until assignDepartment() is called
 
-                // Clear the token from memory after use (security best practice)
+                // Clear token from Vue state regardless — it's now either in use
                 this.googleAccessToken = null;
             },
 
@@ -2230,6 +2251,9 @@
             },
 
             async uploadFromOneDrive(file) {
+                if (this.isAdmin && !this.validateOrgName()) return;
+                this.showStorageNotice = true;
+                
                 const fileObj = {
                     name:       file.name,
                     size:       file.size,

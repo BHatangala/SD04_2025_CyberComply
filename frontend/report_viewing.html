@@ -445,7 +445,7 @@ const BASE = 'http://127.0.0.1:8000/ai';
 const app = createApp({
   data() {
     return {
-      sidebarOpen: false,
+      sidebarOpen: true,
       isAdmin: false,
       isGenerating: false,
       currentReportName: '',
@@ -485,7 +485,6 @@ const app = createApp({
     async generateReport(token) {
       this.isGenerating = true;
 
-      // We need the result_id and its raw_output to build the snapshot
       const resultId = sessionStorage.getItem('latestResultId');
       if (!resultId) {
         this.isGenerating = false;
@@ -493,7 +492,6 @@ const app = createApp({
       }
 
       try {
-        // Fetch the full analysis result to get raw_output (the AI payload)
         const resAnalysis = await fetch(`${BASE}/api/analysis/${resultId}/`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -503,10 +501,16 @@ const app = createApp({
         }
         const analysis = await resAnalysis.json();
 
-        // Build snapshot — this is what gets stored in report_snapshot
-        // and later rendered in the viewer
-        const snapshot = analysis.raw_output || {};
+        // Build snapshot — use DB-sourced company name 
+        // For general users, company_name will be empty and display falls back to just the filename.
+        const snapshot = { ...(analysis.raw_output || {}) };
+        snapshot.metadata = {
+          ...(snapshot.metadata || {}),
+          file_analyzed: analysis.original_filename || snapshot.metadata?.file_analyzed || '',
+          company:       analysis.company_name || ''
+        };
 
+        // ← this is what was missing in the broken version
         const payload = {
           result_id:       resultId,
           report_snapshot: snapshot,
@@ -531,16 +535,17 @@ const app = createApp({
         }
 
         const generated = await resGenerate.json();
+
         // Replace URL so a refresh doesn't re-generate
         window.history.replaceState(
           {}, '',
           `report_viewing.html?report_id=${generated.report_id}`
         );
 
-        // Now display it
+        // Display the newly generated report
         await this.loadReport(generated.report_id, token);
 
-        // Tell the sidebar component to re-fetch so the new report appears immediately
+        // Tell the sidebar to re-fetch so the new report appears immediately
         await this.$nextTick();
         if (this.$refs.sidebar) {
           this.$refs.sidebar.refreshReports();

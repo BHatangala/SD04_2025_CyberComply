@@ -740,13 +740,20 @@ def upload_from_drive(request):
 # ──────────────────────────────────────────────
 
 @csrf_exempt
+@csrf_exempt
 def upload_from_onedrive(request):
     """
     Frontend sends file_id + OAuth token; Django downloads via Microsoft Graph,
-    scans, stores in S3. No AI call — analysis triggered separately.
+    scans, stores in S3, creates a Document record. No AI call.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    # ── Auth ──────────────────────────────────────────────────────────────────
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
 
     try:
         payload = json.loads(request.body)
@@ -756,6 +763,8 @@ def upload_from_onedrive(request):
     file_id      = (payload.get('file_id')      or '').strip()
     access_token = (payload.get('access_token') or '').strip()
     file_name    = (payload.get('file_name')    or '').strip()
+    company_name = (payload.get('company_name') or '').strip()
+    department   = (payload.get('department')   or '').strip()
 
     if not file_id or not access_token or not file_name:
         return JsonResponse({'error': 'Missing required fields'}, status=400)
@@ -766,8 +775,34 @@ def upload_from_onedrive(request):
 
     valid_exts = ('.pdf', '.docx', '.txt')
     if not file_name.lower().endswith(valid_exts):
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
         return JsonResponse({'error': 'Unsupported file type'}, status=400)
 
+    # ── Resolve Organisation & Department ─────────────────────────────────────
+    org  = None
+    dept = None
+    if profile.role == UserProfile.Role.ADMIN:
+        if not company_name:
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            return JsonResponse({'error': 'Organisation name is required.'}, status=400)
+        if not department:
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            return JsonResponse({'error': 'Department is required for each file.'}, status=400)
+        org, _  = Organization.objects.get_or_create(org_name=company_name)
+        dept, _ = Department.objects.get_or_create(org=org, dept_name=department)
+    else:
+        org  = profile.org  # may be None for general users
+        dept = None
+
+    # ── Detect file type ──────────────────────────────────────────────────────
+    ext = file_name.lower().rsplit('.', 1)[-1]
+    file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
+    file_type = file_type_map.get(ext)
+    if not file_type:
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        return JsonResponse({'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'}, status=400)
+
+    # ── Download from Microsoft Graph ─────────────────────────────────────────
     download_url = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_id}/content"
 
     try:
@@ -778,11 +813,14 @@ def upload_from_onedrive(request):
             stream=True,
         )
     except requests.exceptions.RequestException as e:
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
         return JsonResponse({'error': str(e)}, status=502)
 
     if response.status_code == 401:
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
         return JsonResponse({'error': 'Invalid or expired token'}, status=401)
     if not response.ok:
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
         return JsonResponse({'error': f'Microsoft API error {response.status_code}'}, status=502)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp:
@@ -791,26 +829,57 @@ def upload_from_onedrive(request):
         temp_path = tmp.name
 
     try:
-        if os.path.getsize(temp_path) > 50 * 1024 * 1024:
-            return JsonResponse({'error': 'File too large'}, status=400)
+        # ── Size check ────────────────────────────────────────────────────────
+        file_size = os.path.getsize(temp_path)
+        if file_size > 50 * 1024 * 1024:
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            return JsonResponse({'error': 'File too large. Maximum size is 50 MB.'}, status=400)
 
+        # ── Password protection check ─────────────────────────────────────────
         if is_password_protected(temp_path, file_name):
-            return JsonResponse({'error': 'Password protected file'}, status=400)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            return JsonResponse({'error': 'File rejected — password protected files are not allowed'}, status=400)
 
+        # ── Malware scan ──────────────────────────────────────────────────────
         scan_result = scan_file(temp_path)
         if scan_result is not None:
             if scan_result.startswith('SCAN_ERROR:'):
+                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
                 return JsonResponse({'error': 'File could not be scanned. The security scanner is temporarily unavailable. Please try again shortly.'}, status=503)
-            return JsonResponse({'error': 'Malware detected'}, status=400)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
+        # ── Upload to S3 ──────────────────────────────────────────────────────
         s3_key, s3_url = upload_to_s3(temp_path, file_name)
         if s3_key is None:
-            return JsonResponse({'error': 'S3 upload failed'}, status=500)
+            logger.error("S3 upload returned None for file %s, user %s", file_name, profile.user_id)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            return JsonResponse({'error': 'S3 upload failed. Please try again in a few minutes.'}, status=500)
 
+        # ── Cache file bytes for analysis ─────────────────────────────────────
         with open(temp_path, 'rb') as f:
             cache.set(f'file_bytes_{file_name}', f.read(), timeout=3600)
 
-        return JsonResponse({'status': 'uploaded', 's3_url': s3_url, 'file_name': file_name})
+        # ── Create Document record ────────────────────────────────────────────
+        document = Document.objects.create(
+            user=profile,
+            org=org,
+            dept=dept,
+            original_filename=file_name,
+            file_type=file_type,
+            size_bytes=file_size,
+            s3_key=s3_key,
+            status=Document.Status.UPLOADED,
+        )
+
+        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request)
+
+        return JsonResponse({
+            'status':      'uploaded',
+            's3_url':      s3_url,
+            'file_name':   file_name,
+            'document_id': str(document.document_id),
+        })
 
     finally:
         if os.path.exists(temp_path):
@@ -1333,9 +1402,12 @@ def _generate_and_store_otp(profile: UserProfile, purpose: str) -> str:
 
 def _record_audit_log(profile, action_type: str, target_type: str, target_id, success: bool, request=None) -> None:
     ip = request.META.get("REMOTE_ADDR") if request else None
+    # Skip the audit log entry rather than crashing on the NOT NULL constraint for rejection events.
+    if target_id is None:
+        return
     AuditLog.objects.create(
         user=profile, action_type=action_type, target_type=target_type,
-        target_id=target_id, success=success, ip_address=ip,
+        target_id=target_id, success=success, ip_address=ip
     )
 
 
@@ -1833,6 +1905,7 @@ def _serialize_analysis(analysis: AnalysisResult) -> dict:
         "result_id":         str(analysis.result_id),
         "document_id":       str(analysis.document_id),
         "original_filename": analysis.document.original_filename,
+        "company_name":      analysis.document.org.org_name if analysis.document.org else "",  # ← add this
         "compliance_score":  analysis.compliance_score,
         "risk_level":        analysis.risk_level,
         "summary":           analysis.summary,

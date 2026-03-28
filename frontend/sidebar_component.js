@@ -188,6 +188,13 @@ const CyberComplySidebar = {
 
   mounted() {
     this.loadReports();
+
+    // Re-fetch reports when user navigates back to this page via browser history.
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            this.loadReports();
+        }
+    });
   },
 
   methods: {
