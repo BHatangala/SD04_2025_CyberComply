@@ -372,12 +372,12 @@
                         <li v-for="(f, i) in currentSnapshot.risks.factors" :key="i">{{ f }}</li>
                     </ul>
                 </div>
-                <div v-if="currentSnapshot.recommendations?.top_action" style="margin-bottom:16px;">
-                    <strong>Top Recommendation:</strong> {{ currentSnapshot.recommendations.top_action }}
+                <div v-if="topRecommendation" style="margin-bottom:16px;">
+                    <strong>Top Recommendation:</strong> {{ topRecommendation }}
                 </div>
                 <div v-if="currentSnapshot.compliance?.details?.length" style="margin-top:20px;">
                     <strong>Compliance Details:</strong>
-                    <div v-for="(d, i) in currentSnapshot.compliance.details" :key="i"
+                    <div v-for="(d, i) in sortedDetails" :key="i"
                          style="margin-top:12px; padding:12px; background:#1a2845; border-radius:8px;">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                             <strong style="color:#ffffff;">{{ d.clause }}</strong>
@@ -473,6 +473,28 @@ const app = createApp({
     } else if (reportId) {
       // ── Load an existing report chosen from the sidebar ──
       await this.loadReport(reportId, token);
+    }
+  },
+
+  computed: {
+    topRecommendation() {
+        const details = this.currentSnapshot?.compliance?.details || [];
+        const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+        const flagged = details
+            .filter(d => d.status === 'non_compliant' || d.status === 'non-compliant' || d.status === 'partial')
+            .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
+        return flagged.length > 0 ? flagged[0].clause : '';
+    },
+
+    sortedDetails() {
+        const details = this.currentSnapshot?.compliance?.details || [];
+        const STATUS_ORDER = { 'non_compliant': 0, 'non-compliant': 0, 'partial': 1, 'compliant': 2 };
+        const RISK_ORDER   = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+        return [...details].sort((a, b) => {
+            const statusDiff = (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3);
+            if (statusDiff !== 0) return statusDiff;
+            return (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4);
+        });
     }
   },
 
@@ -578,232 +600,202 @@ const app = createApp({
     },
 
     async downloadReport() {
-  if (!this.currentSnapshot) {
-    alert('Please select a report first.');
-    return;
-  }
+      if (!this.currentSnapshot) {
+          alert('Please select a report first.');
+          return;
+      }
 
-  try {
-    //GET report_id from URL (VERY IMPORTANT)
-    const params = new URLSearchParams(window.location.search);
-    const report_id = params.get('report_id');
+      try {
+          const params = new URLSearchParams(window.location.search);
+          const report_id = params.get('report_id');
+          if (!report_id) { alert("Report ID missing."); return; }
 
-    if (!report_id) {
-      alert("Report ID missing.");
-      return;
-    }
+          const res = await fetch("http://127.0.0.1:8000/api/download-report/", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${sessionStorage.getItem('authToken')}` },
+              body: JSON.stringify({ report_id })
+          });
+          const data = await res.json();
+          if (!res.ok) { alert(data.error || "Failed to record download"); return; }
 
-    //GET user email
-    const email = localStorage.getItem('email');
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF({ unit: 'mm', format: 'a4' });
 
-    //CALL BACKEND (THIS FIXES YOUR DB ISSUE)
-    const res = await fetch("http://127.0.0.1:8000/api/download-report/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${sessionStorage.getItem('authToken')}`
-      },
-      body: JSON.stringify({
-        report_id: report_id
-      })
-    });
+          const snap     = this.currentSnapshot;
+          const meta     = snap.metadata || {};
+          const pageW    = doc.internal.pageSize.getWidth();
+          const pageH    = doc.internal.pageSize.getHeight();
+          const margin   = 15;
+          const contentW = pageW - margin * 2;
 
-    const data = await res.json();
+          const DARK_BG   = [16, 23, 38];
+          const HEADER_BG = [26, 40, 69];
+          const CARD_BG   = [20, 32, 56];
+          const ACCENT    = [74, 143, 231];
+          const WHITE     = [255, 255, 255];
+          const LIGHT     = [197, 208, 230];
+          const GREEN     = [76, 175, 80];
+          const RED       = [244, 67, 54];
+          const ORANGE    = [255, 152, 0];
 
-    if (!res.ok) {
-      alert(data.error || "Failed to record download");
-      return;
-    }
+          // ── Helper: fill page background and draw header band ──
+          const initPage = () => {
+              doc.setFillColor(...DARK_BG);
+              doc.rect(0, 0, pageW, pageH, 'F');
+              doc.setFillColor(...HEADER_BG);
+              doc.rect(0, 0, pageW, 18, 'F');
+              doc.setFontSize(8);
+              doc.setTextColor(...LIGHT);
+              doc.setFont('helvetica', 'normal');
+              doc.text('CYBERCOMPLY — COMPLIANCE ANALYSIS REPORT', margin, 11);
+          };
 
-    console.log("Download recorded:", data);
+          // ── Helper: check remaining space, add new page if needed ──
+          const checkPage = (y, needed) => {
+              if (y + needed > pageH - 12) {
+                  doc.addPage();
+                  initPage();
+                  return 26;
+              }
+              return y;
+          };
 
+          // ── Page 1 ──
+          initPage();
+          let y = 26;
 
+          // Title
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(...ACCENT);
+          doc.text(this.currentReportName || 'Report', margin, y);
+          y += 8;
 
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+          doc.setDrawColor(...ACCENT);
+          doc.line(margin, y, pageW - margin, y);
+          y += 8;
 
-    const snap = this.currentSnapshot;
-    const meta = snap.metadata || {};
+          // Metadata
+          doc.setFontSize(9);
+          if (meta.company) {
+              doc.setTextColor(...LIGHT); doc.text('Company:', margin, y);
+              doc.setTextColor(...WHITE); doc.text(meta.company, margin + 26, y); y += 6;
+          }
+          if (meta.file_analyzed) {
+              doc.setTextColor(...LIGHT); doc.text('File:', margin, y);
+              doc.setTextColor(...WHITE); doc.text(meta.file_analyzed, margin + 26, y); y += 6;
+          }
 
-    const pageW = doc.internal.pageSize.getWidth();
-    const pageH = doc.internal.pageSize.getHeight();
-    const margin = 15;
-    const contentW = pageW - margin * 2;
+          const score     = snap.compliance?.compliance_score ?? '—';
+          const riskStatus = snap.risks?.status
+              ? snap.risks.status.charAt(0).toUpperCase() + snap.risks.status.slice(1) : '—';
 
-    let y = 20;
+          doc.setTextColor(...LIGHT); doc.text('Score:', margin, y);
+          doc.setTextColor(...ACCENT); doc.text(`${score}%`, margin + 26, y);
+          doc.setTextColor(...LIGHT); doc.text('Risk:', margin + 65, y);
+          doc.setTextColor(...WHITE); doc.text(riskStatus, margin + 80, y);
+          y += 10;
 
-    const DARK_BG = [16, 23, 38];
-    const HEADER_BG = [26, 40, 69];
-    const CARD_BG = [20, 32, 56];
-    const ACCENT = [74, 143, 231];
-    const WHITE = [255, 255, 255];
-    const LIGHT = [197, 208, 230];
-    const GREEN = [76, 175, 80];
-    const RED = [244, 67, 54];
-    const ORANGE = [255, 152, 0];
+          // Risk Factors
+          const factors = snap.risks?.factors || [];
+          if (factors.length) {
+              y = checkPage(y, 14);
+              doc.setFont('helvetica', 'bold'); doc.setTextColor(...ACCENT);
+              doc.text('Risk Factors', margin, y); y += 6;
+              doc.setFont('helvetica', 'normal'); doc.setTextColor(...LIGHT);
+              factors.forEach(f => {
+                  y = checkPage(y, 6);
+                  doc.text(`• ${f}`, margin + 2, y); y += 5;
+              });
+              y += 4;
+          }
 
-    doc.setFillColor(...DARK_BG);
-    doc.rect(0, 0, pageW, pageH, 'F');
+          // Top Recommendation
+          if (this.topRecommendation) {
+              y = checkPage(y, 16);
+              doc.setFont('helvetica', 'bold'); doc.setTextColor(...ACCENT);
+              doc.text('Top Recommendation', margin, y); y += 6;
+              doc.setFont('helvetica', 'normal'); doc.setTextColor(...LIGHT);
+              const lines = doc.splitTextToSize(this.topRecommendation, contentW);
+              lines.forEach(line => { y = checkPage(y, 6); doc.text(line, margin, y); y += 5; });
+              y += 6;
+          }
 
-    doc.setFillColor(...HEADER_BG);
-    doc.rect(0, 0, pageW, 28, 'F');
+          // Compliance Details — sorted: non-compliant → partial → compliant
+          const STATUS_ORDER = { 'non_compliant': 0, 'non-compliant': 0, 'partial': 1, 'compliant': 2 };
+          const RISK_ORDER   = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+          const details = [...(snap.compliance?.details || [])].sort((a, b) => {
+              const s = (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3);
+              return s !== 0 ? s : (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4);
+          });
 
-    doc.setFontSize(16);
-    doc.setTextColor(...WHITE);
-    doc.setFont('helvetica', 'bold');
-    doc.text('CYBERCOMPLY', margin, 12);
+          if (details.length) {
+              y = checkPage(y, 14);
+              doc.setFont('helvetica', 'bold'); doc.setTextColor(...ACCENT);
+              doc.text('Compliance Details', margin, y); y += 8;
 
-    doc.setFontSize(9);
-    doc.setTextColor(...LIGHT);
-    doc.setFont('helvetica', 'normal');
-    doc.text('COMPLIANCE ANALYSIS REPORT', margin, 20);
+              details.forEach(d => {
+                const clauseLines = doc.splitTextToSize(d.clause || '', contentW - 60);
+                const textLines   = doc.splitTextToSize(d.reasoning || '', contentW - 6);
 
-    y = 36;
+                // Calculate card height accurately based on actual wrapped line counts
+                const clauseH  = clauseLines.length * 5;
+                const metaH    = 5;
+                const reasonH  = textLines.length * 4.5;
+                const cardPad  = 12; // top + bottom padding inside card
+                const cardHeight = clauseH + metaH + reasonH + cardPad;
 
-    doc.setFontSize(13);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...ACCENT);
+                y = checkPage(y, cardHeight + 6);
 
-    const title = this.currentReportName || 'Report';
-    doc.text(title, margin, y);
-    y += 10;
+                doc.setFillColor(...CARD_BG);
+                doc.roundedRect(margin, y, contentW, cardHeight, 3, 3, 'F');
 
-    doc.setDrawColor(...ACCENT);
-    doc.line(margin, y, pageW - margin, y);
-    y += 8;
+                let innerY = y + 5;
 
-    const score = snap.compliance?.compliance_score ?? '—';
-    const riskStatus = snap.risks?.status
-      ? snap.risks.status.charAt(0).toUpperCase() + snap.risks.status.slice(1)
-      : '—';
+                // Clause title
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...WHITE);
+                doc.text(clauseLines, margin + 3, innerY);
 
-    doc.setFontSize(9);
-    doc.setTextColor(...LIGHT);
+                // Status badge (right-aligned, anchored to first line of clause)
+                let statusColor = RED;
+                let statusLabel = 'Non-Compliant';
+                if (d.status === 'compliant')      { statusColor = GREEN;  statusLabel = 'Compliant'; }
+                else if (d.status === 'partial')   { statusColor = ORANGE; statusLabel = 'Partial'; }
+                doc.setTextColor(...statusColor);
+                doc.text(statusLabel, pageW - margin - 3, innerY, { align: 'right' });
 
-    if (meta.company) {
-      doc.text(`Company:`, margin, y);
-      doc.setTextColor(...WHITE);
-      doc.text(meta.company, margin + 25, y);
-      y += 6;
-    }
+                innerY += clauseH + 1;
 
-    if (meta.file_analyzed) {
-      doc.setTextColor(...LIGHT);
-      doc.text(`File:`, margin, y);
-      doc.setTextColor(...WHITE);
-      doc.text(meta.file_analyzed, margin + 25, y);
-      y += 6;
-    }
+                // Risk + Confidence
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...LIGHT);
+                doc.text(
+                    `Risk: ${d.risk_level ? d.risk_level.charAt(0).toUpperCase() + d.risk_level.slice(1) : '—'}   Confidence: ${d.confidence ?? '—'}%`,
+                    margin + 3, innerY
+                );
+                innerY += metaH;
 
-    doc.setTextColor(...LIGHT);
-    doc.text(`Score:`, margin, y);
-    doc.setTextColor(...ACCENT);
-    doc.text(`${score}%`, margin + 25, y);
+                // Reasoning
+                textLines.forEach(line => {
+                    doc.text(line, margin + 3, innerY);
+                    innerY += 4.5;
+                });
 
-    doc.setTextColor(...LIGHT);
-    doc.text(`Risk:`, margin + 60, y);
-    doc.setTextColor(...WHITE);
-    doc.text(riskStatus, margin + 75, y);
-    y += 10;
+                y = y + cardHeight + 4; // consistent gap between cards
+            });
+          }
 
-    const factors = snap.risks?.factors || [];
-    if (factors.length) {
-      doc.setTextColor(...ACCENT);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Risk Factors', margin, y);
-      y += 6;
+          doc.save(`${this.currentReportName || 'report'}.pdf`);
 
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(...LIGHT);
+      } catch (err) {
+          console.error(err);
+          alert("Something went wrong.");
+      }
+  },
 
-      factors.forEach(f => {
-        doc.text(`• ${f}`, margin + 2, y);
-        y += 5;
-      });
-
-      y += 4;
-    }
-
-    const top = snap.recommendations?.top_action;
-    if (top) {
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...ACCENT);
-      doc.text('Top Recommendation', margin, y);
-      y += 6;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(...LIGHT);
-
-      const lines = doc.splitTextToSize(top, contentW);
-      lines.forEach(line => {
-        doc.text(line, margin, y);
-        y += 5;
-      });
-
-      y += 6;
-    }
-
-    const details = snap.compliance?.details || [];
-
-    if (details.length) {
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...ACCENT);
-      doc.text('Compliance Details', margin, y);
-      y += 8;
-
-      details.forEach(d => {
-        const textLines = doc.splitTextToSize(d.reasoning, contentW - 6);
-        const cardHeight = 20 + textLines.length * 5;
-
-        doc.setFillColor(...CARD_BG);
-        doc.roundedRect(margin, y - 4, contentW, cardHeight, 3, 3, 'F');
-
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...WHITE);
-
-        doc.text(d.clause, margin + 3, y + 2);
-
-        let color = RED;
-        if (d.status === 'compliant') color = GREEN;
-        else if (d.status === 'partial') color = ORANGE;
-
-        doc.setTextColor(...color);
-        doc.text(
-          d.status === 'compliant' ? 'Compliant' :
-          d.status === 'partial' ? 'Partial' :
-          'Non-Compliant',
-          pageW - margin - 3,
-          y + 2,
-          { align: 'right' }
-        );
-
-        y += 6;
-
-        doc.setFontSize(8);
-        doc.setTextColor(...LIGHT);
-        doc.text(
-          `Risk: ${d.risk_level || '—'}   Confidence: ${d.confidence}%`,
-          margin + 3,
-          y
-        );
-        y += 5;
-
-        textLines.forEach(line => {
-          doc.text(line, margin + 3, y);
-          y += 4.5;
-        });
-
-        y += 6;
-      });
-    }
-
-    doc.save(`${this.currentReportName || 'report'}.pdf`);
-
-  } catch (err) {
-    console.error(err);
-    alert("Something went wrong.");
-  }
-},
     toggleSidebar() {
       this.sidebarOpen = !this.sidebarOpen;
     },

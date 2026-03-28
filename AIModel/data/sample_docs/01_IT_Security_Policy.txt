@@ -1,0 +1,39 @@
+INFORMATION TECHNOLOGY SECURITY POLICY
+Department: Information Technology
+Version: 2.3 | Effective: January 2026 | Review: January 2027
+
+1. PURPOSE AND SCOPE
+This policy establishes technical security requirements for all IT systems, networks, and devices at Nexacore Technologies Sdn Bhd. It covers authentication, endpoint protection, network security, and device disposal. This policy does not address personal data, privacy notices, consent, data subject rights, or data minimisation — those matters are addressed in separate policies.
+
+2. AUTHENTICATION
+2.1 Multi-factor authentication (MFA) is mandatory for all remote access and privileged accounts.
+2.2 Shared accounts are prohibited. All access must be individually authenticated.
+2.3 Accounts inactive for 90 consecutive days are automatically disabled.
+2.4 Passwords must be at least 12 characters including uppercase, lowercase, numeric and special characters.
+2.5 Passwords cannot be reused within the last 12 cycles and must be changed every 90 days.
+2.6 Plain-text password storage is prohibited. Approved algorithms: bcrypt or Argon2.
+
+3. ENDPOINT PROTECTION
+3.1 All company devices must have IT-approved antivirus and endpoint detection software installed.
+3.2 OS and application patches must be applied within 14 days of vendor release.
+3.3 Critical security patches must be applied within 72 hours.
+3.4 USB and removable media require prior IT Department authorisation.
+3.5 Screen lock activates after 5 minutes of inactivity.
+
+4. NETWORK SECURITY
+4.1 All remote connections must use the company-approved VPN.
+4.2 Use of unsecured public Wi-Fi on company devices is prohibited.
+4.3 Network traffic is monitored by the IT Security team for anomalous activity.
+4.4 Firewall rules are reviewed and updated quarterly.
+
+5. SECURITY MONITORING
+System logs, network traffic, and endpoint activity are monitored by the IT Security team to detect threats. Login events and configuration changes are recorded. Logs are stored for two years to support forensic investigations.
+
+6. INCIDENT RESPONSE
+Security incidents must be reported to IT Security immediately via security@nexacore.lk or the incident portal. The IT Security team acknowledges within 1 hour, investigates within 4 hours, and escalates critical incidents to the IT Director.
+
+7. DEVICE DISPOSAL
+Devices are wiped per NIST SP 800-88 before disposal or reassignment. Storage that cannot be wiped is physically destroyed. All disposals are recorded in the IT asset register.
+
+8. ENFORCEMENT
+Violations of this policy are subject to disciplinary action up to and including termination. Annual security awareness training is mandatory for all staff.

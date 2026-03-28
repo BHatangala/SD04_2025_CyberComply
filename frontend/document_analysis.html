@@ -327,7 +327,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             gap: 4px;
         }
 
@@ -353,6 +353,11 @@
             display: block;
             margin-bottom: 3px;
             color: #ffffff;
+        }
+
+        .recommendations-section .section-header {
+            align-items: flex-start;
+            padding-top: 42px;
         }
 
         /* ─── Action Buttons ─── */
@@ -653,9 +658,6 @@
                         </button>
                     </div>
                     <div class="recommendations-list">
-                        <div class="recommendation-item" v-if="topRecommendation">
-                            {{ topRecommendation }}
-                        </div>
                         <!-- Per-clause findings from AI -->
                         <div
                             class="recommendation-item"
@@ -800,7 +802,7 @@
 
                     // ── Populate UI fields ────────────────────────────────
                     this.analysedFilename = data.original_filename || 'Document Analysis';
-                    this.analysedCompany  = data.org || '';
+                    this.analysedCompany = data.company_name || '';
                     this.complianceScore  = Math.round(data.compliance_score ?? 0);
                     this.complianceLabel  = data.compliance_label || (
                         this.complianceScore >= 75 ? 'High Compliance Level' :

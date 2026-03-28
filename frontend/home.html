@@ -691,10 +691,6 @@
             box-shadow: none;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
         /* ── Integration Alert Modal ── */
         .modal-overlay {
             position: fixed;
@@ -841,7 +837,7 @@
         </div>
     </div>
 
-    <!-- ── Sidebar ── -->
+    <!-- ── Sidebar (external component from sprint-2) ── -->
     <cybercomply-sidebar
         :sidebar-open="sidebarOpen"
         @toggle="sidebarOpen = !sidebarOpen"
@@ -858,7 +854,7 @@
         <!--
             Organisation Name — ADMIN ONLY
             Visible only for ADMINISTRATIVE_USER role.
-            Admin must type the organisation name for every upload session.
+            isAdmin is derived from the authenticated user's role in mounted().
         -->
         <div class="org-row" v-if="isAdmin">
             <div class="org-label">ORGANISATION</div>
@@ -891,7 +887,7 @@
 
                 <div class="upload-sources">
 
-                    <!-- Google Drive -->
+                    <!-- Google Drive (full picker — sprint-2) -->
                     <div class="source-btn" @click.stop="initGoogleDrivePicker()">
                         <div class="source-icon">
                             <svg viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
@@ -906,7 +902,7 @@
                         <div class="source-label">GOOGLE DRIVE</div>
                     </div>
 
-                    <!-- Microsoft OneDrive (full picker implementation from sprint2) -->
+                    <!-- Microsoft OneDrive (full picker — sprint-2) -->
                     <div class="source-btn" @click.stop="initOneDrivePicker()">
                         <div class="source-icon">
                             <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
@@ -949,9 +945,7 @@
                 <span class="upload-info-close" @click="showStorageNotice = false">×</span>
             </div>
 
-            <!--
-                ── Upload Failure Block ──
-                Shown whenever one or more upload attempts failed with reasons. -->
+            <!-- ── Upload Failure Block ── -->
             <div class="upload-failure-block" v-if="errorMessages.length > 0">
                 <div class="upload-failure-messages">
                     <div class="upload-failure-item" v-for="(msg, i) in errorMessages" :key="i">
@@ -981,7 +975,7 @@
                     :key="index"
                     class="file-item"
                 >
-                    <!-- Remove button — also triggers S3 deletion if already uploaded -->
+                    <!-- Remove button — removes from UI + triggers S3 delete + DB soft-delete -->
                     <div class="file-remove" @click="removeFile(index)">×</div>
 
                     <div class="file-icon">
@@ -1061,17 +1055,16 @@
                 Shown only when at least one file is present.
 
                 Admin mode (isAdmin = true):
-                  - Button is disabled while ANY file is still uploading OR
-                    any uploaded/ready file has no department assigned.
-                  - A hint message explains what's blocking the button.
+                  - Button disabled while any file is uploading OR any uploaded file
+                    has no department assigned OR org name is empty.
+                  - Hint message explains what's blocking.
 
                 General user mode (isAdmin = false):
-                  - Button is disabled only while files are still uploading.
-                  - No department requirement.
+                  - Button disabled only while files are still uploading.
+                  - No department or org name requirement.
             -->
             <div class="analyse-row" v-if="uploadedFiles.length > 0">
 
-                <!-- Hint — only visible in admin mode when departments are missing -->
                 <div
                     class="analyse-hint"
                     :class="{ hidden: !isAdmin || !hasMissingDepartments }"
@@ -1082,7 +1075,6 @@
                     Assign a department to all files before analysing
                 </div>
 
-                <!-- Spacer to keep button right-aligned when hint is not shown -->
                 <div v-if="!isAdmin" style="flex:1;"></div>
 
                 <button
@@ -1134,7 +1126,8 @@
                 sidebarOpen: true,
 
                 // ── Admin / role flag ──
-                isAdmin: false,  // initialised false; overwritten in mounted()
+                // Initialised false; overwritten in mounted() from sessionStorage userRole.
+                isAdmin: false,
 
                 // ── Admin fields ──
                 companyName: '',
@@ -1146,14 +1139,19 @@
                 errorMessages: [],
                 showStorageNotice: false,
 
-                // ── Department options ──
+                // ── Department options (full list from sprint-2) ──
                 departments: [
-                    // Core business
-                    'Finance & Accounting', 'Human Resources & Administration', 'Research & Development', 'Legal & Compliance',
-                    'Operations', 'Procurement & Supply Chain', 'Sales & Business Development', 'Marketing & Communications',
-                    // Technology
-                    'Information Technology & Cybersecurity', 'Governance, Risk & Compliance (GRC)', 'Quality Assurance',
-                    // Support
+                    'Finance & Accounting',
+                    'Human Resources & Administration',
+                    'Research & Development',
+                    'Legal & Compliance',
+                    'Operations',
+                    'Procurement & Supply Chain',
+                    'Sales & Business Development',
+                    'Marketing & Communications',
+                    'Information Technology & Cybersecurity',
+                    'Governance, Risk & Compliance (GRC)',
+                    'Quality Assurance',
                     'Customer Service',
                 ],
 
@@ -1176,21 +1174,19 @@
                 deleteEndpoint: 'http://127.0.0.1:8000/api/delete-file/',
                 // Google Drive: receives file_id + access_token, downloads on backend.
                 driveUploadEndpoint: 'http://127.0.0.1:8000/ai/upload-from-drive/',
-                // Issues a signed session token after login.
-                sessionTokenEndpoint: 'http://127.0.0.1:8000/ai/api/session-token/',
                 // Persists AI result + findings to PostgreSQL after analysis.
                 saveAnalysisEndpoint: 'http://127.0.0.1:8000/ai/api/analysis/save/',
-                // Returns last-7-days / last-30-days sidebar history.
+                // Returns last-7-days / last-30-days sidebar history from DB.
                 historyEndpoint: 'http://127.0.0.1:8000/ai/api/analysis/history/',
 
                 // ── Session / Auth state ──
-                sessionToken: null,        // signed token from api/session-token/
-                userEmail: null,           // stored after login
-                userRole: null,            // 'ADMINISTRATIVE_USER' or 'GENERAL_USER'
+                sessionToken: null,      // signed token from login.html
+                userEmail: null,
+                userRole: null,          // 'ADMINISTRATIVE_USER' or 'GENERAL_USER'
 
                 // ── Google Drive state ──
-                googleAccessToken: null,   // OAuth token, held only for current session
-                pickerApiLoaded: false,    // tracks whether gapi picker is ready
+                googleAccessToken: null,
+                pickerApiLoaded: false,
 
                 // ── OneDrive state ──
                 microsoftAccessToken: null
@@ -1198,7 +1194,7 @@
         },
 
         computed: {
-            // True if any file is still in the uploading state
+            // True if any file is still uploading or pending dept assignment
             hasUploadingFiles() {
                 return this.uploadedFiles.some(f =>
                     f.status === 'uploading' || (f.status === 'pending' && this.isAdmin)
@@ -1235,6 +1231,13 @@
         },
 
         async mounted() {
+            // Restore org name if we're returning from a OneDrive OAuth redirect
+            const pendingOrg = sessionStorage.getItem('pendingOrgName');
+            if (pendingOrg) {
+                this.companyName = pendingOrg;
+                sessionStorage.removeItem('pendingOrgName');  // clear after use
+            }
+
             // Capture OneDrive token if redirected back from Microsoft OAuth
             this.captureOneDriveToken();
 
@@ -1245,7 +1248,7 @@
             // If missing or if the server-side profile check fails, redirect to login.
             const token   = sessionStorage.getItem('authToken');
             const email   = sessionStorage.getItem('userEmail');
-            const roleRaw = sessionStorage.getItem('userRole');   // set by login.html
+            const roleRaw = sessionStorage.getItem('userRole');
 
             if (!token || !email) {
                 window.location.href = 'login.html';
@@ -1265,10 +1268,11 @@
             }
 
             // ── Set RBAC flag ────────────────────────────────────────────
-            // roleRaw comes directly from the login response: 'ADMINISTRATIVE_USER'
-            // or 'GENERAL_USER'. No mapping needed — compare directly.
+            // roleRaw comes from the login response: 'ADMINISTRATIVE_USER' or 'GENERAL_USER'.
             this.isAdmin      = (roleRaw === 'ADMINISTRATIVE_USER');
             this.sessionToken = token;
+            this.userEmail    = email;
+            this.userRole     = roleRaw;
 
             // Populate sidebar with real analysis history from the database
             await this.fetchHistory();
@@ -1279,10 +1283,8 @@
         },
 
         methods: {
-            // ── Sidebar ──
-            toggleSidebar() {
-                this.sidebarOpen = !this.sidebarOpen;
-            },
+
+            // ── Navigation ──
             goToHome()    { window.location.href = 'home.html'; },
             showProfile() { window.location.href = 'profile.html'; },
             showHelp()    { window.location.href = 'user_support.html'; },
@@ -1296,6 +1298,7 @@
                 }
             },
 
+            // ── Fetch sidebar history from DB ──
             async fetchHistory() {
                 const token = this.sessionToken || sessionStorage.getItem('authToken');
                 if (!token) return;
@@ -1305,10 +1308,10 @@
                     });
                     if (!res.ok) return;
                     const data = await res.json();
+                    // The sidebar component receives these via props/events — emit or store as needed
+                    // depending on how sidebar_component.js is wired to accept history data.
                     this.last7Days  = (data.last_7_days  || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
                     this.last30Days = (data.last_30_days || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
-                    this.filteredLast7Days  = [...this.last7Days];
-                    this.filteredLast30Days = [...this.last30Days];
                 } catch (e) {
                     console.warn('Could not load analysis history:', e);
                 }
@@ -1327,6 +1330,7 @@
                 e.target.value = '';
             },
 
+            // ── Org name validation (admin only) ──
             validateOrgName() {
                 const name = this.companyName.trim();
                 if (!name) {
@@ -1346,13 +1350,12 @@
                     this.errorMessages.push('Organisation name contains invalid characters. Use only letters, numbers, spaces, hyphens, ampersands, or punctuation.');
                     return false;
                 }
-                this.companyName = name; // store the trimmed version
+                this.companyName = name;
                 return true;
             },
 
-            // ── Validate files and add them to the queue ──
+            // ── Validate files and add them to the upload queue ──
             processFiles(files) {
-                // Clear previous error messages each time the user picks new files
                 this.errorMessages = [];
                 this.showStorageNotice = true;
 
@@ -1374,21 +1377,23 @@
                         continue;
                     }
 
-                    // Push a reactive file object immediately so the UI shows
-                    // the UPLOADING state and progress bar right away.
                     const fileObj = {
                         name:       file.name,
                         size:       file.size,
+                        // Admins must assign dept before upload fires → 'pending'.
+                        // General users go straight to 'uploading'.
                         status:     this.isAdmin ? 'pending' : 'uploading',
                         department: '',
                         deptOpen:   false,
                         rawFile:    file,
                         source:     'device',
-                        documentId: null         // filled in by uploadToDjango on success
+                        documentId: null   // filled in by uploadToDjango on success
                     };
 
                     this.uploadedFiles.push(fileObj);
 
+                    // General users: upload immediately.
+                    // Admins: upload is deferred until assignDepartment() is called.
                     if (!this.isAdmin) {
                         this.uploadToDjango(fileObj);
                     }
@@ -1401,7 +1406,6 @@
 
                 const formData = new FormData();
                 formData.append('document',     fileObj.rawFile);
-                // Admins supply org + dept; general users send empty strings
                 formData.append('company_name', this.isAdmin ? (this.companyName || '') : '');
                 formData.append('department',   this.isAdmin ? (fileObj.department || '') : '');
 
@@ -1432,11 +1436,12 @@
                     if (i !== -1) {
                         Object.assign(this.uploadedFiles[i], {
                             status:     'uploaded',
-                            documentId: data.document_id || null   // stored for delete
+                            documentId: data.document_id || null
                         });
                     }
                     console.log(`Phase 1 complete: ${fileObj.name} → S3 (doc: ${data.document_id})`);
 
+                    // Track in sessionStorage for S3 cleanup on session end
                     const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
                     if (!tracked.includes(fileObj.name)) {
                         tracked.push(fileObj.name);
@@ -1463,7 +1468,7 @@
 
                 const readyFiles = this.uploadedFiles.filter(f => f.status === 'uploaded');
 
-                this.isAnalysing  = true;
+                this.isAnalysing   = true;
                 this.errorMessages = [];
 
                 if (readyFiles.length === 1) {
@@ -1474,6 +1479,9 @@
             },
 
             // ── Phase 2a: Single file — SSE stream ──
+            // Replaces the feature/ai-development approach of writing the result to
+            // localStorage. Result is now persisted to PostgreSQL via saveAnalysisEndpoint,
+            // and only the result_id is kept in sessionStorage for the report page.
             async analyseSingle(fileObj) {
                 const getIndex     = () => this.uploadedFiles.indexOf(fileObj);
                 const updateStatus = (newStatus) => {
@@ -1501,6 +1509,8 @@
                         throw new Error(`Server returned HTTP ${response.status}`);
                     }
 
+                    // ── Read the SSE stream ──
+                    // Django streams `data: {...}\n\n` events as each pipeline stage completes.
                     const reader  = response.body.getReader();
                     const decoder = new TextDecoder();
                     let   buffer  = '';
@@ -1522,20 +1532,27 @@
                                 console.log(`📡 [${fileObj.name}] SSE:`, payload.status);
 
                                 switch (payload.status) {
+
                                     case 'analysing':
                                         updateStatus('analysing');
                                         this.analysisProgressText = `Analysing "${fileObj.name}"…`;
                                         break;
+
                                     case 'analysed':
                                         updateStatus('analysed');
                                         this.analysisProgressText = 'Analysis complete. Redirecting…';
 
-                                        // Persist result to PostgreSQL
+                                        // ── Persist result to PostgreSQL (replaces localStorage) ──
+                                        // feature/ai-development stored the full result object in
+                                        // localStorage under 'latestAnalysisResult'. The merged flow
+                                        // instead POSTs to the DB and stores only the result_id in
+                                        // sessionStorage, which document_analysis.html reads to fetch
+                                        // the full result from the backend.
                                         try {
                                             const saveRes = await fetch(this.saveAnalysisEndpoint, {
                                                 method: 'POST',
                                                 headers: {
-                                                    'Content-Type': 'application/json',
+                                                    'Content-Type':  'application/json',
                                                     'Authorization': `Bearer ${this.sessionToken}`
                                                 },
                                                 body: JSON.stringify({
@@ -1557,10 +1574,12 @@
                                             console.warn('Could not persist analysis result:', saveErr);
                                         }
 
+                                        // Brief pause so the user sees "✓ ANALYSED" before redirect
                                         setTimeout(() => {
                                             window.location.href = 'document_analysis.html';
                                         }, 1500);
                                         break;
+
                                     case 'error':
                                         updateStatus('error');
                                         const msg = payload.message || '';
@@ -1571,7 +1590,9 @@
                                         this.isAnalysing = false;
                                         break;
                                 }
+
                             } catch (parseError) {
+                                // Incomplete or non-JSON fragment — safe to skip
                                 console.warn(`Could not parse SSE line for ${fileObj.name}:`, dataLine);
                             }
                         }
@@ -1631,7 +1652,7 @@
                         const saveRes = await fetch(this.saveAnalysisEndpoint, {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json',
+                                'Content-Type':  'application/json',
                                 'Authorization': `Bearer ${this.sessionToken}`
                             },
                             body: JSON.stringify({
@@ -1670,16 +1691,14 @@
 
             // ── Remove File (× button) ──
             // Removes from UI immediately, then:
-            //   - soft-deletes the Document DB record (sets deleted_at + status=DELETED)
+            //   - soft-deletes the Document DB record
             //   - hard-deletes the file from S3
-            // Prefers document_id for the DB lookup; falls back to file_name.
+            //   - keeps sessionStorage tracking list in sync
             async removeFile(index) {
                 const file = this.uploadedFiles[index];
 
-                // Remove from UI list first for instant feedback
                 this.uploadedFiles.splice(index, 1);
 
-                // Only hit the delete endpoint if the file made it past the uploading phase
                 if (file.status !== 'uploading' && file.status !== 'pending') {
                     try {
                         const body = { file_name: file.name };
@@ -1715,6 +1734,7 @@
                 this.uploadedFiles.forEach(f => f.deptOpen = false);
                 this.uploadedFiles[index].deptOpen = !isOpen;
             },
+
             assignDepartment(index, dept) {
                 this.uploadedFiles[index].department = dept;
                 this.uploadedFiles[index].deptOpen   = false;
@@ -1725,26 +1745,67 @@
                     fileObj.status = 'uploading';
 
                     if (fileObj.source === 'google' && fileObj._driveFileId) {
-                        // Google Drive file that was waiting for dept assignment
                         const driveFileId = fileObj._driveFileId;
                         const driveToken  = fileObj._driveToken;
-                        // Clear stashed credentials from the fileObj now that we're using them
                         fileObj._driveFileId = null;
                         fileObj._driveToken  = null;
                         this.uploadFromDrive(fileObj, driveFileId, driveToken);
+
+                    } else if (fileObj.source === 'onedrive' && fileObj._oneDriveFileId) {
+                        const oneDriveFileId    = fileObj._oneDriveFileId;
+                        const oneDriveToken     = fileObj._oneDriveToken;
+                        fileObj._oneDriveFileId = null;
+                        fileObj._oneDriveToken  = null;
+                        (async () => {
+                            try {
+                                const response = await fetch("http://127.0.0.1:8000/ai/upload-from-onedrive/", {
+                                    method:  "POST",
+                                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${this.sessionToken}` },
+                                    body: JSON.stringify({
+                                        file_id:      oneDriveFileId,
+                                        access_token: oneDriveToken,
+                                        file_name:    fileObj.name,
+                                        company_name: this.companyName || '',
+                                        department:   fileObj.department || ''
+                                    })
+                                });
+                                if (response.status === 401 || response.status === 403) {
+                                    sessionStorage.clear();
+                                    window.location.href = 'login.html';
+                                    return;
+                                }
+                                if (!response.ok) {
+                                    const err = await response.json().catch(() => ({}));
+                                    throw new Error(err.error || `Server returned HTTP ${response.status}`);
+                                }
+                                const data = await response.json();
+                                const i = this.uploadedFiles.indexOf(fileObj);
+                                if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'uploaded', documentId: data.document_id || null });
+                                const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                                if (!tracked.includes(fileObj.name)) {
+                                    tracked.push(fileObj.name);
+                                    sessionStorage.setItem('uploadedFileNames', JSON.stringify(tracked));
+                                }
+                            } catch (error) {
+                                const i = this.uploadedFiles.indexOf(fileObj);
+                                if (i !== -1) this.uploadedFiles.splice(i, 1);
+                                this.errorMessages.push(`"${fileObj.name}" failed to upload from OneDrive — ${error.message}`);
+                            }
+                        })();
+
                     } else if (fileObj.rawFile) {
-                        // Device file waiting for dept assignment
                         this.uploadToDjango(fileObj);
                     }
                 }
             },
+
             closeAllDropdowns() {
                 this.uploadedFiles.forEach(f => f.deptOpen = false);
             },
 
-            // ── Google Drive Integration ──
+            // ── Google Drive Integration (5-step flow from sprint-2) ──
 
-            // Step 1 — Called when user clicks the Google Drive button.
+            // Step 1: Request OAuth token
             initGoogleDrivePicker() {
                 if (typeof google === 'undefined' || !google.accounts) {
                     this.errorMessages = ['Google API is still loading. Please try again in a moment.'];
@@ -1767,7 +1828,7 @@
                 tokenClient.requestAccessToken({ prompt: 'consent' });
             },
 
-            // Step 2 — Load the Google Picker API library, then open the picker.
+            // Step 2: Load Picker API library
             loadPickerApi() {
                 if (this.pickerApiLoaded) {
                     this.openGooglePicker();
@@ -1781,7 +1842,7 @@
                 });
             },
 
-            // Step 3 — Build and display the Google Picker UI.
+            // Step 3: Build and display the Google Picker UI
             openGooglePicker() {
                 const picker = new google.picker.PickerBuilder()
                     .addView(google.picker.ViewId.DOCS)
@@ -1798,7 +1859,7 @@
                 picker.setVisible(true);
             },
 
-            // Step 4 — Picker callback: called when user picks a file or cancels.
+            // Step 4: Picker callback
             onPickerSelected(data) {
                 if (data.action !== google.picker.Action.PICKED) return;
 
@@ -1830,7 +1891,6 @@
                 if (this.isAdmin && !this.validateOrgName()) return;
                 this.showStorageNotice = true;
 
-                // Store the token before nulling it — needed for deferred upload (admin dept flow)
                 const capturedToken = this.googleAccessToken;
 
                 const fileObj = {
@@ -1842,7 +1902,6 @@
                     rawFile:      null,
                     source:       'google',
                     documentId:   null,
-                    // Stash Drive credentials so assignDepartment() can trigger the upload later.
                     _driveFileId: fileId,
                     _driveToken:  capturedToken
                 };
@@ -1850,18 +1909,13 @@
                 this.uploadedFiles.push(fileObj);
 
                 if (!this.isAdmin) {
-                    // General user — upload immediately, no dept needed
                     this.uploadFromDrive(fileObj, fileId, capturedToken);
                 }
-                // Admin — upload is deferred until assignDepartment() is called
 
-                // Clear token from Vue state regardless — it's now either in use
                 this.googleAccessToken = null;
             },
 
-            // Step 5 — POST file_id + access_token to Django backend.
-            //          Django downloads the file from Drive, scans it, and stores in S3.
-            //          Stops at 'uploaded' — AI analysis is NOT triggered here.
+            // Step 5: POST file_id + access_token to Django backend
             async uploadFromDrive(fileObj, fileId, accessToken) {
                 const getIndex = () => this.uploadedFiles.indexOf(fileObj);
 
@@ -1878,7 +1932,6 @@
                             file_id:      fileId,
                             access_token: accessToken,
                             file_name:    fileObj.name,
-                            // Admins supply org + dept; general users send empty strings
                             company_name: this.isAdmin ? (this.companyName || '') : '',
                             department:   this.isAdmin ? (fileObj.department || '') : ''
                         })
@@ -1895,7 +1948,6 @@
                         throw new Error(err.error || `Server returned HTTP ${response.status}`);
                     }
 
-                    // Read the SSE stream — only care about 'uploaded' and 'error'.
                     const reader  = response.body.getReader();
                     const decoder = new TextDecoder();
                     let   buffer  = '';
@@ -1914,7 +1966,7 @@
 
                             try {
                                 const payload = JSON.parse(dataLine.slice(6));
-                                console.log(`[${fileObj.name}] SSE:`, payload.status);
+                                console.log(`[${fileObj.name}] Drive SSE:`, payload.status);
 
                                 switch (payload.status) {
                                     case 'uploaded': {
@@ -1944,7 +1996,7 @@
                                     }
                                 }
                             } catch (parseError) {
-                                console.warn(`Could not parse SSE line for ${fileObj.name}:`, dataLine);
+                                console.warn(`Could not parse Drive SSE line for ${fileObj.name}:`, dataLine);
                             }
                         }
                     }
@@ -1960,9 +2012,8 @@
                 }
             },
 
-            // ── OneDrive Integration (from sprint2) ──
+            // ── OneDrive Integration (from sprint-2) ──
 
-            // Called in mounted() — captures the OAuth token if Microsoft redirected back here.
             captureOneDriveToken() {
                 const hash = window.location.hash;
                 if (hash.includes('access_token')) {
@@ -1976,8 +2027,11 @@
                 }
             },
 
-            // Redirects to Microsoft OAuth to acquire an access token.
             initOneDrivePicker() {
+                if (this.isAdmin && this.companyName.trim()) {
+                    sessionStorage.setItem('pendingOrgName', this.companyName.trim());
+                }
+
                 const REDIRECT_URI = "http://localhost:5500/frontend/home.html";
                 const authUrl =
                     `https://login.microsoftonline.com/common/oauth2/v2.0/authorize` +
@@ -1990,7 +2044,6 @@
                 window.location.href = authUrl;
             },
 
-            // Opens the custom OneDrive file picker UI after OAuth completes.
             openOneDrivePicker() {
                 const vueApp = this;
                 let selected = null;
@@ -2253,19 +2306,23 @@
             async uploadFromOneDrive(file) {
                 if (this.isAdmin && !this.validateOrgName()) return;
                 this.showStorageNotice = true;
-                
+
                 const fileObj = {
-                    name:       file.name,
-                    size:       file.size,
-                    status:     'uploading',
-                    department: '',
-                    deptOpen:   false,
-                    rawFile:    null,
-                    source:     'onedrive',
-                    documentId: null
+                    name:            file.name,
+                    size:            file.size,
+                    status:          this.isAdmin ? 'pending' : 'uploading',
+                    department:      '',
+                    deptOpen:        false,
+                    rawFile:         null,
+                    source:          'onedrive',
+                    documentId:      null,
+                    _oneDriveFileId: file.id,
+                    _oneDriveToken:  this.microsoftAccessToken
                 };
 
                 this.uploadedFiles.push(fileObj);
+
+                if (this.isAdmin) return; // Deferred — assignDepartment() will trigger the upload
 
                 try {
                     const response = await fetch("http://127.0.0.1:8000/ai/upload-from-onedrive/", {
@@ -2278,8 +2335,8 @@
                             file_id:      file.id,
                             access_token: this.microsoftAccessToken,
                             file_name:    file.name,
-                            company_name: this.isAdmin ? (this.companyName || '') : '',
-                            department:   fileObj.department || ''
+                            company_name: '',
+                            department:   ''
                         })
                     });
 
