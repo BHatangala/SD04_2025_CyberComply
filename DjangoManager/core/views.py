@@ -378,7 +378,7 @@ def analyze_compliance(request):
 
             files    = {'file': (file_name, file_bytes, _mime_type_for(file_name))}
             data     = {'company_name': company_name, 'department': department}
-            response = requests.post(f"{AI_API_URL}/analyze", files=files, data=data, timeout=300)
+            response = requests.post(f"{AI_API_URL}/analyze", files=files, data=data, timeout=1200)
             result   = response.json()
 
             # Persist AnalysisResult + Report to database (non-critical — don't break SSE)
@@ -484,7 +484,7 @@ def analyze_batch(request):
             'company_name': company_name,
             'departments':  ','.join(f['department'] for f in multipart_files),
         }
-        response = requests.post(f"{AI_API_URL}/analyze-batch", files=files_payload, data=data_payload, timeout=600)
+        response = requests.post(f"{AI_API_URL}/analyze-batch", files=files_payload, data=data_payload, timeout=1200)
         result   = response.json()
 
         for f in multipart_files:
@@ -739,7 +739,6 @@ def upload_from_drive(request):
 # OneDrive Upload — Phase 1 only
 # ──────────────────────────────────────────────
 
-@csrf_exempt
 @csrf_exempt
 def upload_from_onedrive(request):
     """
@@ -1905,7 +1904,8 @@ def _serialize_analysis(analysis: AnalysisResult) -> dict:
         "result_id":         str(analysis.result_id),
         "document_id":       str(analysis.document_id),
         "original_filename": analysis.document.original_filename,
-        "company_name":      analysis.document.org.org_name if analysis.document.org else "",  # ← add this
+        "company_name":      analysis.document.org.org_name if analysis.document.org else "", 
+        "department":        analysis.document.dept.dept_name if analysis.document.dept else "", 
         "compliance_score":  analysis.compliance_score,
         "risk_level":        analysis.risk_level,
         "summary":           analysis.summary,

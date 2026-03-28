@@ -1,0 +1,30 @@
+FINANCE DEPARTMENT DATA HANDLING AND RECORDS POLICY
+Department: Finance
+Version: 1.0 | Effective: April 2024 | Review: April 2025
+
+1. PURPOSE
+This document describes how the Finance Department of Nexacore Technologies Sdn Bhd manages financial records, vendor payments, payroll data, and related documentation.
+
+2. FINANCIAL DATA MANAGED
+The Finance Department manages: employee payroll records, vendor payment records, customer invoice records, internal budget reports, tax filings, and financial statements.
+
+3. PAYMENT AUTHORISATION CONTROLS
+3.1 Vendor payments above LKR 500,000 require dual authorisation from two Finance officers.
+3.2 New vendor bank details must be verified by telephone callback before processing.
+3.3 Changes to vendor bank details require Finance Manager approval in writing.
+3.4 Urgent payments require written CFO approval before processing.
+
+4. PAYROLL PROCESSING
+Monthly payroll is processed by the designated payroll officer. Pay slips are sent to employees via email. Payroll errors must be reported to the Finance Manager within 3 business days. Payroll files are transmitted to the bank for salary crediting.
+
+5. RECORD KEEPING
+All financial records are kept for 7 years in accordance with statutory requirements. Records are stored in shared Finance network drives accessible to Finance staff. Physical records are stored in locked filing cabinets in the Finance office.
+
+6. VENDOR MANAGEMENT
+Vendor bank details and contact information are maintained in the accounting system. New vendors are added to the approved vendor register after Finance Manager sign-off.
+
+7. AUDIT AND REVIEW
+Annual external audits are conducted by the appointed external auditor. Internal audit reviews are conducted quarterly to check payment authorisation compliance.
+
+8. POLICY REVIEW
+This policy is reviewed annually by the Finance Director.

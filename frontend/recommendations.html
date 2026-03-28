@@ -7,326 +7,626 @@
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
     <style>
-      *{
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-      }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    body {
-        font-family: 'Arial', sans-serif;
-        background-color: #101726;
-        color: #ffffff;
-        overflow-x: hidden;
-    }
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #101726;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
 
-    #app {
-      position: relative;
-      min-height: 100vh;
-    }
+        #app {
+            position: relative;
+            min-height: 100vh;
+        }
 
-    /* Top Header */
-    .top-header {
-      background-color: #1a2845;
-      padding: 15px 30px;
-      display: flex;
-      align-items: center;
-      position: fixed;       
-      top: 0;                
-      left: 0;                
-      width: 100%;            
-      z-index: 100;
-    }
+        /* Top Header (fixed — sprint-2) */
+        .top-header {
+            background-color: #1a2845;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 100;
+        }
 
-    .menu-icon {
-      cursor: pointer;
-      font-size: 24px;
-      color: #8b9dc3;
-      transition: color 0.3s;
-    }
+        .menu-icon {
+            cursor: pointer;
+            font-size: 24px;
+            color: #8b9dc3;
+            transition: color 0.3s;
+        }
 
-    .menu-icon:hover {
-      color: #ffffff;
-    }
+        .menu-icon:hover {
+            color: #ffffff;
+        }
 
-    /* Back Arrow */
-    .back-arrow {
-      position: absolute;
-      left: 30px;
-      top: 80px;
-      cursor: pointer;
-      font-size: 32px;
-      color: #8b9dc3;
-      transition: all 0.3s;
-      font-weight: 300;
-      z-index: 95;
-    }
+        /* Back Arrow */
+        .back-arrow {
+            position: absolute;
+            left: 30px;
+            top: 80px;
+            cursor: pointer;
+            font-size: 32px;
+            color: #8b9dc3;
+            transition: all 0.3s;
+            font-weight: 300;
+            z-index: 95;
+        }
 
-    .back-arrow::after {
-      content: "Back to Previous Page";
-      position: absolute;
-      left: 0px;
-      top: 150%;
-      transform: translateY(-50%);
-      background: #1a2845;
-      color: white;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 14px;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-  }
+        .back-arrow::after {
+            content: "Back to Previous Page";
+            position: absolute;
+            left: 0px;
+            top: 150%;
+            transform: translateY(-50%);
+            background: #1a2845;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
 
-  .back-arrow:hover::after {
-      opacity: 1;
-  }
+        .back-arrow:hover::after {
+            opacity: 1;
+        }
 
-    .back-arrow.shifted {
-      left: 310px;
-    }
+        .back-arrow.shifted {
+            left: 310px;
+        }
 
-    .back-arrow:hover {
-      color: #ffffff;
-    }
+        .back-arrow:hover {
+            color: #ffffff;
+        }
 
-    /* Home Button */
-    .home-button {
-      position: absolute;
-      left: 100px;
-      top: 85px;
-      cursor: pointer;
-      font-size: 28px;
-      color: #8b9dc3;
-      transition: all 0.3s;
-      z-index: 95;
-    }
+        /* Home Button */
+        .home-button {
+            position: absolute;
+            left: 100px;
+            top: 85px;
+            cursor: pointer;
+            font-size: 28px;
+            color: #8b9dc3;
+            transition: all 0.3s;
+            z-index: 95;
+        }
 
-    .home-button::after {
-      content: "Back to Home Page";
-      position: absolute;
-      left: 10px;
-      top: 150%;
-      transform: translateY(-50%);
-      background: #1a2845;
-      color: white;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 14px;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-  }
+        .home-button::after {
+            content: "Back to Home Page";
+            position: absolute;
+            left: 10px;
+            top: 150%;
+            transform: translateY(-50%);
+            background: #1a2845;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
 
-  .home-button:hover::after {
-      opacity: 1;
-  }
+        .home-button:hover::after {
+            opacity: 1;
+        }
 
-    .home-button.shifted {
-      left: 360px; 
-    }
+        .home-button.shifted {
+            left: 360px;
+        }
 
-    .home-button:hover {
-      color: #ffffff;
-    }
+        .home-button:hover {
+            color: #ffffff;
+        }
 
-    .user-profile {
-      position: absolute;
-      right: 30px;
-      width: 50px;
-      height: 50px;
-      background-color: #ffffff;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 3px solid #2a3f5f;
-      transition: transform 0.3s, border-color 0.3s;
-    }
+        .user-profile {
+            position: absolute;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #2a3f5f;
+            transition: transform 0.3s, border-color 0.3s;
+        }
 
-    .user-profile:hover {
-      transform: scale(1.05);
-      border-color: #4a8fe7;
-    }
+        .user-profile:hover {
+            transform: scale(1.05);
+            border-color: #4a8fe7;
+        }
 
-    .user-profile svg {
-      width: 30px;
-      height: 30px;
-      fill: #1a2845;
-    }
+        .user-profile svg {
+            width: 30px;
+            height: 30px;
+            fill: #1a2845;
+        }
 
-    /*main content*/
-    .main-content {
-      transition: margin-left 0.3s ease-in-out;
-      padding: 60px 80px;
-      position: relative;
-      z-index: 1;
-    }
+        /* Main content */
+        .main-content {
+            transition: margin-left 0.3s ease-in-out;
+            padding: 60px 80px;
+            position: relative;
+            z-index: 1;
+        }
 
-    .main-content.shifted {
-      margin-left: 280px;
-    }
+        .main-content.shifted {
+            margin-left: 280px;
+        }
 
-    /* Logo */
-    .logo {
-      text-align: center;
-      margin-top: 55px;
-      margin-bottom: 60px;
-    }
+        /* Logo — margin-top: 55px clears the fixed header (sprint-2) */
+        .logo {
+            text-align: center;
+            margin-top: 55px;
+            margin-bottom: 60px;
+        }
 
-    .logo h1 {
-      font-size: 48px;
-      font-weight: bold;
-      letter-spacing: 4px;
-      color: #ffffff;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-      }
+        .logo h1 {
+            font-size: 48px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
 
-    /* Recommendations */
-    .recommendation {
-      max-width: 900px;
-      margin: 0 auto 25px;
-      background-color: #1a2845;
-      padding: 25px 30px;
-      border-radius: 12px;
-      border-left: 5px solid #4a8fe7;
-    }
+        /* Recommendation card base */
+        .recommendation {
+            max-width: 900px;
+            margin: 0 auto 25px;
+            background-color: #1a2845;
+            padding: 25px 30px;
+            border-radius: 12px;
+            border-left: 5px solid #4a8fe7;
+        }
 
-    .recommendation ul {
-      margin-top: 10px;
-      padding-left: 20px;
-    }
+        /* Wavy Background */
+        .wavy-background {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 85%;
+            z-index: 0;
+            opacity: 0.6;
+            pointer-events: none;
+        }
 
-    .recommendation li {
-      margin-bottom: 8px;
-      color: #c5d0e6;
-    }
+        .wavy-background img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
 
-    .reference {
-      font-size: 13px;
-      color: #8b9dc3;
-      margin-top: 6px;
-    }
+        /* Scrollbar */
+        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar::-webkit-scrollbar-track { background: #0d1420; }
+        .sidebar::-webkit-scrollbar-thumb { background: #2a4a7c; border-radius: 3px; }
+        .sidebar::-webkit-scrollbar-thumb:hover { background: #4a8fe7; }
 
-    /* Wavy Background */
-    .wavy-background {
-      position: fixed;
-      bottom: 0;
-      right: 0;
-      width: 85%;
-      z-index: 0;
-      opacity: 0.6;
-      pointer-events: none;
-    }
+        /* ── Dynamic recommendation card styles (ai-development) ── */
+        .rec-heading {
+            font-size: 15px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
 
-    .wavy-background img {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
+        .rec-reasoning {
+            font-size: 13px;
+            color: #8b9dc3;
+            line-height: 1.55;
+            margin-bottom: 14px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(74,143,231,0.12);
+        }
 
-  </style>
+        .rec-steps-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: #4a8fe7;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .rec-steps {
+            padding-left: 0;
+            list-style: none;
+            margin-bottom: 14px;
+        }
+
+        .rec-steps li {
+            font-size: 13px;
+            color: #c5d0e6;
+            padding: 5px 0 5px 22px;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .rec-steps li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #4a8fe7;
+            font-size: 12px;
+        }
+
+        .rec-reference {
+            font-size: 12px;
+            color: #6b7a99;
+            padding-top: 10px;
+            border-top: 1px solid rgba(74,143,231,0.12);
+            letter-spacing: 0.3px;
+        }
+
+        .risk-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            padding: 3px 9px;
+            border-radius: 99px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .risk-critical { background: rgba(231,74,74,0.15);  color: #e74a4a; border: 1px solid rgba(231,74,74,0.4); }
+        .risk-high     { background: rgba(231,150,74,0.15); color: #e7964a; border: 1px solid rgba(231,150,74,0.4); }
+        .risk-medium   { background: rgba(231,210,74,0.15); color: #d4bf2e; border: 1px solid rgba(231,210,74,0.4); }
+        .risk-low      { background: rgba(74,143,231,0.15); color: #66cc66; border: 1px solid rgba(144,238,144,0.4); }
+        .risk-unknown  { background: rgba(139,157,195,0.15); color: #8b9dc3; border: 1px solid rgba(139,157,195,0.3); }
+
+        /* No data / loading / error banners */
+        .no-data-banner {
+            max-width: 900px;
+            margin: 0 auto 30px;
+            background: rgba(231,74,74,0.08);
+            border: 1px solid rgba(231,74,74,0.25);
+            border-radius: 10px;
+            padding: 18px 24px;
+            font-size: 14px;
+            color: #e74a4a;
+        }
+
+        .loading-banner {
+            max-width: 900px;
+            margin: 0 auto 30px;
+            background: rgba(74,143,231,0.08);
+            border: 1px solid rgba(74,143,231,0.25);
+            border-radius: 10px;
+            padding: 18px 24px;
+            font-size: 14px;
+            color: #8bb8f0;
+        }
+
+        .rec-count {
+            max-width: 900px;
+            margin: 0 auto 20px;
+            font-size: 12px;
+            color: #6b7a99;
+            letter-spacing: 0.4px;
+        }
+
+        @media screen and (max-width: 1200px) {
+            .main-content.shifted { margin-left: 0; }
+        }
+    </style>
 </head>
 
 <body>
 <div id="app">
 
-  <!-- Top Header -->
-  <div class="top-header">
-      <div class="menu-icon" @click="toggleSidebar">●●●</div>
-      <div class="user-profile" @click="showProfile">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-          </svg>
-      </div>
-  </div>
-
-  <!-- Back Arrow -->
-   <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←
-   </div>
-
-  <!-- Home Button -->
-   <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goHome">
-    <svg viewBox="0 0 24 24" width="30" height="30" fill="#8b9dc3">
-        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-    </svg>
-  </div>
-
-  <!-- Sidebar -->
-  <cybercomply-sidebar
-      :sidebar-open="sidebarOpen"
-      @toggle="sidebarOpen = !sidebarOpen"
-  ></cybercomply-sidebar>
-
-  <!-- Main Content -->
-  <div class="main-content" :class="{ shifted: sidebarOpen }">
-    <div class="logo">
-      <h1>CYBERCOMPLY<br/>RECOMMENDATIONS</h1>
+    <!-- Top Header -->
+    <div class="top-header">
+        <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
+        <div class="user-profile" @click="showProfile">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+        </div>
     </div>
 
-    <div class="recommendation" v-for="(rec, index) in recommendations" :key="index">
-      <strong>{{ rec.title }}</strong>
-      <ul>
-        <li v-for="point in rec.points" :key="point">{{ point }}</li>
-      </ul>
-      <div class="reference">{{ rec.reference }}</div>
-    </div>
-  </div>
+    <!-- Back Arrow -->
+    <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←</div>
 
-  <!-- Wavy Background -->
-  <div class="wavy-background">
-      <img src="img2.png" alt="Wavy Design">
-  </div> 
+    <!-- Home Button -->
+    <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goHome">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="#8b9dc3">
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+        </svg>
+    </div>
+
+    <!-- Sidebar (external component — sprint-2) -->
+    <cybercomply-sidebar
+        :sidebar-open="sidebarOpen"
+        @toggle="sidebarOpen = !sidebarOpen"
+    ></cybercomply-sidebar>
+
+    <!-- Main Content -->
+    <div class="main-content" :class="{ shifted: sidebarOpen }">
+        <div class="logo">
+            <h1>CYBERCOMPLY<br/>RECOMMENDATIONS</h1>
+        </div>
+
+        <!-- Loading state -->
+        <div class="loading-banner" v-if="isLoading">
+            ⏳ Loading recommendations…
+        </div>
+
+        <!-- No data / error state (ai-development) -->
+        <div class="no-data-banner" v-if="!isLoading && (loadError || recommendations.length === 0)">
+            ⚠ {{ loadError || 'No analysis result found. Please run a document analysis first from the home page.' }}
+        </div>
+
+        <!-- Count label (ai-development) -->
+        <div class="rec-count" v-if="!isLoading && recommendations.length > 0">
+            {{ recommendations.length }} recommendation{{ recommendations.length !== 1 ? 's' : '' }}
+            generated from non-compliant and partially compliant requirements
+        </div>
+
+        <!-- Dynamic recommendation cards (ai-development) -->
+        <div
+            class="recommendation"
+            v-for="(rec, index) in recommendations"
+            :key="rec.requirementId"
+        >
+            <!-- Clause title + risk badge -->
+            <div class="rec-heading">
+                <span>{{ index + 1 }}. {{ rec.clauseTitle }}</span>
+                <span class="risk-badge" :class="`risk-${rec.riskLevel}`">{{ rec.riskLevel }}</span>
+            </div>
+
+            <!-- AI reasoning for why this clause is non-compliant -->
+            <div class="rec-reasoning">{{ rec.reasoning }}</div>
+
+            <!-- Actionable steps derived from PDPA requirement text -->
+            <div class="rec-steps-label">Steps to Achieve Compliance</div>
+            <ul class="rec-steps">
+                <li v-for="step in rec.steps" :key="step">{{ step }}</li>
+            </ul>
+
+            <!-- PDPA Act reference -->
+            <div class="rec-reference">
+                Personal Data Protection Act No. 9 of 2022 (Sri Lanka) — {{ rec.reference }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Wavy Background -->
+    <div class="wavy-background">
+        <img src="img2.png" alt="Wavy Design">
+    </div>
 
 </div>
 
 <script>
-  const { createApp } = Vue;
+    const { createApp } = Vue;
 
-  const app = createApp({
-    data() {
-      return {
-        sidebarOpen: true,
-        recommendations: [
-          {
-            title: 'Implement stronger access controls',
-            points: [
-              'Use role-based access control (RBAC)',
-              'Enforce least privilege principles'
-            ],
-            reference: 'As required under section 9(1)(a) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)'
-          },
-          {
-            title: 'Improve data encryption practices',
-            points: [
-              'Encrypt sensitive data at rest',
-              'Use TLS for data in transit'
-            ],
-            reference: 'As required under section 9(1)(a) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)'
-          }
-        ]
-      }
-    },
-    methods: {
-      toggleSidebar() {
-        this.sidebarOpen = !this.sidebarOpen;
-      },
-      showProfile() {
-        window.location.href = 'profile.html';
-      },
-      goBack() {
-        window.location.href = 'document_analysis.html';
-      },
-      goHome() {
-        window.location.href = 'home.html';
-      }
+    const BASE = 'http://127.0.0.1:8000/ai';
+
+    // ── Helpers (ai-development — fully preserved) ────────────────────────────
+
+    // Builds a human-readable PDPA reference string from a requirement object.
+    // e.g. { section: 6, subsection: 1, clause: 'a', clause_title: '...' }
+    //   → "Section 6(1)(a) — <clause_title>"
+    function buildReference(req) {
+        let ref = `Section ${req.section}`;
+        if (req.subsection) ref += `(${req.subsection})`;
+        if (req.clause)     ref += `(${req.clause})`;
+        ref += ` — ${req.clause_title}`;
+        return ref;
     }
-  });
-  registerSidebarComponent(app);
-  app.mount('#app');
+
+    // Rephrases legal third-person language into second-person action language.
+    // e.g. "Every controller shall ensure..." → "Ensure that the organisation..."
+    function actionify(text) {
+        return text
+            .replace(/^Every controller shall\s+/i,  'Ensure that the organisation ')
+            .replace(/^The controller shall\s+/i,     'Ensure that the organisation ')
+            .replace(/^A controller shall\s+/i,       'Ensure that the organisation ')
+            .replace(/^Controllers must\s+/i,         'Ensure that the organisation ')
+            .replace(/^Processing must\s+/i,          'Ensure that all processing ')
+            .replace(/^Processing is\s+/i,            'Ensure processing is ')
+            .replace(/^Personal data shall\s+/i,      'Ensure personal data is ')
+            .replace(/^Personal data must\s+/i,       'Ensure personal data is ')
+            .replace(/^The processor shall\s+/i,      'Ensure the processor ')
+            .replace(/^Processors must\s+/i,          'Ensure processors ')
+            .replace(/^[a-z]/, c => c.toUpperCase());
+    }
+
+    // Transforms a legal requirement string into plain-English action steps.
+    // 1. Splits on lettered sub-clauses (a), (b), (c)... when 2+ are present
+    // 2. Otherwise splits on ". " for multi-sentence requirements
+    // 3. Appends one schedule condition as an extra step if available
+    // 4. Capped at 4 steps to keep cards concise
+    function deriveSteps(req) {
+        const raw = req.requirement;
+        const steps = [];
+
+        const subClauseMatches = [...raw.matchAll(/\([a-z]\)\s+/g)];
+
+        if (subClauseMatches.length >= 2) {
+            const parts = raw.split(/\([a-z]\)\s+/).filter(p => p.trim().length > 10);
+            for (const part of parts.slice(0, 4)) {
+                const clean = part.replace(/\.$/, '').trim();
+                if (clean.length > 10) steps.push(actionify(clean));
+            }
+        } else {
+            const sentences = raw.split(/\.\s+/).filter(s => s.trim().length > 15);
+            for (const s of sentences.slice(0, 4)) {
+                steps.push(actionify(s.trim()));
+            }
+        }
+
+        // Supplement with one schedule condition if steps are sparse
+        if (req.schedule_content && steps.length < 4) {
+            for (const [, sched] of Object.entries(req.schedule_content)) {
+                if (sched.conditions && sched.conditions.length > 0) {
+                    const cond = sched.conditions[0].replace(/^\([a-z]\)\s+/, '');
+                    const condTrimmed = cond.length > 220
+                        ? cond.substring(0, cond.lastIndexOf(' ', 220)) + '...'
+                        : cond;
+                    steps.push(`Ensure compliance with ${sched.description}: ${condTrimmed}`);
+                    if (steps.length >= 4) break;
+                }
+            }
+        }
+
+        return steps.length > 0
+            ? steps
+            : [`Implement controls to satisfy: ${raw.substring(0, 150)}...`];
+    }
+
+    // ── Vue App ───────────────────────────────────────────────────────────────
+
+    const app = createApp({
+        data() {
+            return {
+                sidebarOpen: true,
+
+                // PDPA requirements lookup — built from static local JSON file.
+                // This is NOT a Django endpoint. Same pattern as risk_mapping.json.
+                // Path: ../AIModel/data/pdpa_requirements_full.json
+                pdpaIndex: {},
+
+                // Recommendation cards — built from the DB result
+                recommendations: [],
+
+                // Loading / error state
+                isLoading: true,
+                loadError: ''
+            };
+        },
+
+        async mounted() {
+            // ── Auth guard ──────────────────────────────────────────────
+            const token = sessionStorage.getItem('authToken');
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // ── Step 1: Load PDPA requirements JSON from local file ─────
+            // Static file fetch — identical to ai-development approach.
+            // Not served by Django; lives at ../AIModel/data/ relative to frontend.
+            const PDPA_PATH = '../AIModel/data/pdpa_requirements_full.json';
+            try {
+                const res = await fetch(PDPA_PATH);
+                if (res.ok) {
+                    const json = await res.json();
+                    for (const req of json.requirements) {
+                        this.pdpaIndex[req.id] = req;
+                    }
+                    console.log('[INFO] PDPA index built —', Object.keys(this.pdpaIndex).length, 'entries');
+                } else {
+                    console.warn('[WARN] pdpa_requirements_full.json not found at', PDPA_PATH);
+                }
+            } catch (e) {
+                console.warn('[WARN] Could not load PDPA JSON:', e.message);
+            }
+
+            // ── Step 2: Fetch compliance details from DB ────────────────
+            // Replaces the localStorage read from ai-development.
+            // Reads latestResultId written by home.html after analysis save.
+            // Falls back to /latest/ if none is stored.
+            const resultId = sessionStorage.getItem('latestResultId');
+            const url = resultId
+                ? `${BASE}/api/analysis/${resultId}/`
+                : `${BASE}/api/analysis/latest/`;
+
+            try {
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.status === 401 || res.status === 403) {
+                    sessionStorage.clear();
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                if (!res.ok) {
+                    this.loadError = 'No analysis results found. Please upload and analyse a document first.';
+                    this.isLoading = false;
+                    return;
+                }
+
+                const data = await res.json();
+
+                // data.compliance.details has the same shape that was previously
+                // stored in localStorage under result.compliance.details —
+                // so all the card-building logic below is identical to ai-development.
+                const details = data.compliance?.details || [];
+
+                // ── Step 3: Filter, sort, and build recommendation cards ──
+                // Identical logic to ai-development — only the data source changed.
+                const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+
+                const flagged = details
+                    .filter(d => d.status === 'non_compliant' || d.status === 'partial')
+                    .sort((a, b) =>
+                        (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4)
+                    );
+
+                this.recommendations = flagged.map(d => {
+                    const req = this.pdpaIndex[d.requirement_id];
+                    return {
+                        requirementId: d.requirement_id,
+                        clauseTitle:   d.clause || (req?.clause_title ?? d.requirement_id),
+                        reasoning:     d.reasoning,
+                        riskLevel:     d.risk_level || 'unknown',
+                        steps:         req
+                            ? deriveSteps(req)
+                            : [`Address the requirements under ${d.requirement_id}.`],
+                        reference:     req ? buildReference(req) : d.requirement_id
+                    };
+                });
+
+                console.log('[INFO] Recommendations built —', this.recommendations.length, 'cards');
+
+            } catch (e) {
+                console.error('Failed to load recommendations:', e);
+                this.loadError = 'Could not reach the server. Please check your connection.';
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        methods: {
+            showProfile() {
+                window.location.href = 'profile.html';
+            },
+            goBack() {
+                window.location.href = 'document_analysis.html';
+            },
+            goHome() {
+                window.location.href = 'home.html';
+            }
+        }
+    });
+
+    registerSidebarComponent(app);
+    app.mount('#app');
 </script>
 
 </body>
