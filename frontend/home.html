@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="sidebar_component.js"></script>
+
+    <!-- Google Identity Services (OAuth 2.0) + Google API client (Picker) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+
     <style>
         * {
             margin: 0;
@@ -30,7 +36,10 @@
             padding: 15px 30px;
             display: flex;
             align-items: center;
-            position: relative;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
             z-index: 100;
         }
 
@@ -71,135 +80,6 @@
             fill: #1a2845;
         }
 
-        /* ── Sidebar ── */
-        .sidebar {
-            position: absolute;
-            left: 0;
-            top: 60px;
-            width: 280px;
-            height: calc(100vh - 60px);
-            background-color: #0d1420;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease-in-out;
-            z-index: 90;
-            overflow-y: auto;
-            padding: 20px 0;
-            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
-        }
-
-        .sidebar.open {
-            transform: translateX(0);
-        }
-
-        .sidebar-icon-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0px 10px 15px 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #1a2845;
-        }
-
-        .sidebar-icon {
-            width: 45px;
-            height: 45px;
-            background-color: #1a2845;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .sidebar-icon:hover {
-            background-color: #2a4a7c;
-            transform: scale(1.05);
-        }
-
-        .sidebar-icon svg {
-            width: 22px;
-            height: 22px;
-            fill: #8b9dc3;
-            transition: fill 0.3s;
-        }
-
-        .sidebar-icon:hover svg {
-            fill: #ffffff;
-        }
-
-        .search-container {
-            padding: 0 20px 20px;
-            display: none;
-        }
-
-        .search-container.active {
-            display: block;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 10px 15px;
-            background-color: #1a2845;
-            border: 2px solid #2a4a7c;
-            border-radius: 8px;
-            color: #ffffff;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #4a8fe7;
-        }
-
-        .search-input::placeholder {
-            color: #6b7a99;
-        }
-
-        .sidebar-section {
-            margin-bottom: 30px;
-        }
-
-        .sidebar-header {
-            padding: 10px 20px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #6b7a99;
-            letter-spacing: 1.5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .sidebar-header svg {
-            width: 14px;
-            height: 14px;
-            fill: #6b7a99;
-        }
-
-        .sidebar-item {
-            padding: 12px 20px;
-            color: #c5d0e6;
-            cursor: pointer;
-            transition: all 0.2s;
-            border-left: 3px solid transparent;
-            font-size: 14px;
-        }
-
-        .sidebar-item:hover {
-            background-color: #1a2845;
-            border-left-color: #4a8fe7;
-            color: #ffffff;
-        }
-
-        .no-results {
-            padding: 12px 20px;
-            color: #6b7a99;
-            font-size: 12px;
-            font-style: italic;
-        }
-
         /* ── Main Content ── */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
@@ -215,6 +95,7 @@
         /* ── Logo ── */
         .logo {
             text-align: center;
+            margin-top: 45px;
             margin-bottom: 36px;
         }
 
@@ -226,8 +107,7 @@
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
 
-        /* ── Organisation Name Field (admin-only — always shown for now)
-               TODO: Wrap v-if="isAdmin" once auth/database is implemented ── */
+        /* ── Organisation Name Field (admin-only) ── */
         .org-row {
             max-width: 800px;
             margin: 0 auto 28px;
@@ -269,6 +149,14 @@
         .org-input:focus {
             outline: none;
             border-color: #4a8fe7;
+        }
+
+        .org-input-error {
+            border-color: rgba(244, 67, 54, 0.6);
+        }
+
+        .org-input-error:focus {
+            border-color: #f44336;
         }
 
         /* ── Upload Container ── */
@@ -380,23 +268,122 @@
             text-transform: uppercase;
         }
 
-        /* ── Error Message ── */
-        .error-message {
+        /* ── Temporary Storage Info Banner ── */
+        .upload-info-block {
             max-width: 800px;
-            margin: 10px auto;
-            padding: 12px 20px;
-            background-color: rgba(244, 67, 54, 0.1);
-            border-left: 4px solid #f44336;
-            border-radius: 8px;
-            color: #ff6b6b;
-            font-size: 14px;
+            margin: 12px auto 0;
+            background: rgba(74, 143, 231, 0.12);
+            border: 1px solid rgba(74, 143, 231, 0.4);
+            border-radius: 12px;
             animation: slideIn 0.3s ease-out;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 18px;
+        }
+
+        .upload-info-block::before {
+            content: "ℹ";
+            font-size: 15px;
+            font-weight: 700;
+            color: #4a8fe7;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .upload-info-text {
+            color: #8bb8f0;
+            font-size: 13px;
+            line-height: 1.5;
+            flex: 1;
+        }
+
+        .upload-info-close {
+            cursor: pointer;
+            font-size: 16px;
+            color: #4a8fe7;
+            opacity: 0.7;
+            flex-shrink: 0;
+            transition: opacity 0.2s;
+        }
+
+        .upload-info-close:hover { opacity: 1; }
+
+        /* ── Upload Failure Block ── */
+        .upload-failure-block {
+            max-width: 800px;
+            margin: 12px auto 0;
+            background: rgba(244, 67, 54, 0.15);
+            border: 1px solid rgba(244, 67, 54, 0.4);
+            border-radius: 12px;
+            overflow: hidden;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .upload-failure-messages {
+            padding: 12px 18px 10px;
+            border-bottom: 1px solid rgba(244, 67, 54, 0.15);
+        }
+
+        .upload-failure-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            color: #ff6b6b;
+            font-size: 13px;
+            line-height: 1.5;
+            padding: 3px 0;
+        }
+
+        .upload-failure-item::before {
+            content: "✕";
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+            margin-top: 2px;
+            color: #f44336;
+        }
+
+        .upload-rules {
+            padding: 10px 18px 14px;
+        }
+
+        .upload-rules-heading {
+            font-size: 11px;
+            color: #8b9dc3;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .upload-rules-grid {
+            display: flex;
+            gap: 32px;
+        }
+
+        .upload-rules-col {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .upload-rule {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #6b7a99;
+        }
+
+        .upload-rule::before {
+            content: "–";
+            color: #4a5a7a;
+            font-size: 10px;
         }
 
         /* ── File List ── */
         .upload-status {
             max-width: 800px;
-            margin: 20px auto;
+            margin: 20px auto 0;
         }
 
         .file-item {
@@ -517,8 +504,7 @@
             100% { width: 100%; }
         }
 
-        /* ── Department Pill (admin-only)
-               TODO: Wrap with v-if="isAdmin" once auth/database is ready ── */
+        /* ── Department Pill (admin-only) ── */
         .dept-pill {
             display: flex;
             align-items: center;
@@ -611,6 +597,11 @@
             flex-shrink: 0;
         }
 
+        .status-pending {
+            background: rgba(255, 152, 0, 0.12);
+            color: #ff9800;
+        }
+
         .status-uploading {
             background: rgba(74, 143, 231, 0.12);
             color: #4a8fe7;
@@ -629,6 +620,75 @@
         .status-analysed {
             background: rgba(76, 175, 80, 0.15);
             color: #4caf50;
+        }
+
+        .status-error {
+            background: rgba(244, 67, 54, 0.12);
+            color: #ff6b6b;
+        }
+
+        /* ── Analyse Row ── */
+        .analyse-row {
+            max-width: 800px;
+            margin: 20px auto 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 16px 0 4px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .analyse-hint {
+            font-size: 12px;
+            color: #ffc107;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex: 1;
+        }
+
+        .analyse-hint.hidden {
+            visibility: hidden;
+        }
+
+        .analyse-hint svg {
+            width: 14px;
+            height: 14px;
+            fill: #ffc107;
+            flex-shrink: 0;
+        }
+
+        .analyse-btn {
+            background: #4a8fe7;
+            color: #ffffff;
+            border: none;
+            padding: 13px 40px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+            white-space: nowrap;
+            box-shadow: 0 4px 14px rgba(74, 143, 231, 0.35);
+            flex-shrink: 0;
+        }
+
+        .analyse-btn:hover:not(:disabled) {
+            background: #6ba3ff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(74, 143, 231, 0.5);
+        }
+
+        .analyse-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .analyse-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            box-shadow: none;
         }
 
         /* ── Integration Alert Modal ── */
@@ -769,7 +829,7 @@
 
     <!-- ── Top Header ── -->
     <div class="top-header">
-        <div class="menu-icon" @click="toggleSidebar">●●●</div>
+        <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
         <div class="user-profile" @click="showProfile">
             <svg viewBox="0 0 24 24">
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
@@ -777,67 +837,11 @@
         </div>
     </div>
 
-    <!-- ── Sidebar ── -->
-    <div class="sidebar" :class="{ open: sidebarOpen }">
-        <div class="sidebar-icon-bar">
-            <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
-                <svg viewBox="0 0 24 24">
-                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                </svg>
-            </div>
-            <div class="sidebar-icon" @click="goToHome" title="Start new analysis">
-                <svg viewBox="0 0 24 24">
-                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                </svg>
-            </div>
-        </div>
-
-        <div class="search-container" :class="{ active: searchActive }">
-            <input
-                type="text"
-                class="search-input"
-                v-model="searchQuery"
-                placeholder="Search documents..."
-                @input="filterReports"
-            >
-        </div>
-
-        <div class="sidebar-section">
-            <div class="sidebar-header">
-                <svg viewBox="0 0 24 24">
-                    <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                </svg>
-                LAST 7 DAYS
-            </div>
-            <div v-if="filteredLast7Days.length === 0" class="no-results">No results to display</div>
-            <div v-else>
-                <div
-                    v-for="report in filteredLast7Days"
-                    :key="report"
-                    class="sidebar-item"
-                    @click="openReport(report)"
-                >{{ report }}</div>
-            </div>
-        </div>
-
-        <div class="sidebar-section">
-            <div class="sidebar-header">
-                <svg viewBox="0 0 24 24">
-                    <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-                </svg>
-                LAST 30 DAYS
-            </div>
-            <div v-if="filteredLast30Days.length === 0" class="no-results">No results to display</div>
-            <div v-else>
-                <div
-                    v-for="report in filteredLast30Days"
-                    :key="report"
-                    class="sidebar-item"
-                    @click="openReport(report)"
-                >{{ report }}</div>
-            </div>
-        </div>
-    </div>
+    <!-- ── Sidebar (external component from sprint-2) ── -->
+    <cybercomply-sidebar
+        :sidebar-open="sidebarOpen"
+        @toggle="sidebarOpen = !sidebarOpen"
+    ></cybercomply-sidebar>
 
     <!-- ── Main Content ── -->
     <div class="main-content" :class="{ shifted: sidebarOpen }" @click="closeAllDropdowns">
@@ -849,16 +853,18 @@
 
         <!--
             Organisation Name — ADMIN ONLY
-            TODO: Add v-if="isAdmin" once database/auth is integrated.
-                  isAdmin should be derived from the authenticated user's role.
+            Visible only for ADMINISTRATIVE_USER role.
+            isAdmin is derived from the authenticated user's role in mounted().
         -->
-        <div class="org-row">
+        <div class="org-row" v-if="isAdmin">
             <div class="org-label">ORGANISATION</div>
             <input
                 class="org-input"
+                :class="{ 'org-input-error': isAdmin && errorMessages.some(m => m.includes('Organisation')) }"
                 type="text"
                 v-model="companyName"
                 placeholder="Enter organisation name…"
+                @blur="orgNameTouched = true"
             >
         </div>
 
@@ -881,8 +887,8 @@
 
                 <div class="upload-sources">
 
-                    <!-- Google Drive -->
-                    <div class="source-btn" @click.stop="showIntegrationModal('Google Drive')">
+                    <!-- Google Drive (full picker — sprint-2) -->
+                    <div class="source-btn" @click.stop="initGoogleDrivePicker()">
                         <div class="source-icon">
                             <svg viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
                                 <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
@@ -896,8 +902,8 @@
                         <div class="source-label">GOOGLE DRIVE</div>
                     </div>
 
-                    <!-- Microsoft OneDrive -->
-                    <div class="source-btn" @click.stop="showIntegrationModal('Microsoft OneDrive')">
+                    <!-- Microsoft OneDrive (full picker — sprint-2) -->
+                    <div class="source-btn" @click.stop="initOneDrivePicker()">
                         <div class="source-icon">
                             <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                                 <path fill="#0364B8" d="M28.087 16.502l-.665-.386A11.047 11.047 0 0 0 21.8 14.5C15.592 14.5 10.5 19.444 10.5 25.524c0 .18.007.36.018.538l.039.66-.588.276A7.44 7.44 0 0 0 6.5 33.5c0 4.136 3.364 7.5 7.5 7.5h26c3.866 0 7-3.134 7-7 0-3.445-2.494-6.37-5.876-6.916l-.553-.088-.164-.535a11.01 11.01 0 0 0-2.32-4.459z"/>
@@ -931,8 +937,36 @@
                 @change="handleFileSelect"
             >
 
-            <!-- Error Messages -->
-            <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+            <!-- ── Temporary Storage Info Banner ── -->
+            <div class="upload-info-block" v-if="showStorageNotice">
+                <span class="upload-info-text">
+                    Your uploaded documents are temporarily stored and will be automatically deleted after your session ends.
+                </span>
+                <span class="upload-info-close" @click="showStorageNotice = false">×</span>
+            </div>
+
+            <!-- ── Upload Failure Block ── -->
+            <div class="upload-failure-block" v-if="errorMessages.length > 0">
+                <div class="upload-failure-messages">
+                    <div class="upload-failure-item" v-for="(msg, i) in errorMessages" :key="i">
+                        {{ msg }}
+                    </div>
+                </div>
+                <div class="upload-rules" v-if="hasFileErrors">
+                    <p class="upload-rules-heading">When uploading files please ensure:</p>
+                    <div class="upload-rules-grid">
+                        <div class="upload-rules-col">
+                            <span class="upload-rule">No password-protected files</span>
+                            <span class="upload-rule">No malware or flagged content</span>
+                            <span class="upload-rule">Max file size: 50 MB per file</span>
+                        </div>
+                        <div class="upload-rules-col">
+                            <span class="upload-rule">Supported formats: PDF, DOCX, TXT</span>
+                            <span class="upload-rule">Up to 10 files at a time</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- ── File List ── -->
             <div class="upload-status" v-if="uploadedFiles.length > 0">
@@ -941,7 +975,7 @@
                     :key="index"
                     class="file-item"
                 >
-                    <!-- Remove button — also triggers S3 deletion if already uploaded -->
+                    <!-- Remove button — removes from UI + triggers S3 delete + DB soft-delete -->
                     <div class="file-remove" @click="removeFile(index)">×</div>
 
                     <div class="file-icon">
@@ -960,10 +994,11 @@
 
                     <!--
                         Department Pill — ADMIN ONLY
-                        TODO: Wrap with v-if="isAdmin" once database/auth is integrated.
-                              isAdmin should be derived from the authenticated user's role.
+                        Only shown for ADMINISTRATIVE_USER role.
+                        General users have no dept assignment — pill is hidden entirely.
                     -->
                     <div
+                        v-if="isAdmin"
                         class="dept-pill"
                         :class="{ unassigned: !file.department }"
                         @click.stop="toggleDeptDropdown(index)"
@@ -996,19 +1031,59 @@
                     <div
                         class="file-status-badge"
                         :class="{
+                            'status-pending':    file.status === 'pending',
                             'status-uploading':  file.status === 'uploading',
                             'status-uploaded':   file.status === 'uploaded',
                             'status-analysing':  file.status === 'analysing',
-                            'status-analysed':   file.status === 'analysed'
+                            'status-analysed':   file.status === 'analysed',
+                            'status-error':      file.status === 'error'
                         }"
                     >
-                        <span v-if="file.status === 'uploading'">UPLOADING…</span>
+                        <span v-if="file.status === 'pending'">SELECT DEPT</span>
+                        <span v-else-if="file.status === 'uploading'">UPLOADING…</span>
                         <span v-else-if="file.status === 'uploaded'">UPLOADED</span>
                         <span v-else-if="file.status === 'analysing'">ANALYSING…</span>
                         <span v-else-if="file.status === 'analysed'">✓ ANALYSED</span>
+                        <span v-else-if="file.status === 'error'">ERROR</span>
                     </div>
 
                 </div>
+            </div>
+
+            <!--
+                ── Analyse Row ──
+                Shown only when at least one file is present.
+
+                Admin mode (isAdmin = true):
+                  - Button disabled while any file is uploading OR any uploaded file
+                    has no department assigned OR org name is empty.
+                  - Hint message explains what's blocking.
+
+                General user mode (isAdmin = false):
+                  - Button disabled only while files are still uploading.
+                  - No department or org name requirement.
+            -->
+            <div class="analyse-row" v-if="uploadedFiles.length > 0">
+
+                <div
+                    class="analyse-hint"
+                    :class="{ hidden: !isAdmin || !hasMissingDepartments }"
+                >
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                    Assign a department to all files before analysing
+                </div>
+
+                <div v-if="!isAdmin" style="flex:1;"></div>
+
+                <button
+                    class="analyse-btn"
+                    :disabled="!canAnalyse"
+                    @click="startAnalysis"
+                >
+                    ANALYSE
+                </button>
             </div>
         </div>
     </div>
@@ -1037,50 +1112,170 @@
 </div>
 
 <script>
+    const GOOGLE_CLIENT_ID = '813213515196-8jl2875doj2uci86dgipqv7j95p96e1i.apps.googleusercontent.com';
+    const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+
+    const MS_CLIENT_ID = "fe3d792d-14b8-4029-a825-0dc2063a8ead";
+    const MS_SCOPE = "Files.Read User.Read";
+
     const { createApp } = Vue;
 
-    createApp({
+    const app = createApp({
         data() {
             return {
-                // ── Sidebar ──
-                sidebarOpen: false,
-                searchActive: false,
-                searchQuery: '',
-                last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
-                last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
-                filteredLast7Days: [],
-                filteredLast30Days: [],
+                sidebarOpen: true,
+
+                // ── Admin / role flag ──
+                // Initialised false; overwritten in mounted() from sessionStorage userRole.
+                isAdmin: false,
 
                 // ── Admin fields ──
-                // TODO: Replace with isAdmin flag from auth/database once implemented.
                 companyName: '',
+                orgNameTouched: false,
 
                 // ── Upload ──
                 isDragging: false,
                 uploadedFiles: [],
-                errorMessage: '',
+                errorMessages: [],
+                showStorageNotice: false,
 
-                // ── Department options ──
-                departments: ['HR & Admin', 'Finance', 'IT', 'Operations'],
+                // ── Department options (full list from sprint-2) ──
+                departments: [
+                    'Finance & Accounting',
+                    'Human Resources & Administration',
+                    'Research & Development',
+                    'Legal & Compliance',
+                    'Operations',
+                    'Procurement & Supply Chain',
+                    'Sales & Business Development',
+                    'Marketing & Communications',
+                    'Information Technology & Cybersecurity',
+                    'Governance, Risk & Compliance (GRC)',
+                    'Quality Assurance',
+                    'Customer Service',
+                ],
+
+                // ── Analysis state ──
+                isAnalysing: false,
+                analysisProgressText: '',
 
                 // ── Integration modal ──
                 modalVisible: false,
                 modalServiceName: '',
 
                 // ── API endpoints ──
-                // Primary: SSE streaming endpoint from the AI branch.
-                // Handles the full pipeline: upload → S3 store → analyse → result.
+                // Phase 1 (device upload): validate → scan → S3. No AI call.
+                uploadEndpoint: 'http://127.0.0.1:8000/ai/upload/',
+                // Phase 2a (single file): SSE stream → AI → result.
                 analyzeEndpoint: 'http://127.0.0.1:8000/ai/analyze/',
-                // Secondary: S3 file deletion endpoint from the AWS branch.
-                // Called when the user removes a file that has already been uploaded.
-                deleteEndpoint: 'http://127.0.0.1:8000/api/delete-file/'
+                // Phase 2b (multiple files): batch JSON → AI → result.
+                analyzeBatchEndpoint: 'http://127.0.0.1:8000/ai/analyze-batch/',
+                // S3 file deletion + DB soft-delete (called by × button).
+                deleteEndpoint: 'http://127.0.0.1:8000/api/delete-file/',
+                // Google Drive: receives file_id + access_token, downloads on backend.
+                driveUploadEndpoint: 'http://127.0.0.1:8000/ai/upload-from-drive/',
+                // Persists AI result + findings to PostgreSQL after analysis.
+                saveAnalysisEndpoint: 'http://127.0.0.1:8000/ai/api/analysis/save/',
+                // Returns last-7-days / last-30-days sidebar history from DB.
+                historyEndpoint: 'http://127.0.0.1:8000/ai/api/analysis/history/',
+
+                // ── Session / Auth state ──
+                sessionToken: null,      // signed token from login.html
+                userEmail: null,
+                userRole: null,          // 'ADMINISTRATIVE_USER' or 'GENERAL_USER'
+
+                // ── Google Drive state ──
+                googleAccessToken: null,
+                pickerApiLoaded: false,
+
+                // ── OneDrive state ──
+                microsoftAccessToken: null
             };
         },
 
-        mounted() {
-            this.filteredLast7Days  = [...this.last7Days];
-            this.filteredLast30Days = [...this.last30Days];
+        computed: {
+            // True if any file is still uploading or pending dept assignment
+            hasUploadingFiles() {
+                return this.uploadedFiles.some(f =>
+                    f.status === 'uploading' || (f.status === 'pending' && this.isAdmin)
+                );
+            },
+
+            // True if admin mode and any ready file is missing a department
+            hasMissingDepartments() {
+                return this.uploadedFiles
+                    .filter(f => f.status !== 'uploading' && f.status !== 'error' && f.status !== 'pending')
+                    .some(f => !f.department);
+            },
+
+            // Master gate for the Analyse button
+            canAnalyse() {
+                if (this.isAnalysing) return false;
+                if (this.hasUploadingFiles) return false;
+                if (this.uploadedFiles.length === 0) return false;
+                const readyFiles = this.uploadedFiles.filter(f => f.status === 'uploaded');
+                if (readyFiles.length === 0) return false;
+                if (this.isAdmin && !this.companyName.trim()) return false;
+                if (this.isAdmin && this.hasMissingDepartments) return false;
+                return true;
+            },
+
+            hasFileErrors() {
+                return this.errorMessages.some(msg =>
+                    msg.includes('MB limit') ||
+                    msg.includes('not supported') ||
+                    msg.includes('Maximum 10') ||
+                    msg.includes('reach the server')
+                );
+            }
+        },
+
+        async mounted() {
+            // Restore org name if we're returning from a OneDrive OAuth redirect
+            const pendingOrg = sessionStorage.getItem('pendingOrgName');
+            if (pendingOrg) {
+                this.companyName = pendingOrg;
+                sessionStorage.removeItem('pendingOrgName');  // clear after use
+            }
+
+            // Capture OneDrive token if redirected back from Microsoft OAuth
+            this.captureOneDriveToken();
+
             document.addEventListener('click', this.closeAllDropdowns);
+
+            // ── Auth guard ──────────────────────────────────────────────
+            // Reads the session token stored by login.html after successful auth.
+            // If missing or if the server-side profile check fails, redirect to login.
+            const token   = sessionStorage.getItem('authToken');
+            const email   = sessionStorage.getItem('userEmail');
+            const roleRaw = sessionStorage.getItem('userRole');
+
+            if (!token || !email) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Server-side verify: confirm the account still exists and is active
+            try {
+                const res = await fetch(
+                    `http://127.0.0.1:8000/api/profile/?email=${encodeURIComponent(email)}`
+                );
+                if (!res.ok) throw new Error('Profile check failed');
+            } catch {
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // ── Set RBAC flag ────────────────────────────────────────────
+            // roleRaw comes from the login response: 'ADMINISTRATIVE_USER' or 'GENERAL_USER'.
+            this.isAdmin      = (roleRaw === 'ADMINISTRATIVE_USER');
+            this.sessionToken = token;
+            this.userEmail    = email;
+            this.userRole     = roleRaw;
+
+            // Populate sidebar with real analysis history from the database
+            await this.fetchHistory();
         },
 
         beforeUnmount() {
@@ -1089,32 +1284,37 @@
 
         methods: {
 
-            // ── Sidebar ──
-            toggleSidebar() {
-                this.sidebarOpen = !this.sidebarOpen;
-            },
-            toggleSearch() {
-                this.searchActive = !this.searchActive;
-                if (!this.searchActive) {
-                    this.searchQuery = '';
-                    this.filterReports();
-                }
-            },
-            filterReports() {
-                const q = this.searchQuery.toLowerCase();
-                if (!q) {
-                    this.filteredLast7Days  = [...this.last7Days];
-                    this.filteredLast30Days = [...this.last30Days];
+            // ── Navigation ──
+            goToHome()    { window.location.href = 'home.html'; },
+            showProfile() { window.location.href = 'profile.html'; },
+            showHelp()    { window.location.href = 'user_support.html'; },
+            openReport(report) {
+                const resultId = report.resultId || null;
+                if (resultId) {
+                    sessionStorage.setItem('latestResultId', resultId);
+                    window.location.href = 'document_analysis.html';
                 } else {
-                    this.filteredLast7Days  = this.last7Days.filter(r => r.toLowerCase().includes(q));
-                    this.filteredLast30Days = this.last30Days.filter(r => r.toLowerCase().includes(q));
+                    window.location.href = `report_viewing.html?report=${encodeURIComponent(report.label || report)}`;
                 }
             },
-            goToHome()   { window.location.href = 'home.html'; },
-            showProfile(){ window.location.href = 'profile.html'; },
-            showHelp()   { window.location.href = 'user_support.html'; },
-            openReport(reportName) {
-                window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
+
+            // ── Fetch sidebar history from DB ──
+            async fetchHistory() {
+                const token = this.sessionToken || sessionStorage.getItem('authToken');
+                if (!token) return;
+                try {
+                    const res = await fetch(this.historyEndpoint, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    // The sidebar component receives these via props/events — emit or store as needed
+                    // depending on how sidebar_component.js is wired to accept history data.
+                    this.last7Days  = (data.last_7_days  || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
+                    this.last30Days = (data.last_30_days || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
+                } catch (e) {
+                    console.warn('Could not load analysis history:', e);
+                }
             },
 
             // ── File Input Triggers ──
@@ -1130,66 +1330,174 @@
                 e.target.value = '';
             },
 
-            // ── Validate files and add them to the queue ──
+            // ── Org name validation (admin only) ──
+            validateOrgName() {
+                const name = this.companyName.trim();
+                if (!name) {
+                    this.errorMessages.push('Organisation name is required before uploading.');
+                    return false;
+                }
+                if (name.length < 2) {
+                    this.errorMessages.push('Organisation name must be at least 2 characters.');
+                    return false;
+                }
+                if (name.length > 200) {
+                    this.errorMessages.push('Organisation name must be 200 characters or fewer.');
+                    return false;
+                }
+                const validPattern = /^[a-zA-Z0-9\s\-&.,'/()]+$/;
+                if (!validPattern.test(name)) {
+                    this.errorMessages.push('Organisation name contains invalid characters. Use only letters, numbers, spaces, hyphens, ampersands, or punctuation.');
+                    return false;
+                }
+                this.companyName = name;
+                return true;
+            },
+
+            // ── Validate files and add them to the upload queue ──
             processFiles(files) {
-                this.errorMessage = '';
+                this.errorMessages = [];
+                this.showStorageNotice = true;
+
+                if (this.isAdmin && !this.validateOrgName()) return;
 
                 if (this.uploadedFiles.length + files.length > 10) {
-                    this.errorMessage = `Maximum 10 files allowed. You currently have ${this.uploadedFiles.length} file(s) uploaded.`;
+                    this.errorMessages.push(`Maximum 10 files allowed. You currently have ${this.uploadedFiles.length} file(s) uploaded.`);
                     return;
                 }
 
                 for (const file of files) {
                     if (file.size > 50 * 1024 * 1024) {
-                        this.errorMessage = `"${file.name}" exceeds the 50 MB limit.`;
+                        this.errorMessages.push(`"${file.name}" exceeds the 50 MB limit.`);
                         continue;
                     }
                     const validExts = ['.pdf', '.docx', '.txt'];
                     if (!validExts.some(ext => file.name.toLowerCase().endsWith(ext))) {
-                        this.errorMessage = `"${file.name}" is not supported. Only PDF, DOCX, and TXT files are allowed.`;
+                        this.errorMessages.push(`"${file.name}" is not supported. Only PDF, DOCX, and TXT files are allowed.`);
                         continue;
                     }
 
-                    // Push a reactive file object immediately so the UI shows
-                    // the UPLOADING state and progress bar right away.
                     const fileObj = {
                         name:       file.name,
                         size:       file.size,
-                        status:     'uploading', // uploading | uploaded | analysing | analysed
+                        // Admins must assign dept before upload fires → 'pending'.
+                        // General users go straight to 'uploading'.
+                        status:     this.isAdmin ? 'pending' : 'uploading',
                         department: '',
                         deptOpen:   false,
-                        rawFile:    file          // keep the actual File for FormData
+                        rawFile:    file,
+                        source:     'device',
+                        documentId: null   // filled in by uploadToDjango on success
                     };
 
                     this.uploadedFiles.push(fileObj);
 
-                    // Do NOT await — multiple files upload concurrently
-                    this.uploadToDjango(fileObj);
+                    // General users: upload immediately.
+                    // Admins: upload is deferred until assignDepartment() is called.
+                    if (!this.isAdmin) {
+                        this.uploadToDjango(fileObj);
+                    }
                 }
             },
 
-            // ── Core upload method: SSE streaming (AI branch) + S3 session tracking (AWS branch) ──
+            // ── Phase 1: Upload device file to Django (S3 store only, no AI) ──
             async uploadToDjango(fileObj) {
-
-                // Re-resolve the index each time we mutate, because other files
-                // may be added or removed while this async function is running.
                 const getIndex = () => this.uploadedFiles.indexOf(fileObj);
-
-                // Helper: safely update the status of this specific file.
-                const updateStatus = (newStatus) => {
-                    const i = getIndex();
-                    if (i === -1) return; // user removed the file mid-upload — do nothing
-                    // Object.assign keeps Vue 3's reactivity intact on array items.
-                    Object.assign(this.uploadedFiles[i], { status: newStatus });
-                    console.log(`📊 [${fileObj.name}] → ${newStatus}`);
-                };
 
                 const formData = new FormData();
                 formData.append('document',     fileObj.rawFile);
+                formData.append('company_name', this.isAdmin ? (this.companyName || '') : '');
+                formData.append('department',   this.isAdmin ? (fileObj.department || '') : '');
+
+                console.log(`Uploading (phase 1): ${fileObj.name}`);
+
+                try {
+                    const response = await fetch(this.uploadEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${this.sessionToken}`
+                        },
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (response.status === 401 || response.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(data.error || `Server returned HTTP ${response.status}`);
+                    }
+
+                    const i = getIndex();
+                    if (i !== -1) {
+                        Object.assign(this.uploadedFiles[i], {
+                            status:     'uploaded',
+                            documentId: data.document_id || null
+                        });
+                    }
+                    console.log(`Phase 1 complete: ${fileObj.name} → S3 (doc: ${data.document_id})`);
+
+                    // Track in sessionStorage for S3 cleanup on session end
+                    const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                    if (!tracked.includes(fileObj.name)) {
+                        tracked.push(fileObj.name);
+                        sessionStorage.setItem('uploadedFileNames', JSON.stringify(tracked));
+                    }
+
+                } catch (error) {
+                    console.error(`Upload failed for ${fileObj.name}:`, error);
+
+                    const i = getIndex();
+                    if (i !== -1) this.uploadedFiles.splice(i, 1);
+
+                    const reason = error.message.toLowerCase().includes('failed to fetch')
+                        ? `Could not reach the server while uploading "${fileObj.name}". Please check your connection and try again.`
+                        : `"${fileObj.name}" could not be stored. Our file storage is temporarily unavailable — please try again in a few minutes.`;
+                    this.errorMessages.push(reason);
+                }
+            },
+
+            // ── Phase 2: Analyse button clicked ──
+            // Routes to single-file SSE or multi-file batch depending on ready file count.
+            async startAnalysis() {
+                if (!this.canAnalyse) return;
+
+                const readyFiles = this.uploadedFiles.filter(f => f.status === 'uploaded');
+
+                this.isAnalysing   = true;
+                this.errorMessages = [];
+
+                if (readyFiles.length === 1) {
+                    await this.analyseSingle(readyFiles[0]);
+                } else {
+                    await this.analyseBatch(readyFiles);
+                }
+            },
+
+            // ── Phase 2a: Single file — SSE stream ──
+            // Replaces the feature/ai-development approach of writing the result to
+            // localStorage. Result is now persisted to PostgreSQL via saveAnalysisEndpoint,
+            // and only the result_id is kept in sessionStorage for the report page.
+            async analyseSingle(fileObj) {
+                const getIndex     = () => this.uploadedFiles.indexOf(fileObj);
+                const updateStatus = (newStatus) => {
+                    const i = getIndex();
+                    if (i === -1) return;
+                    Object.assign(this.uploadedFiles[i], { status: newStatus });
+                };
+
+                this.analysisProgressText = `Sending "${fileObj.name}" to AI…`;
+
+                const formData = new FormData();
+                formData.append('file_name',    fileObj.name);
                 formData.append('company_name', this.companyName || '');
                 formData.append('department',   fileObj.department || '');
 
-                console.log(`🚀 Uploading: ${fileObj.name}`);
+                console.log(`Analysing (single): ${fileObj.name}`);
 
                 try {
                     const response = await fetch(this.analyzeEndpoint, {
@@ -1203,7 +1511,6 @@
 
                     // ── Read the SSE stream ──
                     // Django streams `data: {...}\n\n` events as each pipeline stage completes.
-                    // We buffer across chunk boundaries so we never try to parse a split event.
                     const reader  = response.body.getReader();
                     const decoder = new TextDecoder();
                     let   buffer  = '';
@@ -1213,56 +1520,60 @@
                         if (done) break;
 
                         buffer += decoder.decode(value, { stream: true });
-
-                        // SSE events are delimited by double newlines.
-                        // Split on \n\n and keep any incomplete trailing fragment in the buffer.
                         const events = buffer.split('\n\n');
-                        buffer = events.pop(); // last element may be incomplete
+                        buffer = events.pop();
 
                         for (const event of events) {
-                            // Find the "data:" line within this event block
-                            const dataLine = event
-                                .split('\n')
-                                .find(line => line.startsWith('data: '));
-
+                            const dataLine = event.split('\n').find(l => l.startsWith('data: '));
                             if (!dataLine) continue;
 
                             try {
-                                const payload = JSON.parse(dataLine.slice(6)); // strip "data: "
+                                const payload = JSON.parse(dataLine.slice(6));
                                 console.log(`📡 [${fileObj.name}] SSE:`, payload.status);
 
                                 switch (payload.status) {
 
-                                    case 'uploaded':
-                                        updateStatus('uploaded');
-                                        // Track in sessionStorage for S3 cleanup on session end
-                                        // (AWS branch pattern — remove when DB layer is ready)
-                                        {
-                                            const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
-                                            if (!tracked.includes(fileObj.name)) {
-                                                tracked.push(fileObj.name);
-                                                sessionStorage.setItem('uploadedFileNames', JSON.stringify(tracked));
-                                            }
-                                        }
-                                        break;
-
                                     case 'analysing':
                                         updateStatus('analysing');
+                                        this.analysisProgressText = `Analysing "${fileObj.name}"…`;
                                         break;
 
                                     case 'analysed':
                                         updateStatus('analysed');
-                                        // Persist the result for the report page.
-                                        // TODO: Replace with a PostgreSQL-backed API call
-                                        //       once the database layer is implemented.
-                                        localStorage.setItem('latestAnalysisResult', JSON.stringify({
-                                            ...payload.result,
-                                            _meta: {
-                                                filename:  fileObj.name,
-                                                company:   this.companyName || 'Unknown Organisation',
-                                                timestamp: new Date().toISOString()
+                                        this.analysisProgressText = 'Analysis complete. Redirecting…';
+
+                                        // ── Persist result to PostgreSQL (replaces localStorage) ──
+                                        // feature/ai-development stored the full result object in
+                                        // localStorage under 'latestAnalysisResult'. The merged flow
+                                        // instead POSTs to the DB and stores only the result_id in
+                                        // sessionStorage, which document_analysis.html reads to fetch
+                                        // the full result from the backend.
+                                        try {
+                                            const saveRes = await fetch(this.saveAnalysisEndpoint, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type':  'application/json',
+                                                    'Authorization': `Bearer ${this.sessionToken}`
+                                                },
+                                                body: JSON.stringify({
+                                                    result:      payload.result,
+                                                    document_id: fileObj.documentId || '',
+                                                    filename:    fileObj.name,
+                                                    company:     this.companyName || ''
+                                                })
+                                            });
+                                            if (saveRes.ok) {
+                                                const saved = await saveRes.json();
+                                                if (saved.result_id) {
+                                                    sessionStorage.setItem('latestResultId', saved.result_id);
+                                                }
+                                            } else {
+                                                console.warn('Analysis save returned HTTP', saveRes.status);
                                             }
-                                        }));
+                                        } catch (saveErr) {
+                                            console.warn('Could not persist analysis result:', saveErr);
+                                        }
+
                                         // Brief pause so the user sees "✓ ANALYSED" before redirect
                                         setTimeout(() => {
                                             window.location.href = 'document_analysis.html';
@@ -1271,7 +1582,12 @@
 
                                     case 'error':
                                         updateStatus('error');
-                                        this.errorMessage = payload.message || `Error processing "${fileObj.name}".`;
+                                        const msg = payload.message || '';
+                                        const friendly = msg.includes('not running') || msg.includes('connect')
+                                            ? 'Analysis is temporarily unavailable. The AI service is not responding — please wait a moment and try again.'
+                                            : `Error processing "${fileObj.name}". Please try again.`;
+                                        this.errorMessages.push(friendly);
+                                        this.isAnalysing = false;
                                         break;
                                 }
 
@@ -1283,36 +1599,122 @@
                     }
 
                 } catch (error) {
-                    console.error(`❌ Upload failed for ${fileObj.name}:`, error);
+                    console.error(`Analysis failed for ${fileObj.name}:`, error);
                     const i = getIndex();
-                    if (i !== -1) {
-                        Object.assign(this.uploadedFiles[i], { status: 'error' });
+                    if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'error' });
+                    this.errorMessages.push(`Analysis is temporarily unavailable. The AI service is not responding — please wait a moment and try again.`);
+                    this.isAnalysing = false;
+                }
+            },
+
+            // ── Phase 2b: Multiple files — batch JSON request ──
+            async analyseBatch(files) {
+                this.analysisProgressText = `Sending ${files.length} files to AI for batch analysis…`;
+
+                files.forEach(fileObj => {
+                    const i = this.uploadedFiles.indexOf(fileObj);
+                    if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'analysing' });
+                });
+
+                const payload = {
+                    company_name: this.companyName || '',
+                    files: files.map(f => ({
+                        file_name:  f.name,
+                        department: f.department || ''
+                    }))
+                };
+
+                console.log(`Analysing (batch): ${files.map(f => f.name).join(', ')}`);
+
+                try {
+                    const response = await fetch(this.analyzeBatchEndpoint, {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body:    JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || `Server returned HTTP ${response.status}`);
                     }
-                    this.errorMessage = `Failed to upload "${fileObj.name}": ${error.message}`;
+
+                    files.forEach(fileObj => {
+                        const i = this.uploadedFiles.indexOf(fileObj);
+                        if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'analysed' });
+                    });
+
+                    this.analysisProgressText = 'Batch analysis complete. Redirecting…';
+
+                    // Persist batch result to PostgreSQL
+                    try {
+                        const firstFile = files[0];
+                        const saveRes = await fetch(this.saveAnalysisEndpoint, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type':  'application/json',
+                                'Authorization': `Bearer ${this.sessionToken}`
+                            },
+                            body: JSON.stringify({
+                                result:      data.result,
+                                document_id: firstFile.documentId || '',
+                                filename:    files.map(f => f.name).join(', '),
+                                company:     this.companyName || ''
+                            })
+                        });
+                        if (saveRes.ok) {
+                            const saved = await saveRes.json();
+                            if (saved.result_id) {
+                                sessionStorage.setItem('latestResultId', saved.result_id);
+                            }
+                        } else {
+                            console.warn('Batch analysis save returned HTTP', saveRes.status);
+                        }
+                    } catch (saveErr) {
+                        console.warn('Could not persist batch analysis result:', saveErr);
+                    }
+
+                    setTimeout(() => {
+                        window.location.href = 'document_analysis.html';
+                    }, 1500);
+
+                } catch (error) {
+                    console.error('Batch analysis failed:', error);
+                    files.forEach(fileObj => {
+                        const i = this.uploadedFiles.indexOf(fileObj);
+                        if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'error' });
+                    });
+                    this.errorMessages.push(`Batch analysis is temporarily unavailable. The AI service is not responding — please wait a moment and try again.`);
+                    this.isAnalysing = false;
                 }
             },
 
             // ── Remove File (× button) ──
-            // Removes the file from the UI immediately, then calls the S3 delete
-            // endpoint if the file has already been received by the server.
+            // Removes from UI immediately, then:
+            //   - soft-deletes the Document DB record
+            //   - hard-deletes the file from S3
+            //   - keeps sessionStorage tracking list in sync
             async removeFile(index) {
                 const file = this.uploadedFiles[index];
 
-                // Remove from UI list first for instant feedback
                 this.uploadedFiles.splice(index, 1);
 
-                // Only hit the delete endpoint if the file made it past the uploading phase.
-                // (No point deleting something that never reached S3.)
-                if (file.status !== 'uploading') {
+                if (file.status !== 'uploading' && file.status !== 'pending') {
                     try {
+                        const body = { file_name: file.name };
+                        // Prefer document_id — more reliable than filename for DB lookup
+                        if (file.documentId) body.document_id = file.documentId;
+
                         await fetch(this.deleteEndpoint, {
                             method:  'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body:    JSON.stringify({ file_name: file.name })
+                            headers: {
+                                'Content-Type':  'application/json',
+                                'Authorization': `Bearer ${this.sessionToken}`
+                            },
+                            body: JSON.stringify(body)
                         });
-                        console.log(`🗑️ Deleted from S3: ${file.name}`);
+                        console.log(`Deleted: ${file.name} (doc: ${file.documentId})`);
 
-                        // Keep sessionStorage tracking list in sync
                         const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
                         sessionStorage.setItem(
                             'uploadedFileNames',
@@ -1320,8 +1722,8 @@
                         );
 
                     } catch (error) {
-                        // Non-critical — the UI has already updated, just log the failure
-                        console.error(`Failed to delete "${file.name}" from S3:`, error);
+                        console.error(`Failed to delete "${file.name}":`, error);
+                        this.errorMessages.push(`Could not delete "${file.name}". Please try again.`);
                     }
                 }
             },
@@ -1332,12 +1734,644 @@
                 this.uploadedFiles.forEach(f => f.deptOpen = false);
                 this.uploadedFiles[index].deptOpen = !isOpen;
             },
+
             assignDepartment(index, dept) {
                 this.uploadedFiles[index].department = dept;
                 this.uploadedFiles[index].deptOpen   = false;
+
+                const fileObj = this.uploadedFiles[index];
+
+                if (fileObj.status === 'pending') {
+                    fileObj.status = 'uploading';
+
+                    if (fileObj.source === 'google' && fileObj._driveFileId) {
+                        const driveFileId = fileObj._driveFileId;
+                        const driveToken  = fileObj._driveToken;
+                        fileObj._driveFileId = null;
+                        fileObj._driveToken  = null;
+                        this.uploadFromDrive(fileObj, driveFileId, driveToken);
+
+                    } else if (fileObj.source === 'onedrive' && fileObj._oneDriveFileId) {
+                        const oneDriveFileId    = fileObj._oneDriveFileId;
+                        const oneDriveToken     = fileObj._oneDriveToken;
+                        fileObj._oneDriveFileId = null;
+                        fileObj._oneDriveToken  = null;
+                        (async () => {
+                            try {
+                                const response = await fetch("http://127.0.0.1:8000/ai/upload-from-onedrive/", {
+                                    method:  "POST",
+                                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${this.sessionToken}` },
+                                    body: JSON.stringify({
+                                        file_id:      oneDriveFileId,
+                                        access_token: oneDriveToken,
+                                        file_name:    fileObj.name,
+                                        company_name: this.companyName || '',
+                                        department:   fileObj.department || ''
+                                    })
+                                });
+                                if (response.status === 401 || response.status === 403) {
+                                    sessionStorage.clear();
+                                    window.location.href = 'login.html';
+                                    return;
+                                }
+                                if (!response.ok) {
+                                    const err = await response.json().catch(() => ({}));
+                                    throw new Error(err.error || `Server returned HTTP ${response.status}`);
+                                }
+                                const data = await response.json();
+                                const i = this.uploadedFiles.indexOf(fileObj);
+                                if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'uploaded', documentId: data.document_id || null });
+                                const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                                if (!tracked.includes(fileObj.name)) {
+                                    tracked.push(fileObj.name);
+                                    sessionStorage.setItem('uploadedFileNames', JSON.stringify(tracked));
+                                }
+                            } catch (error) {
+                                const i = this.uploadedFiles.indexOf(fileObj);
+                                if (i !== -1) this.uploadedFiles.splice(i, 1);
+                                this.errorMessages.push(`"${fileObj.name}" failed to upload from OneDrive — ${error.message}`);
+                            }
+                        })();
+
+                    } else if (fileObj.rawFile) {
+                        this.uploadToDjango(fileObj);
+                    }
+                }
             },
+
             closeAllDropdowns() {
                 this.uploadedFiles.forEach(f => f.deptOpen = false);
+            },
+
+            // ── Google Drive Integration (5-step flow from sprint-2) ──
+
+            // Step 1: Request OAuth token
+            initGoogleDrivePicker() {
+                if (typeof google === 'undefined' || !google.accounts) {
+                    this.errorMessages = ['Google API is still loading. Please try again in a moment.'];
+                    return;
+                }
+
+                const tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CLIENT_ID,
+                    scope: GOOGLE_DRIVE_SCOPE,
+                    callback: (tokenResponse) => {
+                        if (tokenResponse.error) {
+                            this.errorMessages = ['Google Drive authorisation was denied. Please try again and allow access when prompted.'];
+                            return;
+                        }
+                        this.googleAccessToken = tokenResponse.access_token;
+                        this.loadPickerApi();
+                    }
+                });
+
+                tokenClient.requestAccessToken({ prompt: 'consent' });
+            },
+
+            // Step 2: Load Picker API library
+            loadPickerApi() {
+                if (this.pickerApiLoaded) {
+                    this.openGooglePicker();
+                    return;
+                }
+                gapi.load('picker', {
+                    callback: () => {
+                        this.pickerApiLoaded = true;
+                        this.openGooglePicker();
+                    }
+                });
+            },
+
+            // Step 3: Build and display the Google Picker UI
+            openGooglePicker() {
+                const picker = new google.picker.PickerBuilder()
+                    .addView(google.picker.ViewId.DOCS)
+                    .addView(
+                        new google.picker.DocsView()
+                            .setMimeTypes('application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain')
+                    )
+                    .setOAuthToken(this.googleAccessToken)
+                    .setDeveloperKey('')
+                    .setCallback((data) => this.onPickerSelected(data))
+                    .setTitle('Select a file from Google Drive')
+                    .build();
+
+                picker.setVisible(true);
+            },
+
+            // Step 4: Picker callback
+            onPickerSelected(data) {
+                if (data.action !== google.picker.Action.PICKED) return;
+
+                const driveFile = data.docs[0];
+                const fileId    = driveFile.id;
+                const fileName  = driveFile.name;
+                const mimeType  = driveFile.mimeType;
+                const fileSize  = driveFile.sizeBytes || 0;
+
+                console.log(`Google Drive file selected: ${fileName} (${fileId})`);
+
+                const validMimes = [
+                    'application/pdf',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'text/plain'
+                ];
+                if (!validMimes.includes(mimeType)) {
+                    this.errorMessages.push(`"${fileName}" is not supported. Only PDF, DOCX, and TXT files are allowed.`);
+                    return;
+                }
+                if (fileSize > 50 * 1024 * 1024) {
+                    this.errorMessages.push(`"${fileName}" exceeds the 50 MB limit.`);
+                    return;
+                }
+                if (this.uploadedFiles.length >= 10) {
+                    this.errorMessages.push('Maximum 10 files allowed.');
+                    return;
+                }
+                if (this.isAdmin && !this.validateOrgName()) return;
+                this.showStorageNotice = true;
+
+                const capturedToken = this.googleAccessToken;
+
+                const fileObj = {
+                    name:         fileName,
+                    size:         fileSize,
+                    status:       this.isAdmin ? 'pending' : 'uploading',
+                    department:   '',
+                    deptOpen:     false,
+                    rawFile:      null,
+                    source:       'google',
+                    documentId:   null,
+                    _driveFileId: fileId,
+                    _driveToken:  capturedToken
+                };
+
+                this.uploadedFiles.push(fileObj);
+
+                if (!this.isAdmin) {
+                    this.uploadFromDrive(fileObj, fileId, capturedToken);
+                }
+
+                this.googleAccessToken = null;
+            },
+
+            // Step 5: POST file_id + access_token to Django backend
+            async uploadFromDrive(fileObj, fileId, accessToken) {
+                const getIndex = () => this.uploadedFiles.indexOf(fileObj);
+
+                console.log(`Uploading from Google Drive (phase 1): ${fileObj.name}`);
+
+                try {
+                    const response = await fetch(this.driveUploadEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type':  'application/json',
+                            'Authorization': `Bearer ${this.sessionToken}`
+                        },
+                        body: JSON.stringify({
+                            file_id:      fileId,
+                            access_token: accessToken,
+                            file_name:    fileObj.name,
+                            company_name: this.isAdmin ? (this.companyName || '') : '',
+                            department:   this.isAdmin ? (fileObj.department || '') : ''
+                        })
+                    });
+
+                    if (response.status === 401 || response.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error || `Server returned HTTP ${response.status}`);
+                    }
+
+                    const reader  = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let   buffer  = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const events = buffer.split('\n\n');
+                        buffer = events.pop();
+
+                        for (const event of events) {
+                            const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+                            if (!dataLine) continue;
+
+                            try {
+                                const payload = JSON.parse(dataLine.slice(6));
+                                console.log(`[${fileObj.name}] Drive SSE:`, payload.status);
+
+                                switch (payload.status) {
+                                    case 'uploaded': {
+                                        const i = getIndex();
+                                        if (i !== -1) {
+                                            Object.assign(this.uploadedFiles[i], {
+                                                status:     'uploaded',
+                                                documentId: payload.document_id || null
+                                            });
+                                        }
+                                        const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                                        if (!tracked.includes(fileObj.name)) {
+                                            tracked.push(fileObj.name);
+                                            sessionStorage.setItem('uploadedFileNames', JSON.stringify(tracked));
+                                        }
+                                        break;
+                                    }
+                                    case 'error': {
+                                        const i = getIndex();
+                                        if (i !== -1) this.uploadedFiles.splice(i, 1);
+                                        const msg = payload.message || '';
+                                        const friendly = msg.includes('not running') || msg.includes('unavailable')
+                                            ? `"${fileObj.name}" could not be stored. Our file storage is temporarily unavailable — please try again in a few minutes.`
+                                            : `Error uploading "${fileObj.name}" from Google Drive. Please try again.`;
+                                        this.errorMessages.push(friendly);
+                                        break;
+                                    }
+                                }
+                            } catch (parseError) {
+                                console.warn(`Could not parse Drive SSE line for ${fileObj.name}:`, dataLine);
+                            }
+                        }
+                    }
+
+                } catch (error) {
+                    console.error(`Drive upload failed for ${fileObj.name}:`, error);
+                    const i = getIndex();
+                    if (i !== -1) this.uploadedFiles.splice(i, 1);
+                    const reason = error.message.toLowerCase().includes('failed to fetch')
+                        ? `Could not reach the server while uploading "${fileObj.name}" from Google Drive. Please check your connection and try again.`
+                        : `"${fileObj.name}" (Google Drive) could not be stored. Our file storage is temporarily unavailable — please try again in a few minutes.`;
+                    this.errorMessages.push(reason);
+                }
+            },
+
+            // ── OneDrive Integration (from sprint-2) ──
+
+            captureOneDriveToken() {
+                const hash = window.location.hash;
+                if (hash.includes('access_token')) {
+                    const params = new URLSearchParams(hash.substring(1));
+                    const token  = params.get('access_token');
+                    if (token) {
+                        this.microsoftAccessToken = token;
+                        history.replaceState(null, '', window.location.pathname);
+                        this.openOneDrivePicker();
+                    }
+                }
+            },
+
+            initOneDrivePicker() {
+                if (this.isAdmin && this.companyName.trim()) {
+                    sessionStorage.setItem('pendingOrgName', this.companyName.trim());
+                }
+
+                const REDIRECT_URI = "http://localhost:5500/frontend/home.html";
+                const authUrl =
+                    `https://login.microsoftonline.com/common/oauth2/v2.0/authorize` +
+                    `?client_id=${MS_CLIENT_ID}` +
+                    `&response_type=token` +
+                    `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+                    `&response_mode=fragment` +
+                    `&scope=Files.Read%20User.Read`;
+
+                window.location.href = authUrl;
+            },
+
+            openOneDrivePicker() {
+                const vueApp = this;
+                let selected = null;
+                let currentView = 'grid';
+
+                const icons = {
+                    pdf:  { bg: '#fce4e4', color: '#c0392b', label: 'PDF' },
+                    docx: { bg: '#e3f0fb', color: '#1565c0', label: 'DOC' },
+                    txt:  { bg: '#f3f3f3', color: '#555555', label: 'TXT' },
+                };
+
+                function fileIcon(type) {
+                    const ic = icons[type] || icons.txt;
+                    return `<div style="width:44px;height:52px;background:${ic.bg};border-radius:4px;display:flex;align-items:center;justify-content:center;border:0.5px solid ${ic.color}44;">
+                                <span style="font-size:10px;font-weight:600;color:${ic.color};">${ic.label}</span>
+                            </div>`;
+                }
+
+                function getFileType(name) {
+                    if (name.endsWith('.pdf'))  return 'pdf';
+                    if (name.endsWith('.docx')) return 'docx';
+                    if (name.endsWith('.txt'))  return 'txt';
+                    return 'txt';
+                }
+
+                function formatSize(bytes) {
+                    if (!bytes) return '—';
+                    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+                    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                }
+
+                function formatDate(dateStr) {
+                    if (!dateStr) return '—';
+                    const d = new Date(dateStr);
+                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }
+
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position:fixed; inset:0;
+                    background:rgba(0,0,0,0.6);
+                    display:flex; align-items:center; justify-content:center;
+                    z-index:9999;
+                `;
+
+                overlay.innerHTML = `
+                    <div style="background:#ffffff; border-radius:8px; width:640px; max-width:95vw;
+                                box-shadow:0 8px 32px rgba(0,0,0,0.3); overflow:hidden; display:flex; flex-direction:column;">
+                        <div style="background:#0078d4; padding:12px 16px; display:flex; align-items:center; gap:10px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                                <path d="M19.34 10.27A5.48 5.48 0 0 0 14 6.5a5.5 5.5 0 0 0-5.13 3.55A4 4 0 0 0 4.5 14a4 4 0 0 0 4 4h10.5a3.5 3.5 0 0 0 .34-6.73z"/>
+                            </svg>
+                            <span style="color:white; font-size:14px; font-weight:600;">OneDrive</span>
+                            <div style="margin-left:auto; display:flex; gap:12px; align-items:center;">
+                                <svg id="od-close-btn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" style="cursor:pointer; opacity:0.85;">
+                                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap:8px; padding:10px 16px;
+                                    border-bottom:1px solid #e5e5e5; background:#fafafa;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2">
+                                <polyline points="3 9 12 3 21 9"/><polyline points="9 22 9 12 15 12 15 22"/>
+                            </svg>
+                            <span style="font-size:13px; color:#444;">My files</span>
+                            <div style="margin-left:auto; display:flex; gap:4px;">
+                                <div id="od-view-grid" style="padding:5px 7px; border-radius:4px; cursor:pointer; background:#e3f0fb;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="#0078d4">
+                                        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                                        <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                                    </svg>
+                                </div>
+                                <div id="od-view-list" style="padding:5px 7px; border-radius:4px; cursor:pointer;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2">
+                                        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+                                        <line x1="8" y1="18" x2="21" y2="18"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="padding:16px; min-height:280px; max-height:380px; overflow-y:auto; background:#fff;">
+                            <div id="od-grid-view" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px;"></div>
+                            <div id="od-list-view" style="display:none; flex-direction:column; gap:2px;">
+                                <div style="display:grid; grid-template-columns:1fr 80px 100px; padding:6px 10px;
+                                            font-size:12px; color:#888; border-bottom:1px solid #eee; margin-bottom:4px;">
+                                    <span>Name</span><span style="text-align:right;">Size</span><span style="text-align:right;">Modified</span>
+                                </div>
+                            </div>
+                            <div id="od-loading" style="display:flex; align-items:center; justify-content:center;
+                                                        height:200px; color:#888; font-size:13px;">
+                                Loading your files...
+                            </div>
+                        </div>
+
+                        <div style="display:flex; align-items:center; justify-content:space-between;
+                                    padding:12px 16px; border-top:1px solid #e5e5e5; background:#fafafa;">
+                            <span id="od-selected-label" style="font-size:13px; color:#888;">No file selected</span>
+                            <div style="display:flex; gap:8px;">
+                                <button id="od-cancel-btn"
+                                    style="padding:6px 20px; font-size:13px; border-radius:4px;
+                                        border:1px solid #ccc; background:#fff; color:#333; cursor:pointer;">
+                                    Cancel
+                                </button>
+                                <button id="od-open-btn" disabled
+                                    style="padding:6px 20px; font-size:13px; border-radius:4px;
+                                        border:none; background:#0078d4; color:white;
+                                        cursor:not-allowed; opacity:0.4;">
+                                    Open
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(overlay);
+
+                const closeModal = () => document.body.removeChild(overlay);
+                overlay.querySelector('#od-close-btn').onclick  = closeModal;
+                overlay.querySelector('#od-cancel-btn').onclick = closeModal;
+                overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+
+                overlay.querySelector('#od-view-grid').onclick = () => {
+                    currentView = 'grid';
+                    overlay.querySelector('#od-grid-view').style.display = 'grid';
+                    overlay.querySelector('#od-list-view').style.display = 'none';
+                    overlay.querySelector('#od-view-grid').style.background = '#e3f0fb';
+                    overlay.querySelector('#od-view-list').style.background = 'transparent';
+                };
+                overlay.querySelector('#od-view-list').onclick = () => {
+                    currentView = 'list';
+                    overlay.querySelector('#od-grid-view').style.display = 'none';
+                    overlay.querySelector('#od-list-view').style.display = 'flex';
+                    overlay.querySelector('#od-view-grid').style.background = 'transparent';
+                    overlay.querySelector('#od-view-list').style.background = '#e3f0fb';
+                };
+
+                overlay.querySelector('#od-open-btn').onclick = () => {
+                    if (!selected) return;
+                    closeModal();
+                    vueApp.uploadFromOneDrive({
+                        id:   selected.id,
+                        name: selected.name,
+                        size: selected.size
+                    });
+                };
+
+                const headers     = { Authorization: `Bearer ${this.microsoftAccessToken}` };
+                const validExts   = ['.pdf', '.docx', '.txt'];
+                const isValidFile = f =>
+                    f.file && validExts.some(ext => f.name.toLowerCase().endsWith(ext));
+
+                (async () => {
+                    try {
+                        const rootResp = await fetch(
+                            "https://graph.microsoft.com/v1.0/me/drive/root/children?$select=id,name,size,lastModifiedDateTime,file,folder&$top=999",
+                            { headers }
+                        );
+                        const rootData  = await rootResp.json();
+                        const rootItems = rootData.value || [];
+
+                        const rootFiles   = rootItems.filter(isValidFile);
+                        const rootFolders = rootItems.filter(f => f.folder);
+
+                        const folderResults = await Promise.all(
+                            rootFolders.map(folder =>
+                                fetch(
+                                    `https://graph.microsoft.com/v1.0/me/drive/items/${folder.id}/children?$select=id,name,size,lastModifiedDateTime,file,folder&$top=999`,
+                                    { headers }
+                                )
+                                .then(r => r.json())
+                                .then(d => (d.value || []).filter(isValidFile).map(f => ({
+                                    ...f,
+                                    _folder: folder.name
+                                })))
+                                .catch(() => [])
+                            )
+                        );
+
+                        const allFiles = [...rootFiles, ...folderResults.flat()];
+
+                        overlay.querySelector('#od-loading').style.display = 'none';
+
+                        if (allFiles.length === 0) {
+                            overlay.querySelector('#od-loading').style.display = 'flex';
+                            overlay.querySelector('#od-loading').textContent = 'No supported files (PDF, DOCX, TXT) found.';
+                            return;
+                        }
+
+                        const gridView = overlay.querySelector('#od-grid-view');
+                        gridView.innerHTML = allFiles.map((f, i) => `
+                            <div class="od-file-item" data-index="${i}"
+                                style="padding:10px 8px; border-radius:6px; cursor:pointer;
+                                    display:flex; flex-direction:column; align-items:center;
+                                    gap:8px; border:1.5px solid transparent; text-align:center;">
+                                ${fileIcon(getFileType(f.name))}
+                                <span style="font-size:11px; color:#333; line-height:1.3; word-break:break-word;">${f.name}</span>
+                                ${f._folder ? `<span style="font-size:10px; color:#999;">${f._folder}</span>` : ''}
+                            </div>
+                        `).join('');
+
+                        const listView = overlay.querySelector('#od-list-view');
+                        allFiles.forEach((f, i) => {
+                            const row = document.createElement('div');
+                            row.className     = 'od-file-item';
+                            row.dataset.index = i;
+                            row.style.cssText = `display:grid; grid-template-columns:1fr 80px 100px;
+                                padding:8px 10px; border-radius:6px; cursor:pointer;
+                                align-items:center; gap:8px; border:1.5px solid transparent;`;
+                            row.innerHTML = `
+                                <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+                                    ${fileIcon(getFileType(f.name))}
+                                    <div style="overflow:hidden;">
+                                        <div style="font-size:13px; color:#333; white-space:nowrap;
+                                                    overflow:hidden; text-overflow:ellipsis;">${f.name}</div>
+                                        ${f._folder ? `<div style="font-size:11px; color:#999;">${f._folder}</div>` : ''}
+                                    </div>
+                                </div>
+                                <span style="font-size:12px; color:#888; text-align:right;">${formatSize(f.size)}</span>
+                                <span style="font-size:12px; color:#888; text-align:right;">${formatDate(f.lastModifiedDateTime)}</span>
+                            `;
+                            listView.appendChild(row);
+                        });
+
+                        overlay.querySelectorAll('.od-file-item').forEach(el => {
+                            el.onmouseenter = () => {
+                                if (selected !== allFiles[el.dataset.index]) el.style.background = '#f0f6ff';
+                            };
+                            el.onmouseleave = () => {
+                                if (selected !== allFiles[el.dataset.index]) {
+                                    el.style.background  = 'transparent';
+                                    el.style.borderColor = 'transparent';
+                                }
+                            };
+                            el.onclick = () => {
+                                overlay.querySelectorAll('.od-file-item').forEach(e => {
+                                    e.style.background  = 'transparent';
+                                    e.style.borderColor = 'transparent';
+                                });
+                                el.style.background  = '#e3f0fb';
+                                el.style.borderColor = '#0078d4';
+                                selected = allFiles[el.dataset.index];
+                                overlay.querySelector('#od-selected-label').textContent = selected.name;
+                                const btn = overlay.querySelector('#od-open-btn');
+                                btn.disabled      = false;
+                                btn.style.opacity = '1';
+                                btn.style.cursor  = 'pointer';
+                            };
+                        });
+
+                    } catch (err) {
+                        console.error('OneDrive fetch error:', err);
+                        overlay.querySelector('#od-loading').style.display = 'flex';
+                        overlay.querySelector('#od-loading').textContent   = 'Failed to load files. Please try again.';
+                    }
+                })();
+            },
+
+            async uploadFromOneDrive(file) {
+                if (this.isAdmin && !this.validateOrgName()) return;
+                this.showStorageNotice = true;
+
+                const fileObj = {
+                    name:            file.name,
+                    size:            file.size,
+                    status:          this.isAdmin ? 'pending' : 'uploading',
+                    department:      '',
+                    deptOpen:        false,
+                    rawFile:         null,
+                    source:          'onedrive',
+                    documentId:      null,
+                    _oneDriveFileId: file.id,
+                    _oneDriveToken:  this.microsoftAccessToken
+                };
+
+                this.uploadedFiles.push(fileObj);
+
+                if (this.isAdmin) return; // Deferred — assignDepartment() will trigger the upload
+
+                try {
+                    const response = await fetch("http://127.0.0.1:8000/ai/upload-from-onedrive/", {
+                        method:  "POST",
+                        headers: {
+                            "Content-Type":  "application/json",
+                            "Authorization": `Bearer ${this.sessionToken}`
+                        },
+                        body: JSON.stringify({
+                            file_id:      file.id,
+                            access_token: this.microsoftAccessToken,
+                            file_name:    file.name,
+                            company_name: '',
+                            department:   ''
+                        })
+                    });
+
+                    if (response.status === 401 || response.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error || `Server returned HTTP ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const i    = this.uploadedFiles.indexOf(fileObj);
+                    if (i !== -1) {
+                        Object.assign(this.uploadedFiles[i], {
+                            status:     'uploaded',
+                            documentId: data.document_id || null
+                        });
+                    }
+
+                    const tracked = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                    if (!tracked.includes(file.name)) {
+                        tracked.push(file.name);
+                        sessionStorage.setItem('uploadedFileNames', JSON.stringify(tracked));
+                    }
+
+                } catch (error) {
+                    console.error("OneDrive upload error:", error);
+                    const i = this.uploadedFiles.indexOf(fileObj);
+                    if (i !== -1) this.uploadedFiles.splice(i, 1);
+                    this.errorMessages.push(`"${file.name}" failed to upload from OneDrive — ${error.message}`);
+                }
             },
 
             // ── Integration Modal ──
@@ -1358,7 +2392,10 @@
                 return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
             }
         }
-    }).mount('#app');
+    });
+
+    registerSidebarComponent(app);
+    app.mount('#app');
 </script>
 </body>
 </html>

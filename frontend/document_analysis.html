@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Document Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="sidebar_component.js"></script>
     <style>
         * {
             margin: 0;
@@ -59,8 +60,11 @@
             padding: 15px 30px;
             display: flex;
             align-items: center;
-            position: relative;
+            position: fixed;
             z-index: 100;
+            top: 0;
+            left: 0;
+            width: 100%;
             border-bottom: 1px solid rgba(74,143,231,0.18);
         }
 
@@ -142,135 +146,6 @@
             fill: #1a2845;
         }
 
-        /* ─── Sidebar ─── */
-        .sidebar {
-            position: absolute;
-            left: 0;
-            top: 60px;
-            width: 280px;
-            height: calc(100vh - 60px);
-            background-color: rgba(13,20,32,0.97);
-            transform: translateX(-100%);
-            transition: transform 0.3s ease-in-out;
-            z-index: 90;
-            overflow-y: auto;
-            padding: 20px 0;
-            box-shadow: 4px 0 10px rgba(0,0,0,0.3);
-        }
-
-        .sidebar.open {
-            transform: translateX(0);
-        }
-
-        .sidebar-icon-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0px 10px 15px 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #1a2845;
-        }
-
-        .sidebar-icon {
-            width: 45px;
-            height: 45px;
-            background-color: #1a2845;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .sidebar-icon:hover {
-            background-color: #2a4a7c;
-            transform: scale(1.05);
-        }
-
-        .sidebar-icon svg {
-            width: 22px;
-            height: 22px;
-            fill: #8b9dc3;
-            transition: fill 0.3s;
-        }
-
-        .sidebar-icon:hover svg {
-            fill: #ffffff;
-        }
-
-        .search-container {
-            padding: 0 20px 20px;
-            display: none;
-        }
-
-        .search-container.active {
-            display: block;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 10px 15px;
-            background-color: #1a2845;
-            border: 2px solid #2a4a7c;
-            border-radius: 8px;
-            color: #ffffff;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #4a8fe7;
-        }
-
-        .search-input::placeholder {
-            color: #6b7a99;
-        }
-
-        .sidebar-section {
-            margin-bottom: 30px;
-        }
-
-        .sidebar-header {
-            padding: 10px 20px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #6b7a99;
-            letter-spacing: 1.5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .sidebar-header svg {
-            width: 14px;
-            height: 14px;
-            fill: #6b7a99;
-        }
-
-        .sidebar-item {
-            padding: 12px 20px;
-            color: #c5d0e6;
-            cursor: pointer;
-            transition: all 0.2s;
-            border-left: 3px solid transparent;
-            font-size: 14px;
-        }
-
-        .sidebar-item:hover {
-            background-color: #1a2845;
-            border-left-color: #4a8fe7;
-            color: #ffffff;
-        }
-
-        .no-results {
-            padding: 12px 20px;
-            color: #6b7a99;
-            font-size: 12px;
-            font-style: italic;
-        }
-
         /* ─── Main Content ─── */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
@@ -290,6 +165,7 @@
         }
 
         .document-icon {
+            margin-top: 55px;
             margin-bottom: 20px;
             position: relative;
             display: inline-block;
@@ -451,7 +327,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             gap: 4px;
         }
 
@@ -477,6 +353,11 @@
             display: block;
             margin-bottom: 3px;
             color: #ffffff;
+        }
+
+        .recommendations-section .section-header {
+            align-items: flex-start;
+            padding-top: 42px;
         }
 
         /* ─── Action Buttons ─── */
@@ -703,7 +584,7 @@
     <div id="app">
         <!-- Top Header -->
         <div class="top-header">
-            <div class="menu-icon" @click="toggleSidebar">●●●</div>
+            <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
             <div class="user-profile" @click="showProfile">
                 <svg viewBox="0 0 24 24">
                     <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
@@ -715,66 +596,10 @@
         <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←</div>
 
         <!-- Sidebar -->
-        <div class="sidebar" :class="{ open: sidebarOpen }">
-            <div class="sidebar-icon-bar">
-                <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                    </svg>
-                </div>
-                <div class="sidebar-icon" @click="goToHome" title="Start new analysis">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                    </svg>
-                </div>
-            </div>
-
-            <div class="search-container" :class="{ active: searchActive }">
-                <input
-                    type="text"
-                    class="search-input"
-                    v-model="searchQuery"
-                    placeholder="Search documents..."
-                    @input="filterReports"
-                >
-            </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                    </svg>
-                    LAST 7 DAYS
-                </div>
-                <div v-if="filteredLast7Days.length === 0" class="no-results">No results to display</div>
-                <div v-else>
-                    <div
-                        v-for="report in filteredLast7Days"
-                        :key="report"
-                        class="sidebar-item"
-                        @click="openReport(report)"
-                    >{{ report }}</div>
-                </div>
-            </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-                    </svg>
-                    LAST 30 DAYS
-                </div>
-                <div v-if="filteredLast30Days.length === 0" class="no-results">No results to display</div>
-                <div v-else>
-                    <div
-                        v-for="report in filteredLast30Days"
-                        :key="report"
-                        class="sidebar-item"
-                        @click="openReport(report)"
-                    >{{ report }}</div>
-                </div>
-            </div>
-        </div>
+        <cybercomply-sidebar
+            :sidebar-open="sidebarOpen"
+            @toggle="sidebarOpen = !sidebarOpen"
+        ></cybercomply-sidebar>
 
         <!-- Main Content -->
         <div class="main-content" :class="{ shifted: sidebarOpen }">
@@ -833,9 +658,6 @@
                         </button>
                     </div>
                     <div class="recommendations-list">
-                        <div class="recommendation-item" v-if="topRecommendation">
-                            {{ topRecommendation }}
-                        </div>
                         <!-- Per-clause findings from AI -->
                         <div
                             class="recommendation-item"
@@ -898,104 +720,132 @@
 
         // ─────────────────────────────────────────────────────────────
         // ADMIN ROLE FLAG
-        // Replace this with your backend authentication check when ready.
+        // Resolved at runtime from sessionStorage (set by login flow).
+        // The mounted() hook overwrites this with the server-confirmed
+        // role so the hardcoded default below is only a safe fallback.
         //
         // Example (once backend exists):
         //   const isAdminUser = await fetch('/api/auth/me')
         //                         .then(r => r.json())
         //                         .then(u => u.role === 'admin');
-        //
-        // For now, set manually:  true = admin,  false = general user
-        const isAdminUser = true;  // <-- swap to `true` to test admin view
+        const isAdminUser = true;  // fallback — overridden in mounted()
         // ─────────────────────────────────────────────────────────────
 
-        createApp({
+        const BASE = 'http://127.0.0.1:8000/ai';
+
+        const app = createApp({
             data() {
                 return {
-                    sidebarOpen: false,
-                    searchActive: false,
-                    searchQuery: '',
+                    sidebarOpen: true,
                     isAdmin: isAdminUser,
                     toastVisible: false,
                     toastTimer: null,
-                    last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
-                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
-                    filteredLast7Days: [],
-                    filteredLast30Days: [],
 
                     // ── AI Result Fields ──
-                    // TODO: Replace this localStorage read with a fetch('/api/results/latest') once PostgreSQL is connected.
                     complianceScore: 0,
                     complianceLabel: 'Loading...',
                     barWidth: '0%',
                     analysedFilename: 'DOCUMENT ANALYSIS',
                     analysedCompany: '',
                     topRecommendation: '',
-                    complianceDetails: []
+                    complianceDetails: [],
+
+                    // ── Sidebar History ──
+                    last7Days: [],
+                    last30Days: [],
+                    filteredLast7Days: [],
+                    filteredLast30Days: [],
+
+                    // Loading / error state
+                    isLoading: true,
+                    loadError: ''
                 }
             },
-            mounted() {
-                this.filteredLast7Days  = [...this.last7Days];
-                this.filteredLast30Days = [...this.last30Days];
-
-                // ── Load AI result from localStorage ──
-                const raw = localStorage.getItem('latestAnalysisResult');
-                if (raw) {
-                    try {
-                        const result = JSON.parse(raw);
-
-                        // Metadata (set by home.html before redirect)
-                        this.analysedFilename = result._meta?.filename || 'Document Analysis';
-                        this.analysedCompany  = result._meta?.company  || '';
-
-                        // Compliance score and label
-                        const score = result.compliance?.compliance_score ?? 0;
-                        this.complianceScore = Math.round(score);
-                        this.complianceLabel = score >= 75 ? 'High Compliance Level'
-                                            : score >= 40 ? 'Medium Compliance Level'
-                                            :               'Low Compliance Level';
-
-                        // Per-clause details for Recommendations section
-                        this.complianceDetails = (result.compliance?.details || []).filter(
-                            d => d.status === 'non-compliant' || d.status === 'partial' || d.status === 'non_compliant'
-                        );
-
-                        // Top recommendation from Flask placeholder
-                        this.topRecommendation = result.recommendations?.top_action || '';
-
-                        // Animate bar after a short delay (allows CSS transition to fire)
-                        setTimeout(() => {
-                            this.barWidth = `${this.complianceScore}%`;
-                        }, 300);
-
-                    } catch (e) {
-                        console.error('Failed to parse analysis result from localStorage:', e);
-                    }
+            async mounted() {
+                const token = sessionStorage.getItem('authToken');
+                if (!token) {
+                    window.location.href = 'login.html';
+                    return;
                 }
+
+                // ── Resolve admin flag from session (server-confirmed) ────
+                const roleRaw = sessionStorage.getItem('userRole');
+                this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
+
+                // ── Determine which result to display ────────────────────
+                // Prefer an explicit result_id written by home.html after save.
+                // Fall back to /api/analysis/latest/ if none is stored.
+                const resultId = sessionStorage.getItem('latestResultId');
+                const url = resultId
+                    ? `${BASE}/api/analysis/${resultId}/`
+                    : `${BASE}/api/analysis/latest/`;
+
+                try {
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (res.status === 401 || res.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (!res.ok) {
+                        this.loadError = 'No analysis results found. Please upload and analyse a document first.';
+                        this.complianceLabel = 'No results yet';
+                        this.isLoading = false;
+                        return;
+                    }
+
+                    const data = await res.json();
+
+                    // ── Populate UI fields ────────────────────────────────
+                    this.analysedFilename = data.original_filename || 'Document Analysis';
+                    this.analysedCompany = data.company_name || '';
+                    this.complianceScore  = Math.round(data.compliance_score ?? 0);
+                    this.complianceLabel  = data.compliance_label || (
+                        this.complianceScore >= 75 ? 'High Compliance Level' :
+                        this.complianceScore >= 40 ? 'Medium Compliance Level' :
+                                                     'Low Compliance Level'
+                    );
+
+                    // Per-clause details for the Recommendations panel
+                    this.complianceDetails = (
+                        (data.compliance?.details || []).filter(
+                            d => d.status === 'non-compliant'
+                              || d.status === 'partial'
+                              || d.status === 'non_compliant'
+                        )
+                    );
+
+                    // Top-level recommendation from the AI payload
+                    this.topRecommendation = data.recommendations?.top_action || '';
+
+                    // Store result_id so sub-pages (compliance, recommendations) can pick it up
+                    if (data.result_id) {
+                        sessionStorage.setItem('latestResultId', data.result_id);
+                    }
+
+                    // Animate progress bar
+                    setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 300);
+
+                } catch (e) {
+                    console.error('Failed to load analysis result:', e);
+                    this.loadError = 'Could not reach the server. Please check your connection.';
+                } finally {
+                    this.isLoading = false;
+                }
+
+                // ── Populate sidebar history ──────────────────────────────
+                await this.fetchHistory(token);
             },
             methods: {
                 toggleSidebar() {
                     this.sidebarOpen = !this.sidebarOpen;
                 },
-                toggleSearch() {
-                    this.searchActive = !this.searchActive;
-                    if (!this.searchActive) {
-                        this.searchQuery = '';
-                        this.filterReports();
-                    }
-                },
                 goToHome() {
                     window.location.href = 'home.html';
-                },
-                filterReports() {
-                    const q = this.searchQuery.toLowerCase();
-                    if (q === '') {
-                        this.filteredLast7Days  = [...this.last7Days];
-                        this.filteredLast30Days = [...this.last30Days];
-                    } else {
-                        this.filteredLast7Days  = this.last7Days.filter(r => r.toLowerCase().includes(q));
-                        this.filteredLast30Days = this.last30Days.filter(r => r.toLowerCase().includes(q));
-                    }
                 },
                 showProfile() {
                     window.location.href = 'profile.html';
@@ -1003,30 +853,52 @@
                 goBack() {
                     window.location.href = 'home.html';
                 },
-                openReport(reportName) {
-                    window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
+
+                // ── Sidebar history navigation ──
+                openReport(report) {
+                    // report may be a history object { resultId, label } or a plain string
+                    const resultId = report.resultId || null;
+                    if (resultId) {
+                        sessionStorage.setItem('latestResultId', resultId);
+                        window.location.href = 'document_analysis.html';
+                    } else {
+                        window.location.href = `report_viewing.html?report=${encodeURIComponent(report.label || report)}`;
+                    }
+                },
+
+                async fetchHistory(token) {
+                    try {
+                        const res = await fetch(`${BASE}/api/analysis/history/`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        this.last7Days  = (data.last_7_days  || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
+                        this.last30Days = (data.last_30_days || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
+                        this.filteredLast7Days  = [...this.last7Days];
+                        this.filteredLast30Days = [...this.last30Days];
+                    } catch (e) {
+                        console.warn('Could not load analysis history:', e);
+                    }
                 },
 
                 // ── Compliance Score: open to all ──
                 viewComplianceScore() {
                     window.location.href = 'compliance.html';
                 },
-
                 // ── Recommendations: admin only ──
                 viewRecommendations() {
                     if (!this.isAdmin) { this.showAccessDenied(); return; }
                     window.location.href = 'recommendations.html';
                 },
-
                 // ── Compare: admin only ──
                 compareReport() {
                     if (!this.isAdmin) { this.showAccessDenied(); return; }
                     window.location.href = 'comparison.html';
                 },
-
                 // ── Generate Reports: open to all ──
                 generateReports() {
-                    window.location.href = 'report_viewing.html';
+                    window.location.href = 'report_viewing.html?generate=true';
                 },
 
                 showAccessDenied() {
@@ -1035,7 +907,9 @@
                     this.toastTimer = setTimeout(() => { this.toastVisible = false; }, 3500);
                 }
             }
-        }).mount('#app');
+        });
+        registerSidebarComponent(app);
+        app.mount('#app');
     </script>
 </body>
 </html>
