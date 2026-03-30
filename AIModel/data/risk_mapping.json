@@ -1,0 +1,342 @@
+{
+  "SL-PDPA-S4": {
+    "risk_title": "Regulatory Non-Compliance Exposure",
+    "consequence": "Without a demonstrable commitment to the Act's core obligations, the organisation becomes an immediate target for enforcement action by the Data Protection Authority. Inspections, mandatory audits, and corrective orders can be issued at any time, disrupting operations and consuming significant management resources.",
+    "business_impact": ["Regulatory fines", "Mandatory audits", "Operational disruption", "Reputational damage"]
+  },
+  "SL-PDPA-S5": {
+    "risk_title": "Unlawful Data Processing Liability",
+    "consequence": "Processing personal data without a valid lawful basis means every data collection and processing activity the organisation conducts may be deemed illegal. Data subjects can bring civil claims, and the Authority can order immediate cessation of processing, which could halt core business functions overnight.",
+    "business_impact": ["Civil claims from data subjects", "Cease-processing orders", "Data deletion mandates", "Financial penalties"]
+  },
+  "SL-PDPA-S6-1": {
+    "risk_title": "Purpose Creep and Mission Drift",
+    "consequence": "Without documented processing purposes, the organisation cannot demonstrate that data use is limited and proportionate. This creates an environment where data collected for one reason drifts into unintended uses, exposing the organisation to regulatory challenge and eroding data subject trust.",
+    "business_impact": ["Regulatory challenge on data use", "Loss of customer trust", "Increased audit scope", "Potential injunctions"]
+  },
+  "SL-PDPA-S6-2": {
+    "risk_title": "Invalid Archiving and Research Activities",
+    "consequence": "Research, archiving, or statistical activities conducted without the required safeguards under this exception may be challenged as unlawful processing. Academic or commercial partnerships relying on such data use could be invalidated, causing project failures and reputational harm.",
+    "business_impact": ["Research project invalidation", "Partnership liability", "Regulatory challenge", "Loss of research funding"]
+  },
+  "SL-PDPA-S7": {
+    "risk_title": "Excessive Data Collection Risk",
+    "consequence": "Collecting more personal data than necessary magnifies the impact of any security incident and increases regulatory exposure. In the event of a breach, a larger dataset means greater harm to more individuals, leading to higher penalties, more extensive notification obligations, and greater reputational fallout.",
+    "business_impact": ["Amplified breach impact", "Higher regulatory penalties", "Increased notification burden", "Greater litigation exposure"]
+  },
+  "SL-PDPA-S8": {
+    "risk_title": "Inaccurate Data Decision Risk",
+    "consequence": "Decisions made on inaccurate personal data — such as credit assessments, employment decisions, or service eligibility — can cause direct harm to individuals, resulting in compensation claims. The organisation also risks acting on faulty intelligence, leading to poor business outcomes and potential discrimination liability.",
+    "business_impact": ["Compensation claims", "Discrimination liability", "Poor business decisions", "Regulatory scrutiny"]
+  },
+  "SL-PDPA-S9": {
+    "risk_title": "Indefinite Data Retention Exposure",
+    "consequence": "Retaining personal data beyond its necessary period increases the volume of sensitive information at risk at all times. It also creates direct regulatory liability, as the Authority can order deletion of data held without justification. Legacy data stores become a persistent liability with no business benefit.",
+    "business_impact": ["Deletion orders from Authority", "Increased breach exposure", "Storage cost liability", "Regulatory fines"]
+  },
+  "SL-PDPA-S10": {
+    "risk_title": "Data Breach and Security Incident Exposure",
+    "consequence": "Failure to implement appropriate security measures is the single most direct path to a personal data breach. A breach without adequate prior security controls attracts the harshest regulatory response, including maximum fines, mandatory public disclosure, and potential criminal referrals for responsible officers.",
+    "business_impact": ["Maximum regulatory fines", "Mandatory public disclosure", "Criminal referrals", "Class action litigation", "Loss of operating licence"]
+  },
+  "SL-PDPA-S11": {
+    "risk_title": "Data Subject Trust Collapse",
+    "consequence": "Data subjects who are not informed about how their data is used cannot exercise their rights and are likely to feel deceived upon discovery. This destroys trust, drives negative publicity, and creates a basis for regulatory complaints. Transparent processing is a prerequisite for any legitimate ongoing customer relationship.",
+    "business_impact": ["Mass regulatory complaints", "Negative media coverage", "Customer churn", "Reputational damage"]
+  },
+  "SL-PDPA-S12-1": {
+    "risk_title": "Unmanaged Compliance Programme Risk",
+    "consequence": "Without a formal Data Protection Management Programme, the organisation has no structured mechanism to detect, assess, or respond to compliance failures. Issues escalate undetected until they become enforcement matters, at which point remediation costs are significantly higher than prevention.",
+    "business_impact": ["Undetected compliance failures", "Escalated enforcement costs", "Inability to demonstrate due diligence", "Officer personal liability"]
+  },
+  "SL-PDPA-S12-2": {
+    "risk_title": "Non-Alignment with Authority Guidelines",
+    "consequence": "Failure to follow guidelines issued by the Data Protection Authority may be treated as evidence of systemic non-compliance. While lower risk in isolation, it undermines the organisation's credibility in any enforcement interaction and weakens defences in regulatory proceedings.",
+    "business_impact": ["Weakened regulatory defence", "Adverse inference in proceedings", "Reputational credibility loss"]
+  },
+  "SL-PDPA-S13-1": {
+    "risk_title": "Data Subject Access Right Violations",
+    "consequence": "Denying or ignoring data subject access requests is a directly enforceable rights violation. Data subjects can escalate immediately to the Authority, triggering an investigation. Consistent failure creates a pattern of conduct that attracts the most serious enforcement responses.",
+    "business_impact": ["Authority investigations", "Individual compensation awards", "Regulatory fines", "Injunctive orders"]
+  },
+  "SL-PDPA-S13-2": {
+    "risk_title": "Access Request Response Failure",
+    "consequence": "Without a defined process for responding to access requests, the organisation will routinely breach mandatory response timelines. Each missed deadline is an independent compliance failure that can be reported to the Authority, creating a cumulative record of non-compliance that substantially increases enforcement risk.",
+    "business_impact": ["Cumulative compliance failures", "Escalating regulatory fines", "Data subject litigation", "Operational disruption"]
+  },
+  "SL-PDPA-S14-1": {
+    "risk_title": "Continued Processing After Consent Withdrawal",
+    "consequence": "If data subjects cannot effectively withdraw consent, the organisation will continue processing data on an invalid basis after withdrawal is requested. This converts lawful processing into unlawful processing from the moment of withdrawal, exposing the organisation to claims and enforcement for every subsequent use of that data.",
+    "business_impact": ["Unlawful processing liability", "Data subject compensation claims", "Regulatory enforcement", "Data deletion orders"]
+  },
+  "SL-PDPA-S14-2": {
+    "risk_title": "Inability to Handle Objections to Processing",
+    "consequence": "Without an objection-handling process, the organisation has no mechanism to assess and respond to data subject objections. Processing that continues after a valid objection is unlawful, and failure to demonstrate that objections are properly considered is a clear compliance failure that regulators take seriously.",
+    "business_impact": ["Unlawful processing continuation", "Regulatory complaints", "Individual compensation claims", "Reputational damage"]
+  },
+  "SL-PDPA-S15": {
+    "risk_title": "Inaccurate Data Retention Harm",
+    "consequence": "Failing to provide a rectification mechanism means inaccurate data about individuals remains in the organisation's systems indefinitely. This harms the individuals concerned and undermines the integrity of the organisation's own data assets, leading to flawed analytics, poor decisions, and legal liability for consequential harm.",
+    "business_impact": ["Consequential harm claims", "Data quality degradation", "Regulatory action", "Discrimination risk"]
+  },
+  "SL-PDPA-S16": {
+    "risk_title": "Right to Erasure Non-Compliance",
+    "consequence": "Inability to fulfil erasure requests means the organisation retains data it has no right to hold, creating ongoing liability for every day that data remains. If the individual suffers harm from continued retention — such as from a subsequent breach — the organisation bears full liability for that harm.",
+    "business_impact": ["Ongoing retention liability", "Breach harm amplification", "Regulatory erasure orders", "Compensation claims"]
+  },
+  "SL-PDPA-S17-1": {
+    "risk_title": "Data Subject Request Backlog and Enforcement",
+    "consequence": "Without defined response timelines and content requirements, requests from data subjects will be handled inconsistently or not at all. Each unanswered or delayed request is a reportable breach of the Act. A pattern of failures creates a strong basis for an Authority investigation into systemic non-compliance.",
+    "business_impact": ["Systemic investigation risk", "Per-incident fines", "Mandatory process audits", "Reputational harm"]
+  },
+  "SL-PDPA-S17-2": {
+    "risk_title": "Unjustified Refusal of Data Subject Rights",
+    "consequence": "Refusing data subject requests without lawful grounds exposes the organisation to immediate regulatory challenge. Without defined refusal criteria, any refusal is likely to be overturned upon review, and a pattern of unjustified refusals will attract enforcement action and significant fines.",
+    "business_impact": ["Overturned refusals", "Regulatory enforcement", "Compensation awards", "Process overhaul mandates"]
+  },
+  "SL-PDPA-S17-3": {
+    "risk_title": "Undocumented Refusal Trail",
+    "consequence": "Without records of refusals submitted to the Authority, the organisation cannot demonstrate compliance with refusal procedures. This creates an evidence gap in any regulatory investigation and removes the organisation's ability to defend its decision-making in enforcement proceedings.",
+    "business_impact": ["Evidence gap in investigations", "Inability to defend decisions", "Regulatory adverse findings", "Fines"]
+  },
+  "SL-PDPA-S17-4": {
+    "risk_title": "Identity Fraud in Data Subject Requests",
+    "consequence": "Without identity verification procedures, malicious third parties can submit fraudulent access or erasure requests, obtaining sensitive personal data or causing unlawful deletions. This creates both a data breach risk and a liability to the actual data subjects whose data is improperly disclosed or deleted.",
+    "business_impact": ["Third-party data disclosure", "Fraudulent erasure risk", "Data subject compensation claims", "Regulatory liability"]
+  },
+  "SL-PDPA-S17-5": {
+    "risk_title": "Rights Denial for Vulnerable Data Subjects",
+    "consequence": "Without a proxy exercise mechanism, the rights of children, incapacitated individuals, and those represented by legal proxies cannot be exercised. This is a direct rights denial to some of the most vulnerable data subjects, attracting serious regulatory and reputational consequences.",
+    "business_impact": ["Vulnerable person rights denial", "Regulatory enforcement", "Reputational harm", "Potential litigation"]
+  },
+  "SL-PDPA-S17-6": {
+    "risk_title": "Unlawful Fee Charging for Rights Requests",
+    "consequence": "Charging unauthorised fees for data subject requests, or refusing requests pending unprescribed payment, constitutes a rights violation. Data subjects may escalate complaints to the Authority, which can order fee waivers, process overhauls, and impose penalties for each improper charge levied.",
+    "business_impact": ["Regulatory fee-waiver orders", "Individual complaints", "Process overhaul mandates", "Fines per improper charge"]
+  },
+  "SL-PDPA-S17-7": {
+    "risk_title": "Opaque Fee Communication Practices",
+    "consequence": "Failing to notify data subjects of fees and their justification before charging undermines informed consent to the fee. Data subjects who are surprised by charges are more likely to escalate complaints, and the Authority will view undisclosed fee practices as an attempt to deter the exercise of legal rights.",
+    "business_impact": ["Deterrence-of-rights findings", "Complaint escalations", "Regulatory fines", "Reputational damage"]
+  },
+  "SL-PDPA-S18-1": {
+    "risk_title": "Unchallenged Automated Decision Harm",
+    "consequence": "Automated decisions affecting individuals — such as credit scoring, insurance pricing, or recruitment screening — cannot be challenged if no review mechanism exists. Individuals harmed by erroneous automated outputs have no recourse, and the organisation cannot demonstrate fairness, creating significant discrimination and regulatory liability.",
+    "business_impact": ["Discrimination claims", "Regulatory investigation", "Reputational damage", "Compensation liability"]
+  },
+  "SL-PDPA-S18-2": {
+    "risk_title": "Automated Decision Exception Misapplication",
+    "consequence": "Applying automated decision-making in circumstances where it is not lawfully permitted — without recognising valid exceptions — exposes the organisation to challenge on every automated decision taken. The entire automated decision pipeline may need to be suspended pending a compliance review.",
+    "business_impact": ["Pipeline suspension risk", "Compensation claims", "Regulatory enforcement", "Operational disruption"]
+  },
+  "SL-PDPA-S19-1": {
+    "risk_title": "Unresolved Data Subject Disputes",
+    "consequence": "Without an appeal pathway, data subjects who disagree with the organisation's decisions have no formal recourse except to escalate directly to the Authority or courts. This bypasses any internal resolution opportunity, immediately elevating disputes to the highest-cost and highest-risk resolution forums.",
+    "business_impact": ["Direct Authority escalations", "Court proceedings", "High litigation costs", "Adverse public findings"]
+  },
+  "SL-PDPA-S19-2": {
+    "risk_title": "Non-Compliance with Authority Determinations",
+    "consequence": "If the organisation does not understand or acknowledge the Authority's role in determining lawfulness of its decisions, it may fail to implement determinations, constituting contempt of the regulatory process. This escalates routine compliance matters into serious enforcement actions with criminal dimensions.",
+    "business_impact": ["Contempt of regulatory process", "Criminal referrals", "Escalated enforcement", "Business disruption orders"]
+  },
+  "SL-PDPA-S19-3": {
+    "risk_title": "Delayed Implementation of Appeal Outcomes",
+    "consequence": "Without awareness of timeline requirements for communicating Authority determinations, the organisation may delay implementation, extending the period during which non-compliant practices continue. Each day of continued non-compliance after a determination compounds regulatory exposure.",
+    "business_impact": ["Compounding daily fines", "Extended non-compliance period", "Escalated enforcement", "Reputational harm"]
+  },
+  "SL-PDPA-S19-4": {
+    "risk_title": "Failure to Implement Regulatory Decisions",
+    "consequence": "Failing to implement the Authority's decisions within prescribed timelines is a standalone serious breach, separate from the underlying compliance failure. It signals deliberate or negligent disregard for regulatory authority and is likely to trigger maximum penalty responses.",
+    "business_impact": ["Maximum regulatory penalties", "Criminal referrals for officers", "Mandatory compliance oversight", "Business suspension risk"]
+  },
+  "SL-PDPA-S19-5": {
+    "risk_title": "Uncontested Adverse Court Outcomes",
+    "consequence": "Without awareness of the further appeal pathway to the Court of Appeal, the organisation may miss critical deadlines to contest unfavourable Authority determinations. Uncontested determinations become final and binding, creating precedents that affect all future regulatory interactions.",
+    "business_impact": ["Binding adverse precedents", "Missed appeal deadlines", "Unrecoverable legal positions", "Long-term compliance burden"]
+  },
+  "SL-PDPA-S20-1": {
+    "risk_title": "Absence of Data Protection Accountability Function",
+    "consequence": "Organisations required to appoint a Data Protection Officer but failing to do so have no designated accountability function for data protection compliance. This means compliance gaps accumulate without oversight, and the organisation cannot demonstrate the proactive compliance posture that regulators expect from high-risk processors.",
+    "business_impact": ["Unmanaged compliance accumulation", "Regulatory fines", "Inability to demonstrate due diligence", "Enforcement action"]
+  },
+  "SL-PDPA-S20-2": {
+    "risk_title": "Unqualified DPO Appointment Risk",
+    "consequence": "Appointing an unqualified DPO means the function provides false assurance — compliance issues will be missed or mishandled. When the Authority investigates, an unqualified DPO appointment may itself be cited as evidence of inadequate compliance infrastructure, worsening the organisation's position.",
+    "business_impact": ["False compliance assurance", "Compounded enforcement findings", "DPO liability", "Mandatory re-appointment orders"]
+  },
+  "SL-PDPA-S20-3": {
+    "risk_title": "Group-Level DPO Coverage Gaps",
+    "consequence": "Without a properly designated DPO covering all relevant entities in a group, some entities will operate without any data protection oversight. Regulators may investigate each entity individually, multiplying enforcement exposure across the group and creating inconsistent compliance standards.",
+    "business_impact": ["Multiple entity investigations", "Multiplied fines", "Inconsistent group compliance", "Coordination failures"]
+  },
+  "SL-PDPA-S20-4": {
+    "risk_title": "Inaccessible Data Protection Contact",
+    "consequence": "Data subjects and the Authority must be able to contact the DPO directly. Without published contact details, data subjects cannot exercise their rights effectively, and the Authority cannot engage with the designated compliance officer. Both failures are independently reportable violations.",
+    "business_impact": ["Rights access barrier", "Regulatory communication failure", "Independent violation findings", "Reputational damage"]
+  },
+  "SL-PDPA-S20-5": {
+    "risk_title": "Ineffective Data Protection Oversight",
+    "consequence": "A DPO without defined responsibilities cannot perform the oversight function the Act requires. The organisation will have the appearance of compliance without the substance, and when an incident occurs, the absence of effective DPO oversight will be cited as an aggravating factor in any enforcement action.",
+    "business_impact": ["Aggravated enforcement findings", "DPO personal liability", "Compliance programme failure", "Increased penalty exposure"]
+  },
+  "SL-PDPA-S21-1": {
+    "risk_title": "Uncontrolled Third-Party Data Processing",
+    "consequence": "Without contractual controls over processors, the organisation cannot ensure that third parties handling personal data on its behalf comply with the Act. Any breach or violation by a processor becomes the controller's liability. The organisation is fully exposed to the consequences of its processors' failures.",
+    "business_impact": ["Full processor breach liability", "Uncontrolled third-party risk", "Regulatory fines", "Data subject claims against controller"]
+  },
+  "SL-PDPA-S21-2": {
+    "risk_title": "Joint Controller Liability Ambiguity",
+    "consequence": "Without defined joint controller arrangements, responsibility for compliance is unclear when multiple organisations process the same data. Each joint controller is individually liable for the full obligations of the Act, and the absence of allocation agreements means each party bears maximum exposure with no contractual recourse.",
+    "business_impact": ["Full joint liability exposure", "Inter-party disputes", "Data subject claims against all parties", "Regulatory confusion"]
+  },
+  "SL-PDPA-S22-1": {
+    "risk_title": "Processor Non-Compliance Cascade",
+    "consequence": "Processors that do not understand or implement their core obligations create compliance failures that cascade back to the controller. The organisation may unknowingly be complicit in unlawful processing carried out by its processors, inheriting liability for violations it did not directly commit.",
+    "business_impact": ["Inherited processor liability", "Unlawful processing chain", "Regulatory action against controller", "Reputational damage"]
+  },
+  "SL-PDPA-S22-2": {
+    "risk_title": "Unauthorised Controller Status Assumption",
+    "consequence": "A processor that begins determining processing purposes and means assumes controller status and its full obligations without authorisation. If this is not identified and managed, data may be processed under an entirely unauthorised legal basis, creating a fundamental lawfulness failure with no available defence.",
+    "business_impact": ["Unauthorised processing exposure", "Contractual breach", "Regulatory enforcement on both parties", "Data subject claims"]
+  },
+  "SL-PDPA-S22-3": {
+    "risk_title": "Unvetted Sub-Processing Chain",
+    "consequence": "Without oversight of sub-processors, personal data can flow through an uncontrolled chain of third parties, each with different — and potentially inadequate — security and compliance standards. A breach anywhere in the sub-processing chain creates full liability for the organisation as the original controller.",
+    "business_impact": ["Uncontrolled data flow", "Sub-processor breach liability", "Regulatory enforcement", "Data subject harm exposure"]
+  },
+  "SL-PDPA-S22-4": {
+    "risk_title": "Sub-Processor Liability Gap",
+    "consequence": "Without contractual liability provisions for sub-processors, the organisation has no recourse when a sub-processor causes a data breach or compliance failure. The controller bears the regulatory consequences while having no contractual mechanism to recover losses or compel remediation from the responsible party.",
+    "business_impact": ["Unrecoverable breach costs", "Sole regulatory liability", "No contractual recourse", "Financial exposure"]
+  },
+  "SL-PDPA-S22-5": {
+    "risk_title": "Ambiguous Personnel Data Access Controls",
+    "consequence": "Without a clear definition of personnel who can access personal data, the organisation cannot enforce least-privilege access controls. Overly broad personnel access increases insider threat risk and makes it impossible to demonstrate that access to personal data is appropriately restricted and monitored.",
+    "business_impact": ["Insider threat exposure", "Access control failures", "Inability to demonstrate restriction", "Regulatory findings on access governance"]
+  },
+  "SL-PDPA-S23-1": {
+    "risk_title": "Unreported Data Breach Criminal and Civil Exposure",
+    "consequence": "Failing to notify the Authority of a personal data breach within required timelines is one of the most serious standalone violations under the Act. Late or absent breach notification attracts the maximum financial penalties and may constitute a criminal offence for responsible officers, regardless of whether the breach itself caused harm.",
+    "business_impact": ["Maximum financial penalties", "Criminal liability for officers", "Mandatory public disclosure", "Civil claims from affected individuals", "Loss of operating licence"]
+  },
+  "SL-PDPA-S23-2": {
+    "risk_title": "Breach Response Chaos and Escalated Harm",
+    "consequence": "Without defined breach notification rules, the organisation will respond to incidents in an ad hoc manner, delaying notifications and increasing harm to affected individuals. Disorganised breach response is treated by regulators as evidence of systemic compliance failure, substantially increasing penalties.",
+    "business_impact": ["Escalated breach harm", "Aggravated penalty findings", "Delayed individual notifications", "Class action exposure", "Media crisis risk"]
+  },
+  "SL-PDPA-S24-1": {
+    "risk_title": "High-Risk Processing Without Risk Assessment",
+    "consequence": "Commencing high-risk processing activities without a DPIA means the organisation proceeds in ignorance of the risks it is creating for data subjects. If harm materialises, the absence of a DPIA is direct evidence of negligence, dramatically increasing penalty exposure and creating personal liability for decision-makers.",
+    "business_impact": ["Processing suspension orders", "Negligence findings", "Officer personal liability", "Maximum regulatory penalties", "Data subject compensation claims"]
+  },
+  "SL-PDPA-S24-2": {
+    "risk_title": "Incomplete Risk Assessment Findings",
+    "consequence": "A DPIA that does not cover the required content elements — such as necessity assessments, risk identification, and proposed mitigations — is treated as no DPIA at all. The organisation bears the full burden of proof for any processing decisions that were not properly assessed, with no mitigation credit for an incomplete assessment.",
+    "business_impact": ["No mitigation credit", "Full processing liability", "Regulatory enforcement", "Evidence of inadequate governance"]
+  },
+  "SL-PDPA-S24-3": {
+    "risk_title": "DPO Exclusion from Risk Assessment",
+    "consequence": "Excluding the DPO from the DPIA process defeats the purpose of having a DPO and produces risk assessments that miss legal compliance issues. Regulators will view DPO non-involvement as evidence that the DPIA was a box-ticking exercise rather than a genuine risk assessment.",
+    "business_impact": ["DPIA validity challenge", "DPO function undermined", "Regulatory adverse findings", "Processing liability"]
+  },
+  "SL-PDPA-S24-4": {
+    "risk_title": "Stale Risk Assessments on Changed Processing",
+    "consequence": "Processing activities that change significantly without a fresh DPIA may introduce new risks that the original assessment did not contemplate. The organisation continues processing under a risk assessment that no longer reflects reality, creating unmanaged exposure that will not be discovered until an incident occurs.",
+    "business_impact": ["Unmanaged evolving risks", "Incident-triggered enforcement", "Stale compliance documentation", "Negligence findings"]
+  },
+  "SL-PDPA-S24-5": {
+    "risk_title": "Authority Oversight Avoidance Finding",
+    "consequence": "Failing to submit DPIAs to the Authority when required, or failing to provide additional information on request, will be treated as an attempt to avoid regulatory oversight. This creates an adversarial dynamic with the Authority and results in the most aggressive enforcement responses.",
+    "business_impact": ["Adversarial regulatory relationship", "Enforcement escalation", "Processing prohibition orders", "Maximum fines"]
+  },
+  "SL-PDPA-S25-1": {
+    "risk_title": "Unmitigated Pre-Processing Risk",
+    "consequence": "Beginning processing activities without first implementing risk mitigation measures means the organisation accepts and creates preventable harm to data subjects. Any harm that occurs could have been avoided, creating the strongest possible basis for regulatory penalties and civil compensation claims.",
+    "business_impact": ["Preventable harm liability", "Maximum regulatory penalties", "Civil compensation exposure", "Processing suspension orders"]
+  },
+  "SL-PDPA-S25-2": {
+    "risk_title": "Unilateral High-Risk Processing Decision",
+    "consequence": "Proceeding with high-risk processing without consulting the Authority when risks cannot be mitigated removes the Authority's opportunity to provide guidance or impose conditions. The organisation assumes sole responsibility for all consequences of that processing, with no regulatory input as a mitigating factor.",
+    "business_impact": ["Sole processing liability", "No regulatory mitigation credit", "Post-incident enforcement", "Reputational damage"]
+  },
+  "SL-PDPA-S25-3": {
+    "risk_title": "Non-Compliance with Risk Mitigation Instructions",
+    "consequence": "Ignoring written instructions from the Authority to mitigate risks or cease processing constitutes deliberate defiance of regulatory authority. This is treated as one of the most serious aggravating factors in enforcement proceedings and may result in criminal prosecution of individual officers.",
+    "business_impact": ["Criminal prosecution of officers", "Maximum enforcement penalties", "Business operations injunction", "Reputational catastrophe"]
+  },
+  "SL-PDPA-S25-4": {
+    "risk_title": "Incomplete Authority Consultation Record",
+    "consequence": "Failing to provide the Authority with requested information during consultation obstructs the regulatory oversight process. This is treated as non-cooperation, which regulators consider an aggravating factor that justifies higher penalties and more intrusive ongoing oversight.",
+    "business_impact": ["Non-cooperation finding", "Aggravated penalties", "Intrusive ongoing oversight", "Extended regulatory scrutiny"]
+  },
+  "SL-PDPA-S25-5": {
+    "risk_title": "Continued Processing in Defiance of Authority",
+    "consequence": "Continuing to process personal data after the Authority has instructed the organisation to implement measures or cease processing represents the most serious level of non-compliance. Regulators have maximum enforcement powers in this scenario, including business prohibition orders and criminal referrals.",
+    "business_impact": ["Business prohibition orders", "Criminal referrals", "Maximum financial penalties", "Public enforcement notices", "Director disqualification risk"]
+  },
+  "SL-PDPA-S25-6": {
+    "risk_title": "Inadequate Special Category Processing Safeguards",
+    "consequence": "Processing special categories of personal data — health, ethnic origin, biometric data — without deemed safeguards creates severe exposure for the most sensitive class of data subjects. Breaches involving special category data attract the highest regulatory penalties and the most damaging media coverage.",
+    "business_impact": ["Maximum breach penalties", "Media crisis risk", "Data subject discrimination claims", "Processing suspension orders"]
+  },
+  "SL-PDPA-S25-7": {
+    "risk_title": "Unsanctioned National Security Data Processing",
+    "consequence": "Processing personal data for national security, public order, or public health purposes without mandatory Authority consultation creates an unlawful processing scenario in the most politically sensitive data category. Such violations attract government-level scrutiny and may result in the most serious enforcement outcomes available under the Act.",
+    "business_impact": ["Government-level scrutiny", "Licence revocation", "Criminal prosecution", "Maximum penalties", "National security referrals"]
+  },
+  "SL-PDPA-S26-1": {
+    "risk_title": "Prohibited Cross-Border Transfer by Public Authority",
+    "consequence": "Public authorities transferring personal data outside Sri Lanka in violation of data localisation requirements commit a categorical breach of the Act. This is an absolute obligation with no available exceptions for public bodies, creating automatic enforcement exposure for every transfer made.",
+    "business_impact": ["Automatic enforcement exposure", "Transfer prohibition orders", "Criminal liability for officers", "International regulatory cooperation investigations"]
+  },
+  "SL-PDPA-S26-2": {
+    "risk_title": "Transfer to Inadequately Protected Jurisdictions",
+    "consequence": "Transferring personal data to countries without an adequacy decision may expose data subjects to jurisdictions with no meaningful data protection. If harm to data subjects occurs due to inadequate overseas protections, the Sri Lankan controller remains liable for that harm, regardless of where it occurred.",
+    "business_impact": ["Cross-border harm liability", "Regulatory enforcement", "Transfer prohibition orders", "Data subject compensation claims"]
+  },
+  "SL-PDPA-S26-3": {
+    "risk_title": "Unlawful International Data Transfers",
+    "consequence": "Without utilising the appropriate transfer mechanisms available to private organisations — such as standard contractual clauses or binding corporate rules — any international transfer of personal data is unlawful. Global operations that depend on cross-border data flows may be disrupted or prohibited entirely.",
+    "business_impact": ["Global operations disruption", "Transfer prohibition orders", "Regulatory fines", "Contractual invalidity with overseas parties"]
+  },
+  "SL-PDPA-S26-4": {
+    "risk_title": "Absence of Cross-Border Safeguard Instruments",
+    "consequence": "Without formal safeguard instruments — binding corporate rules, standard contractual clauses, or approved codes of conduct — international data transfers have no legal foundation. The organisation cannot demonstrate that data subjects' rights travel with their data, creating persistent liability for every international transfer made.",
+    "business_impact": ["Per-transfer regulatory liability", "Safeguard instrument mandates", "Processing prohibition orders", "International partner liability"]
+  },
+  "SL-PDPA-S26-5": {
+    "risk_title": "Derogation Misuse in International Transfers",
+    "consequence": "Relying on derogations — such as explicit consent or necessity — for routine international transfers is unlawful. Derogations are narrow exceptions for specific circumstances, not general authorisation for ongoing transfers. Systemic misuse of derogations will be identified as deliberate circumvention of transfer rules, attracting the highest penalties.",
+    "business_impact": ["Deliberate circumvention finding", "Maximum penalties", "Transfer prohibition orders", "Ongoing compliance monitoring"]
+  },
+  "SL-PDPA-S27-1": {
+    "risk_title": "Unsolicited Marketing Liability",
+    "consequence": "Sending marketing messages to data subjects without their consent constitutes spam and a direct violation of the Act. Each unsolicited message is an individual violation, and large-scale marketing campaigns conducted without consent can result in penalties calculated per message sent, creating catastrophic financial exposure.",
+    "business_impact": ["Per-message penalty exposure", "Anti-spam enforcement", "Marketing campaign shutdown", "Mass data subject complaints", "Reputational damage"]
+  },
+  "SL-PDPA-S27-2": {
+    "risk_title": "Invalid Marketing Consent Collection",
+    "consequence": "Collecting consent for marketing messages using procedures that do not meet Schedule III conditions means all consent obtained is invalid. Every marketing message sent on the basis of that consent is unlawful, and the organisation must re-obtain valid consent from its entire marketing database to continue operations lawfully.",
+    "business_impact": ["Entire consent database invalidation", "Marketing operations suspension", "Re-consent campaign costs", "Regulatory fines", "Brand damage"]
+  },
+  "SL-PDPA-S27-3": {
+    "risk_title": "No Opt-Out Mechanism for Marketing",
+    "consequence": "Sending marketing messages without a free opt-out mechanism traps data subjects in unwanted communications with no lawful exit. This is one of the most visible and easily verifiable violations, attracting high volumes of data subject complaints and regulatory attention disproportionate to the organisation's size.",
+    "business_impact": ["Mass data subject complaints", "Regulatory investigation trigger", "Marketing campaign injunction", "Reputational harm", "Fines"]
+  },
+  "SL-PDPA-S27-4": {
+    "risk_title": "Anonymous Marketing Communication Risk",
+    "consequence": "Marketing messages that do not identify the controller or the third party on whose behalf the message is sent prevent data subjects from exercising their rights or making informed decisions. This also makes it impossible for regulators to trace responsibility for non-compliant campaigns, which is treated as deliberate obfuscation.",
+    "business_impact": ["Deliberate obfuscation finding", "Regulatory enforcement", "Data subject trust erosion", "Individual complaint escalations"]
+  },
+  "SL-PDPA-S27-5": {
+    "risk_title": "Non-Standard Message Classification",
+    "consequence": "Without adopting Authority-prescribed codes and prefixes for message categories, the organisation's communications cannot be properly classified by recipients or regulated. This creates confusion, undermines the regulatory framework for solicited messages, and may result in enforcement action for non-adoption of mandatory standards.",
+    "business_impact": ["Non-standard messaging enforcement", "Regulatory compliance orders", "Operational messaging overhaul", "Confusion for recipients"]
+  },
+  "SL-PDPA-S27-6": {
+    "risk_title": "Ambiguous Communication Scope",
+    "consequence": "Without understanding the statutory definition of a message under this section, the organisation may fail to recognise which of its communications are subject to the solicited messages regime. Activities that fall within the definition but are treated as outside it will create undetected compliance failures across communication channels.",
+    "business_impact": ["Undetected compliance failures", "Regulatory enforcement on excluded channels", "Systemic non-compliance", "Operational communications review burden"]
+  }
+}

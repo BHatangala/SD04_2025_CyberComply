@@ -1,0 +1,37 @@
+CYBERSECURITY INCIDENT RESPONSE POLICY AND PROCEDURES
+Department: Information Technology / Security Operations
+Version: 2.0 | Effective: September 2025 | Review: September 2026
+
+1. PURPOSE AND SCOPE
+This policy establishes the framework for responding to cybersecurity incidents at Nexacore Technologies Sdn Bhd. It defines processes for identifying, containing, eradicating, and recovering from security incidents. This policy does not cover consent collection or data subject rights — those are addressed in the Data Privacy Protection Policy.
+
+2. INCIDENT CLASSIFICATION
+Critical (P1): Active breach, ransomware, confirmed data exfiltration — respond immediately.
+High (P2): Suspected breach, significant unauthorised access — within 1 hour.
+Medium (P3): Policy violation, phishing attempt, minor access anomaly — within 4 hours.
+Low (P4): Suspicious email, anomalous activity with no confirmed breach — within 24 hours.
+
+3. INCIDENT RESPONSE TEAM
+IRT Lead: Head of IT Security. Technical Lead: Senior Security Engineer. Communications Lead: Head of Corporate Communications. Legal: Legal Department representative. All IRT members must be contactable 24/7 via the emergency contact list.
+
+4. RESPONSE PROCEDURES
+4.1 Detection: Staff report incidents to security@nexacore.lk or the incident portal.
+4.2 Containment: Isolate affected systems. Suspend compromised accounts immediately.
+4.3 Eradication: Remove malicious code. Rebuild systems from verified clean backups.
+4.4 Recovery: Restore systems and monitor for recurrence.
+4.5 Post-Incident Review: Conducted within 5 business days for all P1 and P2 incidents.
+
+5. DATA MINIMISATION IN INCIDENT HANDLING
+Personal data collected and processed during incident investigations is strictly limited to what is necessary for identifying, containing, and resolving the security incident. Incident reports include only the personal data elements directly relevant to the specific incident. Data collected during investigations is not used for any other purpose. Access to incident records is restricted to the Incident Response Team members directly involved in the response.
+
+6. PERSONAL DATA BREACH NOTIFICATION — PDPA SECTION 23
+Where a confirmed incident involves personal data, the Data Protection Officer is notified within 2 hours of confirmation. The DPO assesses notification obligations under the PDPA No. 9 of 2022. Where required, the Data Protection Authority of Sri Lanka is notified within 72 hours of the controller becoming aware of the breach. Affected data subjects are notified without undue delay where the breach is likely to result in high risk to their rights. All personal data breaches are recorded in the Breach Register including: nature of the breach, categories and volume of data affected, likely consequences, and remedial measures taken.
+
+7. EVIDENCE PRESERVATION
+Forensic evidence is preserved with chain-of-custody controls. Evidence is stored securely and must not be modified after collection. Legal is notified for all P1 incidents where litigation may follow.
+
+8. COMMUNICATION
+Internal incident communications are limited to staff with a direct operational need to know. External communications are managed by the Communications Lead in consultation with Legal. Staff must not discuss incidents externally or on personal social media.
+
+9. TRAINING AND TESTING
+Annual phishing awareness training for all staff. Annual IRT tabletop exercise. Full red team simulation every 2 years.

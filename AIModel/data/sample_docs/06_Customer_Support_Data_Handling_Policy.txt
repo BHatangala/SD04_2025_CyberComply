@@ -1,0 +1,27 @@
+CUSTOMER SUPPORT DEPARTMENT DATA HANDLING POLICY
+Department: Customer Support
+Version: 1.0 | Effective: July 2024 | Review: July 2025
+
+1. PURPOSE
+This policy outlines how the Customer Support Department handles customer information in providing support services via phone, email, live chat, and the customer portal.
+
+2. CUSTOMER DATA ACCESSED
+Support staff access customer name, contact details, account information, complaint history, call recordings, and chat transcripts through the CRM system.
+
+3. CALL AND CHAT RECORDING
+Customer support calls and chat sessions are recorded for quality assurance purposes. Customers are informed at the start of calls via an automated announcement. The department is aware that formal consent should be captured for call recordings, however a documented consent procedure has not yet been implemented and no consent records are currently maintained.
+
+4. DATA MINIMISATION — PARTIAL IMPLEMENTATION
+Staff are expected to access only the customer records relevant to their active case. However, no technical controls currently enforce this — CRM access is provisioned to all Customer Support staff upon joining, giving all agents equal access to the full customer database regardless of their assigned cases. A formal data minimisation review is scheduled but has not been completed.
+
+5. DATA RETENTION
+Customer records, case notes, and call recordings are stored in the CRM and cloud storage. Data is retained until storage limits require deletion. No formal retention schedule has been established for customer support records.
+
+6. ESCALATION
+Support cases may be escalated to Technical Support, Billing, or Legal as required. Customer information is shared with the receiving team to support resolution.
+
+7. STAFF CONDUCT
+Staff must handle customer information professionally and not disclose it externally. Violations are subject to disciplinary action up to termination.
+
+8. POLICY REVIEW
+This policy is reviewed annually by the Customer Support Manager.

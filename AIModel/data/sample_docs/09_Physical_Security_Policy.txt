@@ -1,0 +1,38 @@
+PHYSICAL SECURITY AND FACILITY ACCESS CONTROL POLICY
+Department: Facilities / Security
+Version: 1.5 | Effective: February 2025 | Review: February 2026
+
+1. PURPOSE AND SCOPE
+This policy establishes physical security controls for all Nexacore Technologies Sdn Bhd facilities to protect personnel, assets, and equipment. It applies to all employees, contractors, visitors, and vendors accessing company premises.
+
+2. ACCESS CONTROL
+2.1 Employees are issued proximity access cards with access levels based on job function.
+2.2 Access cards are reviewed quarterly and deactivated immediately upon resignation or termination.
+2.3 Visitors must register at the front desk and be escorted by a staff member at all times.
+2.4 Tailgating through secured doors is strictly prohibited.
+
+3. SERVER ROOM ACCESS
+3.1 Access to the server room is restricted to authorised IT staff only.
+3.2 All entry and exit events are logged electronically.
+3.3 Visitors to the server room require advance approval from the IT Director.
+3.4 Server room access is reviewed monthly.
+
+4. CCTV MONITORING
+CCTV cameras are installed at building entrances, exits, and common areas. Footage is monitored by the Security team and stored for 30 days before overwriting. Cameras are serviced quarterly by the Facilities team.
+
+5. CONTRACTOR AND MAINTENANCE ACCESS
+5.1 Contractors must be pre-approved by Facilities management before site access.
+5.2 All contractors receive a visitor badge on arrival at reception.
+5.3 Contractor work is supervised or spot-checked by Facilities staff.
+
+6. CLEAN DESK POLICY
+6.1 Sensitive documents must not be left visible on desks when staff are away.
+6.2 Workstations must be locked when staff leave their desk.
+6.3 Documents must be stored in locked cabinets overnight.
+
+7. MEDIA DISPOSAL
+7.1 Paper documents are shredded using cross-cut shredders before disposal.
+7.2 Electronic media is handed to IT for secure wiping before disposal.
+
+8. INCIDENT REPORTING
+Physical security incidents must be reported to the Security team immediately. Incidents are recorded and escalated to the Facilities Manager.
