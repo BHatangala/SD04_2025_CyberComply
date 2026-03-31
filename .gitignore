@@ -63,3 +63,11 @@ __pycache__/
 # Local SQLite database (Django development only)
 db.sqlite3
 **/db.sqlite3
+
+# Playwright
+node_modules/
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/blob-report/
+/frontend/.playwright/.cache/
+/frontend/.playwright/.auth/

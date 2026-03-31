@@ -12,6 +12,8 @@
   "type": "commonjs",
   "devDependencies": {
     "@jest/globals": "^30.3.0",
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.5.0",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0"
   },
