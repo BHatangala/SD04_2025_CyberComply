@@ -20,8 +20,8 @@ import os, sys, hashlib, django
 from datetime import timedelta
 
 # ── ① Edit these two values to match your project ──────────────────────────
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cybercomply.settings")  # ← EDIT
-APP_NAME = "core"   # ← EDIT  (the Django app that owns models.py)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cybercomply.settings")  
+APP_NAME = "core"   
 # ───────────────────────────────────────────────────────────────────────────
 
 django.setup()
@@ -61,7 +61,7 @@ def seed_otp(email: str, purpose: str) -> None:
         purpose  = purpose,
         expires_at = timezone.now() + timedelta(minutes=10),  # generous buffer for tests
     )
-    print(f"[seed_test_otp] ✓ Seeded OTP {KNOWN_OTP!r} for {email} / {purpose}")
+    print(f"[seed_test_otp] Seeded OTP {KNOWN_OTP!r} for {email} / {purpose}")
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ const KNOWN_OTP = '123456';
  */
 function seedOtp(email, purpose) {
     const scriptPath = path.join(DJANGO_PROJECT_ROOT, 'seed_test_otp.py');
-    const cmd = `${PYTHON_BIN} "${scriptPath}" "${email}" "${purpose}"`;
+    const cmd = `"${PYTHON_BIN}" "${scriptPath}" "${email}" "${purpose}"`;
     try {
         const output = execSync(cmd, {
             cwd: DJANGO_PROJECT_ROOT,
