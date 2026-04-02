@@ -4,7 +4,7 @@
   "description": "",
   "main": "otp_component.js",
   "scripts": {
-    "test": "jest --verbose"
+    "test": "jest tests/unit --verbose"
   },
   "keywords": [],
   "author": "",

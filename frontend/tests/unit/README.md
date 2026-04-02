@@ -6,6 +6,8 @@ Unit tests for the CyberComply frontend logic using **Jest** and **jsdom**.
 
 ## Prerequisites
 
+Checkout to 'test' branch.
+
 Make sure **Node.js** is installed on your machine.
 
 ```bash
@@ -23,7 +25,7 @@ Once installation successfully completes, restart VS Code and type the version c
 
 ## Setup
 
-Navigate to the `frontend` folder and install dependencies:
+After pulling from the `test` branch, navigate to the `frontend` folder and install dependencies:
 
 ```bash
 cd frontend
@@ -60,9 +62,7 @@ frontend/
 ├── tests/
 │   └── unit/
 │   |    ├── home.test.js              # Tests for validateOrgName() and canAnalyse() logic
-│   |    ├── compliance.test.js        # Tests for getGaps(), getRisks(), getRiskCounts()
-│   |    ├── recommendations.test.js   # Tests for buildReference(), actionify(), deriveSteps()
-│   |    └── report_viewing.test.js    # Tests for getTopRecommendation(), getSortedDetails()
+│   |    └── compliance.test.js        # Tests for getGaps(), getRisks(), getRiskCounts()
 |   └── TestingReadme.md
 ├── package.json and other frontend html files
 └── ...
