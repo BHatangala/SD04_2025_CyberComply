@@ -618,6 +618,23 @@
             <!-- Content Container -->
             <div class="content-container">
 
+                <div
+                    v-if="loadError"
+                    style="
+                        background: rgba(231,74,74,0.12);
+                        border: 1px solid rgba(231,74,74,0.4);
+                        border-left: 4px solid #e74a4a;
+                        color: #f0d0d0;
+                        padding: 16px 22px;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        letter-spacing: 0.3px;
+                        margin-bottom: 24px;
+                    "
+                >
+                    {{ loadError }}
+                </div>
+                
                 <!-- Compliance Score Section -->
                 <div class="compliance-section">
                     <div class="section-tooltip-wrapper">

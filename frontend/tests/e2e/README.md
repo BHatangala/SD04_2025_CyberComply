@@ -161,7 +161,11 @@ cd "sd04_2025\frontend"
 | `npx playwright test --project=chromium` | Run all tests in Chromium only |
 | `npx playwright test 1_welcome.spec.js --project=chromium --headed` | Run a single spec file |
 | `npx playwright test --project=chromium --headed --workers=1` | Run sequentially (one at a time) |
-| `npx playwright test` | Run across all browsers (Chromium, Firefox, WebKit, Edge) |
+| `npx playwright test` | Run all tests across all browsers (Chromium, Firefox, WebKit, Edge) |
+| `npx playwright test --project=firefox` | Run all tests across browser (Firefox) |
+| `npx playwright test --project=webkit` | Run all tests across browser (Safari) |
+| `npx playwright test --project="Microsoft Edge"` | Run all tests across browser (Edge) |
+| `npx playwright test --project=chromium --project=firefox --project=webkit --project="Microsoft Edge" --workers=1` | Run all tests across all browsers sequentially |
 | `npx playwright show-report` | Open the HTML test report after a run |
 
 
