@@ -1454,9 +1454,21 @@
                     const i = getIndex();
                     if (i !== -1) this.uploadedFiles.splice(i, 1);
 
-                    const reason = error.message.toLowerCase().includes('failed to fetch')
-                        ? `Could not reach the server while uploading "${fileObj.name}". Please check your connection and try again.`
-                        : `"${fileObj.name}" could not be stored. Our file storage is temporarily unavailable — please try again in a few minutes.`;
+                    const msg = error.message || '';
+                    let reason;
+                    if (msg.toLowerCase().includes('failed to fetch')) {
+                        reason = `Could not reach the server while uploading "${fileObj.name}". Please check your connection and try again.`;
+                    } else if (
+                        msg.includes('password protected') || msg.includes('malware') ||
+                        msg.includes('not allowed') || msg.includes('Unsupported file type') ||
+                        msg.includes('Organisation name') || msg.includes('Department is required') ||
+                        msg.includes('50 MB limit') || msg.includes('password')
+                    ) {
+                        // Real rejection reason from backend — show it directly
+                        reason = msg;
+                    } else {
+                        reason = `"${fileObj.name}" could not be stored. Our file storage is temporarily unavailable — please try again in a few minutes.`;
+                    }
                     this.errorMessages.push(reason);
                 }
             },
