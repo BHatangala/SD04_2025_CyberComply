@@ -1,0 +1,19 @@
+{{ app_name }} - {{ title }}
+
+Hello,
+
+{{ intro }}
+
+{{ instruction }}
+
+Your verification code is:
+
+{{ otp }}
+
+Important: This code is only valid for {{ expiry_minutes }} minutes.
+
+If you did not request this, you can safely ignore this email.
+
+For your security, never share this code with anyone.
+
+This is an automated message from {{ app_name }}.
