@@ -36,6 +36,34 @@ DEBUG = os.getenv("DEBUG", "True") == "True"
 ALLOWED_HOSTS = []
 
 
+# ====================== SECURITY SETTINGS (HTTPS/TLS) ======================
+# These settings enforce secure file transmission (HTTPS/TLS) for documents
+# Temporary storage is already handled in views.py using tempfile.
+# HTTPS enforcement only activates when DEBUG=False (on real server).
+# Keeps local development (with runserver + Live Server) unaffected and functional.
+
+# Always-on safe security headers (work in both dev and production)
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Full HTTPS/TLS enforcement only in production (when DEBUG=False)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_HSTS_SECONDS = 31536000          # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+else:
+    # Local development - keep relaxed so runserver + Live Server works
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -167,4 +195,5 @@ CLAMAV_PORT = 3310
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
+    # Add production domain here when deployed, e.g. "https://yourdomain.com",
 ]

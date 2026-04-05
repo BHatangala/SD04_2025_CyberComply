@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Comparison Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="sidebar_component.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -27,13 +28,16 @@
             min-height: 100vh;
         }
 
-        /* --- TOP HEADER --- */
+        /* --- TOP HEADER (fixed — sprint-2) --- */
         .top-header {
             background-color: #1a2845;
             padding: 15px 30px;
             display: flex;
             align-items: center;
-            position: relative;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
             z-index: 100;
         }
 
@@ -157,133 +161,6 @@
             fill: #1a2845;
         }
 
-        /* --- SIDEBAR --- */
-        .sidebar {
-            position: absolute;
-            left: 0;
-            top: 60px;
-            width: 280px;
-            bottom: 0;
-            min-height: calc(100vh - 60px);
-            background-color: #0d1420;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease-in-out;
-            z-index: 90;
-            overflow-y: auto;
-            padding: 20px 0;
-            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
-        }
-
-        .sidebar.open {
-            transform: translateX(0);
-        }
-
-        .sidebar-icon-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0px 10px 15px 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #1a2845;
-        }
-
-        .sidebar-icon {
-            width: 45px;
-            height: 45px;
-            background-color: #1a2845;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .sidebar-icon:hover {
-            background-color: #2a4a7c;
-            transform: scale(1.05);
-        }
-
-        .sidebar-icon svg {
-            width: 22px;
-            height: 22px;
-            fill: #8b9dc3;
-            transition: fill 0.3s;
-        }
-
-        .sidebar-icon:hover svg {
-            fill: #ffffff;
-        }
-
-        /* Search Input */
-        .search-container {
-            padding: 0 20px 20px;
-            display: none;
-        }
-
-        .search-container.active {
-            display: block;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 10px 15px;
-            background-color: #1a2845;
-            border: 2px solid #2a4a7c;
-            border-radius: 8px;
-            color: #ffffff;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #4a8fe7;
-        }
-
-        .sidebar-section {
-            margin-bottom: 30px;
-        }
-
-        .sidebar-header {
-            padding: 10px 20px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #6b7a99;
-            letter-spacing: 1.5px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .sidebar-header svg {
-            width: 14px;
-            height: 14px;
-            fill: #6b7a99;
-        }
-
-        .sidebar-item {
-            padding: 12px 20px;
-            color: #c5d0e6;
-            cursor: pointer;
-            transition: all 0.2s;
-            border-left: 3px solid transparent;
-            font-size: 14px;
-        }
-
-        .sidebar-item:hover {
-            background-color: #1a2845;
-            border-left-color: #4a8fe7;
-            color: #ffffff;
-        }
-
-        .no-results {
-            padding: 12px 20px;
-            color: #6b7a99;
-            font-size: 12px;
-            font-style: italic;
-        }
-
         /* --- MAIN CONTENT --- */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
@@ -296,7 +173,7 @@
             margin-left: 280px;
         }
 
-        /* Page Specific Styles */
+        /* Page title pushed down to clear the fixed header (sprint-2) */
         .page-title {
             text-align: center;
             font-size: 3rem;
@@ -322,6 +199,10 @@
             padding-left: 20px;
         }
 
+        /*
+         * metrics-row: uses sprint-2's gap:20px + flex-wrap:wrap for
+         * better responsiveness, while keeping ai-development's layout intent
+         */
         .metrics-row {
             display: flex;
             align-items: center;
@@ -331,13 +212,16 @@
             flex-wrap: wrap;
         }
 
+        /*
+         * metric-box: sprint-2's min-width:200px + width:auto so boxes
+         * expand naturally for longer department names
+         */
         .metric-box {
             background-color: white;
             color: black;
             padding: 15px 20px;
             min-width: 200px;
             width: auto;
-            /* Flexible width for longer names */
             height: 70px;
             display: flex;
             align-items: center;
@@ -367,6 +251,13 @@
             outline: none;
         }
 
+        /* Disabled option hint style (ai-development) */
+        .custom-select option[disabled] {
+            color: #8b9dc3;
+            font-style: italic;
+            font-size: 0.85rem;
+        }
+
         .info-box {
             background-color: #1a2845;
             padding: 25px 20px;
@@ -374,6 +265,7 @@
             border-left: 5px solid #4a8fe7;
         }
 
+        /* sprint-2's min-width keeps stat box from collapsing on smaller screens */
         .stat-box {
             text-align: left;
             font-size: 1.1rem;
@@ -381,7 +273,6 @@
             font-weight: 400;
             min-width: 200px;
             padding: 15px 20px;
-            /* Adjust padding for the stats to be slightly thinner */
         }
 
         .stat-box div {
@@ -409,13 +300,13 @@
             padding-left: 10px;
         }
 
-        .rec-list>li {
+        .rec-list > li {
             font-size: 1.1rem;
             margin-bottom: 20px;
             letter-spacing: 1px;
         }
 
-        .rec-list>li::before {
+        .rec-list > li::before {
             content: "•";
             margin-right: 15px;
             font-size: 1.5rem;
@@ -437,7 +328,6 @@
 
         .sub-rec-list li::before {
             content: "■";
-            /* Square bullet */
             font-size: 0.6rem;
             margin-right: 15px;
         }
@@ -447,7 +337,6 @@
             position: fixed;
             bottom: 0;
             left: 0;
-            /* Absolute corner */
             width: 100%;
             z-index: 0;
             opacity: 0.7;
@@ -461,34 +350,54 @@
         }
 
         /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        /* --- NO DATA / ERROR / LOADING BANNERS (ai-development) --- */
+        .no-data-banner {
+            background: rgba(231,74,74,0.08);
+            border: 1px solid rgba(231,74,74,0.25);
+            border-radius: 10px;
+            padding: 18px 24px;
+            font-size: 14px;
+            color: #e74a4a;
+            margin-bottom: 30px;
         }
 
-        ::-webkit-scrollbar-track {
-            background: transparent;
+        .loading-banner {
+            background: rgba(74,143,231,0.08);
+            border: 1px solid rgba(74,143,231,0.25);
+            border-radius: 10px;
+            padding: 18px 24px;
+            font-size: 14px;
+            color: #8bb8f0;
+            margin-bottom: 30px;
         }
 
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
+        @media screen and (max-width: 1200px) {
+            .main-content.shifted { margin-left: 0; }
         }
 
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.2);
+        @media screen and (max-width: 768px) {
+            .main-content { padding: 40px 30px; }
+            .metrics-row { flex-direction: column; align-items: stretch; }
+            .back-arrow { left: 20px; }
+            .back-arrow.shifted { left: 310px; }
         }
     </style>
 </head>
 
 <body>
     <div id="app">
+
         <!-- Top Header -->
         <div class="top-header">
-            <div class="menu-icon" @click="toggleSidebar">●●●</div>
+            <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
             <div class="user-profile" @click="showProfile">
                 <svg viewBox="0 0 24 24">
-                    <path
-                        d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                 </svg>
             </div>
         </div>
@@ -503,115 +412,94 @@
             </svg>
         </div>
 
-        <!-- Sidebar -->
-        <div class="sidebar" :class="{ open: sidebarOpen }">
-            <div class="sidebar-icon-bar">
-                <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
-                    <svg viewBox="0 0 24 24">
-                        <path
-                            d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
-                    </svg>
-                </div>
-                <div class="sidebar-icon" @click="goToHome" title="Start new analysis">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                    </svg>
-                </div>
-            </div>
-
-            <div class="search-container" :class="{ active: searchActive }">
-                <input type="text" class="search-input" v-model="searchQuery" placeholder="Search documents..."
-                    @input="filterReports">
-            </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <svg viewBox="0 0 24 24">
-                        <path
-                            d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
-                    </svg>
-                    LAST 7 DAYS
-                </div>
-                <div v-if="filteredLast7Days.length === 0" class="no-results">No results</div>
-                <div v-else>
-                    <div v-for="report in filteredLast7Days" :key="report" class="sidebar-item"
-                        @click="openReport(report)">
-                        {{ report }}
-                    </div>
-                </div>
-            </div>
-
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <svg viewBox="0 0 24 24">
-                        <path
-                            d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z" />
-                    </svg>
-                    LAST 30 DAYS
-                </div>
-                <div v-if="filteredLast30Days.length === 0" class="no-results">No results</div>
-                <div v-else>
-                    <div v-for="report in filteredLast30Days" :key="report" class="sidebar-item"
-                        @click="openReport(report)">
-                        {{ report }}
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Sidebar (external component — sprint-2) -->
+        <cybercomply-sidebar
+            :sidebar-open="sidebarOpen"
+            @toggle="sidebarOpen = !sidebarOpen"
+        ></cybercomply-sidebar>
 
         <!-- Main Content -->
         <div class="main-content" :class="{ shifted: sidebarOpen }">
             <h1 class="page-title">COMPARISON DASHBOARD</h1>
 
-            <!-- Dashboard Content -->
             <div class="dashboard-container">
-                <div class="company-name">ABC Company</div>
 
-                <div class="metrics-row">
+                <!-- Loading state -->
+                <div class="loading-banner" v-if="isLoading">
+                    ⏳ Loading analysis results…
+                </div>
+
+                <!-- No data / error state (ai-development) -->
+                <div class="no-data-banner" v-if="!isLoading && (loadError || !hasData)">
+                    ⚠ {{ loadError || 'No analysis result found. Please run a document analysis first from the home page.' }}
+                </div>
+
+                <!-- Company name from DB (ai-development logic, DB source) -->
+                <div class="company-name" v-if="!isLoading && hasData">
+                    Company Name : {{ companyName }}
+                </div>
+
+                <div class="metrics-row" v-if="!isLoading && hasData">
+
+                    <!--
+                        Department dropdown (ai-development).
+                        Currently shows the single department linked to the analysed document.
+                        The Document model has a FK to Department (dept -> dept_name).
+                        When multi-department comparison is implemented in a future sprint,
+                        populate this select from the org's full department list via the API.
+                    -->
                     <select class="metric-box custom-select" v-model="selectedDepartment">
-                        <option value="Security">Security Department</option>
-                        <option value="IT">IT Department</option>
-                        <option value="Finance">Finance Department</option>
-                        <option value="HR">HR Department</option>
-                        <option value="Admin">Admin Department</option>
+                        <option
+                            v-if="departmentName"
+                            :value="departmentName">
+                            {{ departmentName }} Department
+                        </option>
+                        <!-- Hint shown when only one department is available -->
+                        <option disabled value="" v-if="departmentName">
+                            — Only one department analysed —
+                        </option>
+                        <option disabled value="" v-if="!departmentName">
+                            No department assigned
+                        </option>
                     </select>
 
+                    <!-- Score and risk level from DB (ai-development logic, DB source) -->
                     <div class="info-box stat-box">
-                        <div>Score : 80%</div>
-                        <div>Risk Level : Low</div>
+                        <div>Score : {{ complianceScore }}%</div>
+                        <div>Risk Level : {{ overallRiskLevel }}</div>
                     </div>
 
-                    <div class="metric-box" style="cursor: pointer;" @click="showGraphic" v-if="userRole === 'admin'">
+                    <!--
+                        Graphical View button — only shown to admins when multiple
+                        departments have been analysed (ai-development logic preserved).
+                        userRole is derived from sessionStorage 'userRole' in mounted().
+                    -->
+                    <div
+                        class="metric-box"
+                        style="cursor: pointer;"
+                        @click="showGraphic"
+                        v-if="isAdmin && hasMultipleDepartments"
+                    >
                         Graphical View
                     </div>
                 </div>
 
-                <div class="info-box recommendations-section">
-                    <h2 class="rec-title">{{ selectedDepartment }} DEPARTMENTAL RECOMMENDATIONS :</h2>
+                <!-- Departmental recommendations (ai-development) -->
+                <div class="info-box recommendations-section" v-if="!isLoading && hasData">
+                    <h2 class="rec-title">{{ selectedDepartment || departmentName }} DEPARTMENTAL RECOMMENDATIONS :</h2>
                     <ul class="rec-list">
-                        <li>
-                            Lorem ipsum dolor sit amet, consectetur adipiscing elit
+                        <li v-for="rec in departmentRecommendations" :key="rec.requirementId">
+                            {{ rec.clauseTitle }}
                             <ul class="sub-rec-list">
-                                <li>As mentioned in page 15, line 18 of the Personal Data Protection Act No 9 of 2022
-                                </li>
+                                <li>{{ rec.reference }}</li>
                             </ul>
                         </li>
-                        <li>
-                            Lorem ipsum dolor sit amet, consectetur adipiscing elit
-                            <ul class="sub-rec-list">
-                                <li>As mentioned in page 15, line 18 of the Personal Data Protection Act No 9 of 2022
-                                </li>
-                            </ul>
-                        </li>
-                        <li>
-                            Lorem ipsum dolor sit amet, consectetur adipiscing elit
-                            <ul class="sub-rec-list">
-                                <li>As mentioned in page 15, line 18 of the Personal Data Protection Act No 9 of 2022
-                                </li>
-                            </ul>
+                        <li v-if="departmentRecommendations.length === 0">
+                            No recommendations — this department is fully compliant.
                         </li>
                     </ul>
                 </div>
+
             </div>
         </div>
 
@@ -624,53 +512,154 @@
     <script>
         const { createApp } = Vue;
 
-        createApp({
+        const BASE = 'http://127.0.0.1:8000/ai';
+
+        const app = createApp({
             data() {
                 return {
-                    userRole: 'admin', // Change this to 'user' to test the button disappearing
                     sidebarOpen: true,
-                    searchActive: false,
-                    searchQuery: '',
-                    selectedDepartment: 'Security',
-                    last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
-                    last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
-                    filteredLast7Days: [],
-                    filteredLast30Days: []
+
+                    // RBAC — overwritten from sessionStorage in mounted()
+                    isAdmin: false,
+
+                    selectedDepartment: '',
+
+                    // ── Populated from DB fetch ──
+                    hasData:          false,
+                    companyName:      'Unknown Organisation',
+                    departmentName:   '',
+                    complianceScore:  0,
+                    allDetails:       [],   // data.compliance.details array from API
+                    departments:      [],   // future: full list of org departments
+
+                    // Loading / error state
+                    isLoading: true,
+                    loadError: ''
+                };
+            },
+
+            computed: {
+                // Derive plain-English risk level from score (ai-development).
+                // Uses the same thresholds as document_analysis.html.
+                overallRiskLevel() {
+                    if (this.complianceScore >= 75) return 'Low';
+                    if (this.complianceScore >= 40) return 'Medium';
+                    return 'High';
+                },
+
+                // True only when the org has more than one department analysed.
+                // Currently always false because we store one document per analysis.
+                // Gates the Graphical View button — future sprint will populate
+                // this.departments from a separate API call.
+                hasMultipleDepartments() {
+                    if (this.departments && this.departments.length > 0) {
+                        return this.departments.length > 1;
+                    }
+                    return false;
+                },
+
+                // Non-compliant + partial clauses for the selected department.
+                // Since the current flow analyses one document at a time, this
+                // always reflects that document's department. When multi-dept
+                // comparison is added, filter by selectedDepartment here.
+                departmentRecommendations() {
+                    return this.allDetails
+                        .filter(d => d.status === 'non_compliant' || d.status === 'partial')
+                        .map(d => ({
+                            requirementId: d.requirement_id,
+                            clauseTitle:   d.clause || d.requirement_id,
+                            // Builds a concise PDPA reference from the requirement_id.
+                            // e.g. "SL-PDPA-S6-1" → "Section 6(1) of the Personal Data
+                            // Protection Act No. 9 of 2022 (Sri Lanka)"
+                            reference: this.buildReferenceFromId(d.requirement_id)
+                        }));
                 }
             },
-            mounted() {
-                this.filteredLast7Days = [...this.last7Days];
-                this.filteredLast30Days = [...this.last30Days];
+
+            async mounted() {
+                // ── Auth guard ──────────────────────────────────────────────
+                const token = sessionStorage.getItem('authToken');
+                if (!token) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                // ── RBAC flag from session ───────────────────────────────────
+                const roleRaw = sessionStorage.getItem('userRole');
+                this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
+
+                // ── Fetch analysis result from DB ────────────────────────────
+                // Reads the result_id written by home.html after saving the analysis.
+                // Falls back to /latest/ if none is stored.
+                const resultId = sessionStorage.getItem('latestResultId');
+                const url = resultId
+                    ? `${BASE}/api/analysis/${resultId}/`
+                    : `${BASE}/api/analysis/latest/`;
+
+                try {
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (res.status === 401 || res.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (!res.ok) {
+                        this.loadError = 'No analysis results found. Please upload and analyse a document first.';
+                        this.isLoading = false;
+                        return;
+                    }
+
+                    const data = await res.json();
+
+                    // ── Map DB response fields ───────────────────────────────
+                    this.hasData = true;
+
+                    // data.org — serialised from Document.org.org_name
+                    this.companyName    = data.company_name || 'Unknown Organisation';
+
+                    // data.department — serialised from Document.dept.dept_name
+                    // NOTE TO BACKEND: confirm the serialiser exposes this field as
+                    // 'department'. Fallback to 'dept_name' covers either convention.
+                    this.departmentName = data.department || data.dept_name || '';
+                    this.selectedDepartment = this.departmentName;
+
+                    // data.compliance_score — from AnalysisResult.compliance_score
+                    this.complianceScore = Math.round(data.compliance_score ?? 0);
+
+                    // data.compliance.details — stored in AnalysisResult.raw_output
+                    // Same nested shape the old localStorage result had, so all
+                    // computed properties work without changes.
+                    this.allDetails = data.compliance?.details || [];
+
+                } catch (e) {
+                    console.error('Failed to load comparison data:', e);
+                    this.loadError = 'Could not reach the server. Please check your connection.';
+                } finally {
+                    this.isLoading = false;
+                }
             },
+
             methods: {
-                toggleSidebar() {
-                    this.sidebarOpen = !this.sidebarOpen;
+                // Derives a human-readable PDPA reference string from a requirement ID.
+                // "SL-PDPA-S6-1"  → "Section 6(1) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)"
+                // "SL-PDPA-S23-1" → "Section 23(1) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)"
+                buildReferenceFromId(id) {
+                    const stripped = (id || '').replace(/^SL-PDPA-S/, '');
+                    const parts    = stripped.split('-');
+                    let ref = `Section ${parts[0]}`;
+                    if (parts[1]) ref += `(${parts[1]})`;
+                    return `${ref} of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)`;
                 },
-                toggleSearch() {
-                    this.searchActive = !this.searchActive;
-                    if (!this.searchActive) {
-                        this.searchQuery = '';
-                        this.filterReports();
-                    }
-                },
-                filterReports() {
-                    const query = this.searchQuery.toLowerCase();
-                    if (!query) {
-                        this.filteredLast7Days = [...this.last7Days];
-                        this.filteredLast30Days = [...this.last30Days];
-                    } else {
-                        this.filteredLast7Days = this.last7Days.filter(report => report.toLowerCase().includes(query));
-                        this.filteredLast30Days = this.last30Days.filter(report => report.toLowerCase().includes(query));
-                    }
-                },
+
                 showProfile() {
                     window.location.href = 'profile.html';
                 },
-                openReport(reportName) {
-                    window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
-                },
                 goBack() {
-                    window.history.back();
+                    window.location.href = 'document_analysis.html';
                 },
                 goToHome() {
                     window.location.href = 'home.html';
@@ -679,7 +668,10 @@
                     window.location.href = 'comparison_dashboard_graphical.html';
                 }
             }
-        }).mount('#app');
+        });
+
+        registerSidebarComponent(app);
+        app.mount('#app');
     </script>
 </body>
 

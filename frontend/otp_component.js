@@ -74,6 +74,8 @@ const OtpVerification = {
                     placeholder="******"
                     class="otp-input"
                     :disabled="loading"
+                    @input="sanitizeOtp"
+                    @paste="handlePaste"
                     @keyup.enter="verify"
                 />
             </div>
@@ -96,7 +98,23 @@ const OtpVerification = {
     },
 
     methods: {
+
+        // Keep OTP numeric and max 6 digits while typing
+        sanitizeOtp() {
+            this.otp = this.otp.replace(/\D/g, '').slice(0, 6);
+        },
+
+        // Allow clean paste from email and keep only 6 digits
+        handlePaste(event) {
+            event.preventDefault();
+            const pastedText = (event.clipboardData || window.clipboardData).getData('text');
+            this.otp = pastedText.replace(/\D/g, '').slice(0, 6);
+        },
+
         async verify() {
+
+            // Prevent multiple verification requests
+            if (this.loading) return;
             this.message = { text: '', type: '' };
 
             // ── Client-side validation ──
@@ -104,18 +122,25 @@ const OtpVerification = {
                 this.setMessage('error', 'Please enter the OTP.');
                 return;
             }
+            // Do not reveal OTP format rules
             if (!/^\d{6}$/.test(this.otp)) {
-                this.setMessage('error', 'OTP must be exactly 6 digits.');
+                this.otp = "";
+                this.setMessage('error', 'Invalid or expired verification code.');
                 return;
             }
 
             this.loading = true;
 
             try {
-                const endpoint =
-                    this.mode === "reset"
-                        ? "http://127.0.0.1:8000/api/verify-reset-otp/"
-                        : "http://127.0.0.1:8000/api/verify-otp/";
+                let endpoint = "";
+
+                if (this.mode === "reset") {
+                    endpoint = "http://127.0.0.1:8000/api/verify-reset-otp/";
+                } else if (this.mode === "delete") {
+                    endpoint = "http://127.0.0.1:8000/api/verify-delete-account-otp/";
+                } else {
+                    endpoint = "http://127.0.0.1:8000/api/verify-otp/";
+                }
 
                 const response = await fetch(endpoint, {
                     method: "POST",
@@ -126,29 +151,44 @@ const OtpVerification = {
                     })
                 });
 
-                const data = await response.json();
+                // Safely parse backend response
+                let data = {};
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    data = {};
+                }
 
+                // Show only safe backend OTP messages; fallback to a generic message
                 if (!response.ok) {
-                    throw new Error(data.detail || "Invalid OTP.");
+                    throw new Error(data.detail || "Invalid or expired verification code.");
                 }
 
                 // Safety check if backend didn't return token in reset mode
                 if (this.mode === "reset" && !data.reset_token) {
-                    throw new Error("Reset token not received. Please try again.");
+                    throw new Error("Verification failed. Please try again.");
                 }
 
+                // Safety check if backend didn't return token in delete mode
+                if (this.mode === "delete" && !data.delete_token) {
+                    throw new Error("Verification failed. Please try again.");
+                }
+                
                 // Clear OTP after success
                 this.otp = "";
 
                 // If reset mode, send token back
                 if (this.mode === "reset") {
                     this.$emit("verified", data.reset_token);
+                } else if (this.mode === "delete") {
+                    this.$emit("verified", data.delete_token);    
                 } else {
-                    this.$emit("verified");
+                    this.$emit("verified", data);
                 }
 
             } catch (err) {
-                this.setMessage('error', err.message || 'Verification failed. Please try again.');
+                this.otp = "";
+                this.setMessage('error', err.message || 'Invalid or expired verification code.');
             } finally {
                 this.loading = false;
             }
