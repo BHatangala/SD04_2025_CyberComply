@@ -7,6 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="otp_component.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         * {
             margin: 0;
@@ -17,8 +18,9 @@
         body {
             font-family: 'Arial', sans-serif;
             background-color: #101726;
-            color: #ffffff;
+            color: #f0f4ff;
             overflow-x: hidden;
+            overflow-y: auto;
         }
 
         #app {
@@ -50,7 +52,7 @@
             color: #ffffff;
         }
 
-        /* Back navigation arrow */
+        /* Back Navigation */
         .back-arrow {
             position: absolute;
             left: 30px;
@@ -61,28 +63,6 @@
             transition: all 0.3s;
             font-weight: 300;
             z-index: 95;
-        }
-
-        /* Tooltip for back arrow */
-        .back-arrow::after {
-            content: "Back to Previous Page";
-            position: absolute;
-            left: 40px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: #1a2845;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            white-space: nowrap;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s;
-        }
-
-        .back-arrow:hover::after {
-            opacity: 1;
         }
 
         .back-arrow.shifted {
@@ -123,7 +103,7 @@
         /* === MAIN CONTENT AREA === */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
-            padding: 80px 80px 60px;
+            padding: 60px 40px 60px;
             position: relative;
             z-index: 1;
         }
@@ -135,94 +115,192 @@
         /* Profile avatar */
         .profile-avatar {
             text-align: center;
-            margin-bottom: 28px;
+            margin-bottom: 30px;
         }
 
         .profile-avatar svg {
-            width: 120px;
-            height: 120px;
+            width: 100px;
+            height: 100px;
             fill: #ffffff;
-            filter: drop-shadow(0 4px 12px rgba(74, 143, 231, 0.4));
+            filter: drop-shadow(0 6px 14px rgba(255, 255, 255, 0.12));
         }
 
         /* Profile Details Section */
         .profile-container {
-            max-width: 800px;
+            max-width: 820px;
             margin: 0 auto;
-            padding: 40px;
-            background: linear-gradient(135deg, #1e3a5f 0%, #2a4a7c 100%);
-            border-radius: 20px;
-            box-shadow: 0 8px 20px rgba(74, 143, 231, 0.2);
+            padding: 55px 70px;
+            background: rgba(26, 40, 69, 0.85);
+            border-radius: 18px;
+            border: 1px solid rgba(120,160,255,0.25);
+            backdrop-filter: blur(10px);
+            box-shadow:
+                0 25px 60px rgba(0,0,0,0.55),
+                0 0 25px rgba(90,140,255,0.18);
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .profile-container:hover {
+            transform: translateY(-4px);
+            box-shadow:
+                0 25px 55px rgba(0,0,0,0.65),
+                0 0 35px rgba(74,143,231,0.25);
         }
 
         .profile-field {
-            display: flex;
+            display: grid;
+            grid-template-columns: 160px 20px 1fr 30px;
             align-items: center;
-            margin-bottom: 20px;
-            font-size: 18px;
+            margin-bottom: 24px;
+        }
+
+        .profile-colon {
+            text-align: center;
+            color: #8fb5ff;
+            line-height: 1;
+        }
+
+        .profile-value {
+            color: #f0f4ff;
+            padding-left: 8px;
+            font-size: 16px;
         }
 
         .profile-field label {
             width: 150px;
-            color: #c5d0e6;
-            font-weight: 500;
+            color: #cbd5e1;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
         }
 
         .profile-field span {
-            color: #ffffff;
+            color: #f0f4ff;
+            font-size: 15px;
+        }
+
+        .edit-icon {
+            cursor: pointer;
+            color: #8b9dc3;
+            font-size: 18px;
+            transition: color 0.3s;
+            justify-self: end;
+        }
+
+        .edit-icon:hover { color: #4a8fe7; }
+        
+        .profile-input {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid #4a8fe7;
+            border-radius: 4px;
+            color: #fff;
+            padding: 8px 12px;
+            font-size: 15px;
+            width: 100%;
+            outline: none;
+        }
+
+        .profile-input:focus {
+            border-color: #8fb5ff;
+            box-shadow: 0 0 10px rgba(74,143,231,0.3);
+        }
+
+        .save-container {
+            display: flex;
+            justify-content: flex-end;
+            margin: 30px 0 20px;
+        }
+
+        .save-button {
+            background: #4a8fe7;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .save-button:hover:not(:disabled) { background: #5d9ef0; transform: translateY(-2px); }
+        .save-button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .save-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         /* Profile action buttons */
         .profile-actions {
             display: flex;
             justify-content: space-between;
-            gap: 100px;
-            margin-top: 40px;
+            gap: 22px;
+            margin-top: 28px;
         }
 
         .action-button {
             flex: 1;
-            min-width: 0;
-            padding: 14px 20px;
-            background-color: #ffffff;
+            padding: 14px;
+            background: #ffffff;
             color: #1a2845;
             border: none;
             border-radius: 8px;
-            cursor: pointer;
             font-size: 14px;
             font-weight: 600;
-            transition: all 0.3s;
-            text-align: center;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.25);
         }
 
         .action-button:hover {
-            background-color: #f0f0f0;
             transform: translateY(-2px);
+            background: #f5f7ff;
+
+            box-shadow:
+                0 0 12px rgba(140, 180, 255, 0.6),
+                0 0 25px rgba(140, 180, 255, 0.35),
+                0 10px 20px rgba(0,0,0,0.35);
         }
 
         .action-button.delete {
             background-color: #ffffff;
-            color: #1a2845;
+            color: #123456;
         }
 
         /* Logout Button */
         .logout-button {
             position: absolute;
             top: 15px;
-            right: 100px;
-            padding: 8px 24px;
-            background-color: #ffffff;
-            color: #1a2845;
+            right: 30px;
+            padding: 10px 18px;
+            background-color: #a2b8c8;
+            color: #123456;
             border: none;
-            border-radius: 8px;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s;
+            font-weight: bold;
+            transition: all 0.2s;
         }
 
         .logout-button:hover {
-            background-color: #f0f0f0;
+            transform: translateY(-1px);
+
+            box-shadow:
+                0 0 10px rgba(140,180,255,0.5),
+                0 0 18px rgba(140,180,255,0.3);
         }
 
         /* === BACKGROUND ELEMENTS === */
@@ -247,26 +325,27 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            margin: 24px 0 32px;
-            font-size: 16px;
-            color: #c5d0e6;
+            margin-top: 34px;
+            margin-bottom: 24px;
+            font-size: 14px;
+            color: #ffffff;
         }
 
         .twofa-checkbox input[type="checkbox"] {
             appearance: none;
-            width: 20px;
-            height: 20px;
-            background: #1e3a5f;
-            border: 2px solid #4a8fe7;
+            width: 18px;
+            height: 18px;
+            background: #ffffff;
+            border: 1px solid #020f2b;
             border-radius: 4px;
             cursor: pointer;
             position: relative;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
         }
 
         .twofa-checkbox input[type="checkbox"]:checked {
-            background: #4a8fe7;
-            border-color: #4a8fe7;
+            background: #ffffff;
+            border-color: #020f2b;
         }
 
         .twofa-checkbox input[type="checkbox"]:checked::after {
@@ -275,8 +354,8 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: white;
-            font-size: 14px;
+            color: #10315d;
+            font-size: 12px;
             font-weight: bold;
         }
 
@@ -285,39 +364,293 @@
             user-select: none;
         }
 
-        /* === MODAL STYLES === */
-        .otp-overlay {
+        /* Password row alignment */
+        .password-field {
+            align-items: center;
+        }
+
+        .password-inline {
+            display: flex;
+            align-items: center;
+            gap: 22px;
+            padding-left: 6px;
+        }
+
+        .password-mask {
+            font-size: 15px;
+            letter-spacing: 2px;
+            color: #f0f4ff;
+        }
+
+        .change-password-btn {
+            background: none;
+            border: none;
+            color: #8ED0FF;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0;
+            transition: color 0.2s ease;
+        }
+
+        .change-password-btn:hover {
+            color: #b4d8ef;
+            text-decoration: underline;
+        }
+
+        .edit-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: 12px;
+        }
+
+        .cancel-btn {
+            background: transparent;
+            border: 1px solid #6b7a99;
+            color: #6b7a99;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .cancel-btn:hover {
+            background: rgba(107,122,153,0.1);
+            color: #fff;
+        }
+
+        .cancel-icon {
+            cursor: pointer;
+            color: #8b9dc3;
+            font-size: 18px;
+            transition: color 0.3s;
+        }
+        .cancel-icon:hover {
+            color: #ff6b6b;
+        }
+
+        /* === DELETE CONFIRMATION MODAL === */
+        .delete-modal-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.75);
+            background: rgba(0, 0, 0, 0.78);
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 200;
+            z-index: 300;
             backdrop-filter: blur(4px);
+            animation: fadeIn 0.2s ease;
         }
-
-        .otp-modal {
-            background: linear-gradient(135deg, #1e3a5f 0%, #2a4a7c 100%);
+        
+        .delete-modal {
+            background: linear-gradient(145deg, #1a2845 0%, #162038 100%);
+            border: 1px solid rgba(255, 100, 100, 0.25);
             border-radius: 16px;
-            padding: 40px;
-            max-width: 420px;
-            width: 90%;
-            box-shadow: 0 12px 40px rgba(0,0,0,0.6);
-            text-align: center;
+            padding: 36px 40px;
+            max-width: 460px;
+            width: 92%;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(220, 60, 60, 0.08);
+            animation: popIn 0.22s ease;
         }
-
-        .otp-modal h3 {
-            margin-bottom: 24px;
+        
+        .delete-modal-title {
             font-size: 22px;
-            color: #ffffff;
+            font-weight: 700;
+            color: #f87171;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+        
+        .delete-modal-subtitle {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+        
+        .delete-modal-summary {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 22px;
+        }
+        
+        .delete-modal-summary-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+        
+        .delete-modal-summary-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: #cbd5e1;
+            margin-bottom: 8px;
+        }
+        
+        .delete-modal-summary-item:last-child { margin-bottom: 0; }
+        
+        .delete-modal-summary-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #f87171;
+            flex-shrink: 0;
+        }
+        
+        .delete-modal-reason {
+            margin-bottom: 24px;
+        }
+        
+        .delete-modal-reason label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #64748b;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .delete-modal-reason select {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .delete-modal-reason select:focus {
+            border-color: rgba(248, 113, 113, 0.5);
+        }
+        
+        .delete-modal-reason select option {
+            background: #1a2845;
+        }
+        
+        .delete-modal-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .delete-modal-cancel {
+            flex: 1;
+            padding: 12px;
+            background: transparent;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #94a3b8;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .delete-modal-cancel:hover {
+            border-color: #64748b;
+            color: #e2e8f0;
+            background: rgba(255, 255, 255, 0.04);
+        }
+        
+        .delete-modal-confirm {
+            flex: 1;
+            padding: 12px;
+            background: #dc2626;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+        }
+        
+        .delete-modal-confirm:hover {
+            background: #b91c1c;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(220, 38, 38, 0.4);
+        }
+        
+        .delete-modal-confirm:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
 
-        .otp-modal p {
-            color: #c5d0e6;
-            margin-bottom: 28px;
-            font-size: 15px;
+        /* === Admin Access button lock for Admin Users === */
+        .action-button.locked {
+            cursor: not-allowed;
+            opacity: 0.55;
+            background-color: #d8dfe8;
+            color: #1a2845;
+            position: relative;
         }
+
+        .action-button.locked:hover {
+            background-color: #d8dfe8;
+            color: #1a2845;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .action-button .btn-lock-icon {
+            width: 15px;
+            height: 15px;
+            fill: #8b9dc3;
+            flex-shrink: 0;
+        }
+
+        /* Access Denied Toast */
+        .access-toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: linear-gradient(135deg, #1a2845, #0d1420);
+            border: 1px solid rgba(74,143,231,0.5);
+            border-left: 4px solid #e74a4a;
+            color: #ffffff;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 14px;
+            letter-spacing: 0.3px;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+            white-space: nowrap;
+        }
+
+        .access-toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .access-toast svg {
+            width: 18px;
+            height: 18px;
+            fill: #e74a4a;
+            flex-shrink: 0;
+        }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn  { from { transform: scale(0.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
         /* === RESPONSIVE DESIGN === */
         @media screen and (max-width: 1200px) {
@@ -330,6 +663,7 @@
                 margin-left: 0;  /* Don't push content on smaller screens */
             }
         }
+
     </style>
 </head>
 <body>
@@ -351,6 +685,7 @@
 
         <!-- Main Content - User Profile -->
         <div class="main-content" :class="{ shifted: sidebarOpen }">
+
             <!-- Profile Avatar -->
             <div class="profile-avatar">
                 <svg viewBox="0 0 24 24">
@@ -360,21 +695,55 @@
 
             <!-- Profile Information Container -->
             <div class="profile-container">
+                <!-- Name -->
                 <div class="profile-field">
                     <label>Name</label>
-                    <span>: {{ fullName }}</span>
+                    <span class="profile-colon">:</span>
+                    <div v-if="editingField !== 'name'" class="profile-value">{{ fullName }}</div>
+                    <div v-else class="flex items-center">
+                        <input type="text" v-model="editedFullName" class="profile-input"
+                            @keyup.enter="saveField('name')" @keyup.esc="cancelEdit('name')" ref="nameInput">
+                        <span class="cancel-icon" @click="cancelEdit('name')" title="Cancel">✕</span>
+                    </div>
+                    <span class="edit-icon" @click="startEditing('name')" v-if="editingField !== 'name'">✎</span>
                 </div>
+
+                <!-- Email -->
                 <div class="profile-field">
                     <label>Email</label>
-                    <span>: {{ email }}</span>
+                    <span class="profile-colon">:</span>
+                    <div v-if="editingField !== 'email'" class="profile-value">{{ email }}</div>
+                    <div v-else class="flex items-center">
+                        <input type="email" v-model="editedEmail" class="profile-input"
+                            @keyup.enter="saveField('email')" @keyup.esc="cancelEdit('email')" ref="emailInput">
+                        <span class="cancel-icon" @click="cancelEdit('email')" title="Cancel">✕</span>
+                    </div>
+                    <span class="edit-icon" @click="startEditing('email')" v-if="editingField !== 'email'">✎</span>
                 </div>
-                <div class="profile-field">
+
+                <!-- Password -->
+                <div class="profile-field password-field">
                     <label>Password</label>
-                    <span>: {{ passwordMasked }}</span>
+                    <span class="profile-colon">:</span>
+                    <div class="password-inline">
+                        <span class="password-mask">**************</span>
+                        <span class="edit-icon" @click="goToResetPassword" title="Change Password">✎</span>
+                    </div>
                 </div>
+
+                <!-- Role -->
                 <div class="profile-field">
                     <label>Role</label>
-                    <span>: {{ role }}</span>
+                    <span class="profile-colon">:</span>
+                    <span class="profile-value">{{ roleDisplay }}</span>
+                </div>
+
+                <!-- Save button (only when changes exist) -->
+                <div class="save-container" v-if="hasChanges">
+                    <button class="save-button" @click="confirmSave" :disabled="isSaving">
+                        <span v-if="isSaving" class="save-spinner"></span>
+                        {{ isSaving ? 'SAVING...' : 'SAVE CHANGES' }}
+                    </button>
                 </div>
 
                 <!-- 2FA Authentication Toggle Checkbox -->
@@ -383,110 +752,407 @@
                         type="checkbox" 
                         id="enable-2fa" 
                         v-model="enableTwoFactor"
+                        @change="updateTwoFactorSetting"
                     >
                     <label for="enable-2fa">Enable two-factor authentication</label>
                 </div>
 
                 <!-- Profile Action Buttons -->
                 <div class="profile-actions">
-                    <button class="action-button" @click="grantAdminAccess">GRANT ADMIN ACCESS</button>
+                    <!-- GRANT ADMIN ACCESS BUTTON (Conditional) -->
+                    <button 
+                        class="action-button" 
+                        :class="{ locked: isAdmin }"
+                        @click="grantAdminAccess"
+                    >
+                        <svg v-if="isAdmin" class="btn-lock-icon" viewBox="0 0 24 24">
+                            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                        </svg>
+                        GRANT ADMIN ACCESS
+                    </button>
                     <button class="action-button delete" @click="deleteAccount">DELETE ACCOUNT</button>
                 </div>
             </div>
         </div>
 
-        <!-- Delete Account OTP + Success Modal -->
-        <div v-if="step === 'otp' || step === 'success'" class="otp-overlay">
-
-            <div class="otp-modal">
-
-                <!-- OTP Verification View -->
-                <div v-if="step === 'otp'">
-
-                    <h2>Verify Account Deletion</h2>
-                    <p><br>An OTP has been sent to your registered email.</p>
-
-                    <transition name="fade">
-                        <div v-if="message.text"
-                            class="message-banner"
-                            :class="message.type">
-                            {{ message.text }}
-                        </div>
-                    </transition>
-
-                    <otp-verification 
-                        :email="userEmail"
-                        @verified="handleDeleteVerified">
-                    </otp-verification>
-
+        <!-- Delete Account Confirmation Modal -->
+        <div v-if="showDeleteModal" class="delete-modal-overlay" @click.self="showDeleteModal = false">
+            <div class="delete-modal">
+                <div class="delete-modal-title">⚠ Delete Account</div>
+                <div class="delete-modal-subtitle">
+                    This action is permanent and cannot be undone. The following data will be permanently erased from our systems.
                 </div>
-
-                <!-- Success Confirmation View -->
-                <div v-if="step === 'success'" class="success-step">
-
-                    <h3 class="success-title">Account Deleted Successfully</h3>
-
+        
+                <div class="delete-modal-summary">
+                    <div class="delete-modal-summary-title">What will be deleted</div>
+                    <div class="delete-modal-summary-item">
+                        <span class="delete-modal-summary-dot"></span>
+                        Your account and all login records
+                    </div>
+                    <div class="delete-modal-summary-item">
+                        <span class="delete-modal-summary-dot"></span>
+                        All uploaded documents and associated metadata
+                    </div>
+                    <div class="delete-modal-summary-item">
+                        <span class="delete-modal-summary-dot"></span>
+                        All compliance analysis results and findings
+                    </div>
+                    <div class="delete-modal-summary-item">
+                        <span class="delete-modal-summary-dot"></span>
+                        All recommendations and generated reports
+                    </div>
+                    <div class="delete-modal-summary-item">
+                        <span class="delete-modal-summary-dot"></span>
+                        All admin access privileges associated with your account
+                    </div>
                 </div>
-
+        
+                <div class="delete-modal-reason">
+                    <label>Reason for leaving (optional)</label>
+                    <select v-model="deleteReason">
+                        <option value="">Prefer not to say</option>
+                        <option value="Switching to a different platform.">Switching to a different platform</option>
+                        <option value="No longer need the service.">No longer need the service</option>
+                        <option value="Privacy concerns.">Privacy concerns</option>
+                        <option value="Too expensive.">Too expensive</option>
+                        <option value="Missing features I need.">Missing features I need</option>
+                        <option value="Other.">Other</option>
+                    </select>
+                </div>
+        
+                <div class="delete-modal-actions">
+                    <button class="delete-modal-cancel" @click="showDeleteModal = false">
+                        Cancel
+                    </button>
+                    <button
+                        class="delete-modal-confirm"
+                        @click="confirmDeleteAccount"
+                        :disabled="deletingAccount"
+                    >
+                        {{ deletingAccount ? 'PROCESSING...' : 'DELETE MY ACCOUNT' }}
+                    </button>
+                </div>
             </div>
-
         </div>
-
+        
         <!-- Webpage Background Element -->
         <div class="wavy-background">
             <img src="img5.png" alt="Curly Line Design">
+        </div>
+
+        <!-- Access Denied Toast -->
+        <div class="access-toast" :class="{ visible: toastVisible }">
+            <svg viewBox="0 0 24 24">
+                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+            </svg>
+            This feature is only available for General Users.
         </div>
     </div>
 
     <script>
         const { createApp } = Vue;
 
-        /*
-        CyberComply Profile Page Section
-        Manages user profile display, and account settings
-        */
         const app = createApp({
-        data() {
-            return {
-                // UI State
-                step: 'profile', // profile | otp | success
-                message: { text: '', type: '' }, // Notification messages
-                sidebarOpen: true, // Sidebar visibility state
-                
-                // User Data
-                userName: 'James S',
-                fullName: 'James Smith',
-                userEmail: sessionStorage.getItem('userEmail') || '',
-                email: sessionStorage.getItem('userEmail') || 'James@gmail.com',
-                role: sessionStorage.getItem('userRole') || 'General User',
-                passwordMasked: 'Pa***********',
+            data() {
+                return {
+                    sidebarOpen: true, // Sidebar visibility state
+                    
+                    // User Data
+                    fullName: '',
+                    email: '',
+                    role: '',
+                    originalFullName: '',
+                    originalEmail: '',
+                    editedFullName: '',
+                    editedEmail: '',
+                    tempFullName: '',
+                    tempEmail: '',
+                    editingField: null,
+                    hasChanges: false,
+                    isSaving: false,
 
-                enableTwoFactor: false, // 2FA preference
-                showOtpModal: false // Modal State
-            }
-        },
+                    enableTwoFactor: false, // 2FA preference
 
-        /*
-        Lifecycle hook - component mounted
-        */
-        mounted() {
-                // Initialize filtered lists
-                this.filteredLast7Days = [...this.last7Days];
-                this.filteredLast30Days = [...this.last30Days];
+                    // Delete account modal state
+                    showDeleteModal: false,
+                    deleteReason: '',
+                    deletingAccount: false,
 
-                // Assigns User Role
-                this.assignRoleFromEmail();
+                    // Toast for access denied (Admin Access button)
+                    toastVisible: false,
+                    toastTimer: null,
+
+                    // Admin access lock state
+                    isAdmin: false
+                }
             },
-            mounted() {
-                // Initialize filtered lists
-                this.filteredLast7Days = [...this.last7Days];
-                this.filteredLast30Days = [...this.last30Days];
+
+            /*
+            Lifecycle hook - component mounted
+            */
+            computed: {
+                roleDisplay() {
+                    const role = (this.role || "").toLowerCase();
+                    if (role.includes("administrative")) return "Administrative User";
+                    if (role.includes("general")) return "General User";
+                    return "General User";
+                }
             },
+            watch: {
+                editedFullName(newVal) {
+                    this.hasChanges = newVal !== this.originalFullName;
+                },
+                editedEmail(newVal) {
+                    this.hasChanges = newVal !== this.originalEmail;
+                }
+            },
+            async mounted() {
+                // Fetch latest profile details from backend
+                await this.loadUserProfile();
+            },
+            
             methods: {
                 // Toggles sidebar open/close state
                 toggleSidebar() {
                     this.sidebarOpen = !this.sidebarOpen;
                 },
+
+                async loadUserProfile() {
+                    const email = sessionStorage.getItem('userEmail');
+                    if (!email) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Not logged in',
+                            text: 'Redirecting to login...',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                        setTimeout(() => window.location.href = 'login.html', 2000);
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`http://127.0.0.1:8000/api/profile/?email=${encodeURIComponent(email)}`);
+                        if (!res.ok) throw new Error('Failed to load profile');
+                        const data = await res.json();
+
+                        this.fullName = this.originalFullName = data.full_name;
+                        this.email = this.originalEmail = data.email;
+                        this.role = data.role;
+                        this.enableTwoFactor = data.otp_is_enabled;
+
+                        this.editedFullName = data.full_name;
+                        this.editedEmail = data.email;
+
+                        this.isAdmin = (data.role || "").toLowerCase().includes("administrative");
+
+                        sessionStorage.setItem('userFullName', data.full_name);
+                        sessionStorage.setItem('userEmail', data.email);
+                    } catch (err) {
+                        console.error('Profile load failed:', err);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Failed to load profile',
+                            text: 'Please try again or contact support.',
+                            timer: 4000,
+                            showConfirmButton: false
+                        });
+                    }
+                },
+
+                saveField(field) {
+                    this.editingField = null;
+                },
+
+                async confirmSave() {
+                    const nameChanged = this.editedFullName.trim() !== this.originalFullName;
+                    const emailChanged = this.editedEmail.trim().toLowerCase() !== this.originalEmail;
+
+                    // If no changes at all → shouldn't happen due to v-if="hasChanges"
+                    if (!nameChanged && !emailChanged) return;
+
+                    // Validate name if changed
+                    if (nameChanged && this.editedFullName.trim().length < 3) {
+                        return Swal.fire({
+                            icon: 'error',
+                            title: 'Invalid Name',
+                            text: 'Name must be at least 3 characters'
+                        });
+                    }
+
+                    // Validate email if changed
+                    if (emailChanged && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.editedEmail)) {
+                        return Swal.fire({
+                            icon: 'error',
+                            title: 'Invalid Email',
+                            text: 'Please enter a valid email address'
+                        });
+                    }
+
+                    const result = await Swal.fire({
+                        title: emailChanged ? 'Change Email?' : 'Save Changes?',
+                        text: emailChanged 
+                            ? 'A verification code will be sent to the new email address.' 
+                            : 'Save profile changes?',
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonColor: '#4a8fe7',
+                        confirmButtonText: 'Yes'
+                    });
+
+                    if (!result.isConfirmed) return;
+
+                    this.isSaving = true;
+
+                    try {
+                        // Step 1: If name changed → save it immediately (PATCH)
+                        if (nameChanged) {
+                            const res = await fetch('http://127.0.0.1:8000/api/profile/update/', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    email: this.email,  // Add this line - your backend needs the email
+                                    full_name: this.editedFullName.trim() 
+                                })
+                            });
+                            if (!res.ok) {
+                                const err = await res.json();
+                                throw new Error(err.detail || 'Name update failed');
+                            }
+                            const data = await res.json();
+                            this.fullName = this.originalFullName = data.full_name;
+                            sessionStorage.setItem('userFullName', data.full_name);
+
+                            // Reset temp values after successful name save
+                            this.tempFullName = '';
+                        }
+
+                        // Step 2: If email changed → redirect to OTP page
+                        if (emailChanged) {
+                            sessionStorage.setItem('pendingNewEmail', this.editedEmail.trim().toLowerCase());
+                            // Reset temp values before redirect
+                            this.tempEmail = '';
+                            // Show a brief loading message before redirect
+                            Swal.fire({
+                                title: 'Redirecting...',
+                                text: 'Taking you to email verification',
+                                timer: 1000,
+                                showConfirmButton: false,
+                                didOpen: () => Swal.showLoading()
+                            }).then(() => {
+                                window.location.href = 'email_change_verify.html';
+                            });
+                            return;
+                        }
+
+                        // If only name changed (or both but name first)
+                        this.hasChanges = false;
+                        this.editingField = null;
+                        this.tempFullName = '';
+                        this.tempEmail = '';
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Saved!',
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+                    } catch (err) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Failed',
+                            text: err.message || 'Could not save changes'
+                        });
+                    } finally {
+                        this.isSaving = false;
+                    }
+                },
+
+                async saveNameOnly() {
+                    this.isSaving = true;
+                    try {
+                        const res = await fetch('http://127.0.0.1:8000/api/profile/update/', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ full_name: this.editedFullName.trim() })
+                        });
+                        if (!res.ok) throw new Error('Update failed');
+                        const data = await res.json();
+
+                        this.fullName = this.originalFullName = data.full_name;
+                        sessionStorage.setItem('userFullName', data.full_name);
+                        this.hasChanges = false;
+                        this.editingField = null;
+                        Swal.fire({ icon: 'success', title: 'Saved!', timer: 1500, showConfirmButton: false });
+                    } catch (err) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Failed',
+                            text: err.message || 'Could not save changes'
+                        });
+                    } finally {
+                        this.isSaving = false;
+                    }
+                },
+
+                startEditing(field) {
+                    // Store current value as temp backup for cancel
+                    if (field === 'name') this.tempFullName = this.editedFullName;
+                    if (field === 'email') this.tempEmail = this.editedEmail;
+
+                    this.editingField = field;
+                    this.$nextTick(() => {
+                        const input = this.$refs[field + 'Input'];
+                        if (input) {
+                            input.focus();
+                            input.select(); // Highlight text for easy overwrite
+                        }
+                    });
+                },
+
+                cancelEdit(field) {
+                    // Revert to original/previous value
+                    if (field === 'name') {
+                        this.editedFullName = this.tempFullName || this.originalFullName;
+                        this.tempFullName = '';
+                    }
+                    if (field === 'email') {
+                        this.editedEmail = this.tempEmail || this.originalEmail;
+                        this.tempEmail = '';
+                    }
+
+                    this.editingField = null;
+                    this.hasChanges = false; // Reset if no real change
+                },
+
+                async updateTwoFactorSetting() {
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/api/profile/twofa/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                email: this.email,
+                                otp_is_enabled: this.enableTwoFactor
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            alert(data.detail || 'Failed to update two-factor authentication setting.');
+                            this.enableTwoFactor = !this.enableTwoFactor;
+                            return;
+                        }
+
+                        console.log(data.detail);
+                    } catch (error) {
+                        console.error('Error updating 2FA setting:', error);
+                        alert('Something went wrong while updating two-factor authentication.');
+                        this.enableTwoFactor = !this.enableTwoFactor;
+                    }
+                },
+
                 // Handles user logout
                 async logout() {
                     //Delete all uploaded files from S3 before logging out
@@ -494,7 +1160,7 @@
     
                     if (fileNames.length > 0) {
                         try {
-                            await fetch('http://127.0.0.1:8000/api/delete-all-files/', {
+                            await fetch('http://127.0.0.1:8000/api/delete-file/', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ file_names: fileNames })
@@ -509,50 +1175,79 @@
                 },
                 // Navigates to admin access granting page
                 grantAdminAccess() {
+                    if (this.isAdmin) {
+                        this.showAccessDenied();
+                        return;
+                    }
+                    // Only General Users can proceed
                     window.location.href = 'adminaccess.html';
+                },
+                showAccessDenied() {
+                    if (this.toastTimer) clearTimeout(this.toastTimer);
+                    this.toastVisible = true;
+                    this.toastTimer = setTimeout(() => {
+                        this.toastVisible = false;
+                    }, 3500);
+                },
+                // Navigate to forgot password page
+                goToResetPassword() {
+                    window.location.href = "forgot_password.html";
                 },
                 // Initiation of account deletion process
                 // Shows OTP verification modal
                 deleteAccount() {
-                    this.step = 'otp';
-                    this.message = {
-                        text: '',
-                        type: 'success'
-                    };
+                    // Show the confirmation modal instead of immediately requesting OTP
+                    this.showDeleteModal = true;
                 },
-                // Handles successful OTP verification for account deletion
-                handleDeleteVerified() {
-
-                    // simulate account deletion
-                    localStorage.clear();
-
-                    this.step = 'success';
-
-                    setTimeout(() => {
-                        window.location.href = 'welcome.html';
-                    }, 2200);
+                
+                async confirmDeleteAccount() {
+                    if (this.deletingAccount) return;
+                    this.deletingAccount = true;
+                
+                    try {
+                        const response = await fetch('http://127.0.0.1:8000/api/request-delete-account/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: this.email })
+                        });
+                
+                        const data = await response.json();
+                
+                        if (!response.ok) {
+                            this.showDeleteModal = false;
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: data.detail || 'Failed to send delete account OTP.'
+                            });
+                            return;
+                        }
+                
+                        // Store reason so delete_account_verify.html can pass it to the backend
+                        sessionStorage.setItem('deleteAccountReason', this.deleteReason || '');
+                        sessionStorage.setItem('deleteAccountMessage', 'A verification code has been sent to your email.');
+                        this.showDeleteModal = false;
+                        window.location.href = 'delete_account_verify.html';
+                
+                    } catch (error) {
+                        console.error('Error requesting delete account OTP:', error);
+                        this.showDeleteModal = false;
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Something went wrong while requesting the verification code.'
+                        });
+                    } finally {
+                        this.deletingAccount = false;
+                    }
                 },
+                
                 // Navigates back to previous page
                 goToHome() {
                     window.history.back();
-                },
-                // Assigns user role
-                assignRoleFromEmail() {
-                    const storedRole = sessionStorage.getItem('userRole');
-                    const storedEmail = sessionStorage.getItem('userEmail');
-
-                    // Example rule — change to your real logic later
-                    if (storedRole) {
-                        this.role = storedRole;
-                    }
-
-                    if (storedEmail) {
-                        this.email = storedEmail;
-                    }
-                },
+                }
             }
         });
-        registerOtpComponent(app);
         registerSidebarComponent(app);
         app.mount('#app');
     </script>

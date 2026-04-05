@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify New Email</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <style>
+        body { background-color: #101726; }
+        .right-wave { position: fixed; bottom: 0; right: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+        /* Fade transition for message banner */
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+
+        .custom-btn {
+            margin-top: 20px;
+            width: 100%;
+            padding: 10px;
+            background-color: #a2b8c8;
+            border: none;
+            color: #123456;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .custom-btn:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+        }
+
+        .custom-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .otp-input {
+            font-family: monospace;
+            letter-spacing: 0.5em;
+            text-align: center;
+            background: rgba(30, 41, 59, 0.8);
+            border: 2px solid #334155;
+            color: white;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            transition: all 0.2s;
+        }
+        .otp-input:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+            outline: none;
+        }
+        .verify-btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            font-weight: 600;
+            padding: 0.875rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+        }
+        .verify-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            transform: translateY(-1px);
+        }
+        .verify-btn:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+        .resend-link {
+            color: #94a3b8;
+            transition: color 0.2s;
+        }
+        .resend-link:hover:not(:disabled) {
+            color: #60a5fa;
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex flex-col text-white overflow-hidden relative">
+
+    <div id="app" class="h-full w-full flex flex-col relative z-10">
+        <div class="flex-1 flex items-center justify-center px-4">
+            <div class="w-full max-w-md text-center space-y-8">
+
+                <div class="space-y-8">
+                    <!-- Masked email display -->
+                    <p class="text-gray-300 text-sm text-center">
+                        OTP Verification Code has been sent to<br>
+                        <span class="text-white font-medium">{{ maskedEmail }}</span>
+                    </p>
+
+                    <!-- Message banner -->
+                    <transition name="fade">
+                        <div v-if="message.text" :class="[
+                            'text-sm p-4 rounded-lg text-center shadow-md border',
+                            message.type === 'error'
+                                ? 'bg-red-900/40 text-red-200 border-red-700/50'
+                                : 'bg-green-900/40 text-green-200 border-green-700/50'
+                        ]">
+                            {{ message.text }}
+                        </div>
+                    </transition>
+
+                    <!-- OTP Input + Verify Button -->
+                    <div class="space-y-6">
+                        <div class="flex flex-col items-center gap-3">
+                            <label for="otp-input" class="text-sm font-medium text-gray-300">
+                                Enter verification code
+                            </label>
+                            <input
+                                id="otp-input"
+                                v-model="otp"
+                                type="text"
+                                inputmode="numeric"
+                                maxlength="6"
+                                placeholder="000000"
+                                autocomplete="one-time-code"
+                                class="w-48 text-center text-3xl font-mono tracking-widest bg-gray-900/60 border-2 border-gray-700 rounded-lg py-4 px-6 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none transition-all disabled:opacity-50"
+                                :disabled="isVerifying"
+                                @input="otp = otp.replace(/\D/g, '')"
+                                @paste.prevent="handleOtpPaste"
+                                @keyup.enter="verifyOtp"
+                            >
+                        </div>
+
+                        <button
+                            @click="verifyOtp"
+                            :disabled="isVerifying || otp.length !== 6"
+                            class="w-full max-w-xs mx-auto flex items-center justify-center gap-3 py-3.5 px-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all shadow-md disabled:shadow-none"
+                        >
+                            <span v-if="isVerifying" class="inline-block animate-spin">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </span>
+                            {{ isVerifying ? 'Verifying...' : 'Verify Code' }}
+                        </button>
+                    </div>
+
+                    <!-- Resend link -->
+                    <div class="text-center pt-4">
+                        <button
+                            @click="resendOtp"
+                            :disabled="isResending"
+                            class="text-sm text-gray-400 hover:text-blue-400 transition-colors flex items-center justify-center gap-2 mx-auto disabled:opacity-50"
+                        >
+                            <i class="fas fa-redo-alt text-xs" :class="{ 'fa-spin': isResending }"></i>
+                            {{ isResending ? 'Sending new code...' : 'Resend verification code' }}
+                        </button>
+                    </div>
+
+                    <!-- Back link -->
+                    <div class="text-center pt-6">
+                        <a href="profile.html" class="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+                            ← Back to Profile
+                        </a>
+                    </div>
+                </div>
+        </div>
+    </div>
+
+    <img src="img2.png" alt="Decorative Wave Right" class="right-wave">
+
+    <script src="otp_component.js"></script>
+
+    <script>
+        const { createApp, reactive, ref, computed, onMounted } = Vue;
+
+        const app = createApp({
+            setup() {
+                const newEmail = ref(sessionStorage.getItem('pendingNewEmail') || '');
+                const otp = ref('');
+                const isVerifying = ref(false);
+                const isResending = ref(false);
+                const isInitialSending = ref(false);
+                const message = reactive({ text: '', type: '' });
+
+                const maskedEmail = computed(() => {
+                    if (!newEmail.value) return '';
+                    const [local, domain] = newEmail.value.split('@');
+                    if (!domain) return newEmail.value;
+                    return `${local.slice(0, 2)}${'*'.repeat(Math.max(0, local.length - 4))}@${domain}`;
+                });
+
+                const handleOtpPaste = (e) => {
+                    e.preventDefault();
+                    const text = (e.clipboardData || window.clipboardData).getData('text');
+                    otp.value = text.replace(/\D/g, '').slice(0, 6);
+                };
+
+                // ==================== AUTO SEND OTP ON PAGE LOAD ====================
+                const sendInitialOtp = async () => {
+                    if (!newEmail.value) {
+                        message.text = "No pending email change found. Please go back to profile.";
+                        message.type = 'error';
+                        return;
+                    }
+
+                    isInitialSending.value = true;
+                    message.text = '';
+
+                    try {
+                        const res = await fetch('http://127.0.0.1:8000/api/request-email-change/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                current_email: sessionStorage.getItem('userEmail'),
+                                new_email: newEmail.value,
+                                resend: false   // First time request
+                            })
+                        });
+
+                        const data = await res.json();
+
+                        if (!res.ok) {
+                            message.text = data.detail || 'Failed to send verification code';
+                            message.type = 'error';
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Failed',
+                                text: message.text
+                            });
+                            return;
+                        }
+
+                        // Success - show success message
+                        message.text = 'Verification code sent to your new email!';
+                        message.type = 'success';
+
+                    } catch (err) {
+                        message.text = 'Network error while sending code. Please try resending.';
+                        message.type = 'error';
+                    } finally {
+                        isInitialSending.value = false;
+                    }
+                };
+
+                const verifyOtp = async () => {
+                    if (otp.value.length !== 6) {
+                        message.text = 'Please enter a 6-digit code';
+                        message.type = 'error';
+                        return;
+                    }
+
+                    isVerifying.value = true;
+                    message.text = '';
+
+                    try {
+                        const res = await fetch('http://127.0.0.1:8000/api/verify-email-change/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                otp: otp.value,
+                                new_email: newEmail.value,
+                                current_email: sessionStorage.getItem('userEmail')
+                            })
+                        });
+
+                        const data = await res.json();
+
+                        if (!res.ok) {
+                            message.text = data.detail || 'Invalid or expired code';
+                            message.type = 'error';
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Verification Failed',
+                                text: message.text,
+                                timer: 3000
+                            });
+                            return;
+                        }
+
+                        // Success
+                        sessionStorage.setItem('userEmail', newEmail.value);
+
+                        // Apply pending name change if exists
+                        const pendingName = sessionStorage.getItem('pendingNameChange');
+                        if (pendingName) {
+                            try {
+                                await fetch('http://127.0.0.1:8000/api/profile/update/', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ 
+                                        email: newEmail.value,
+                                        full_name: pendingName 
+                                    })
+                                });
+                                sessionStorage.setItem('userFullName', pendingName);
+                            } catch (e) {
+                                console.warn('Failed to apply pending name change:', e);
+                            }
+                        }
+
+                        // Cleanup
+                        sessionStorage.removeItem('pendingNewEmail');
+                        sessionStorage.removeItem('pendingNameChange');
+
+                        message.text = 'Email successfully updated!';
+                        message.type = 'success';
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Email Updated',
+                            text: 'You will be redirected to your profile...',
+                            timer: 2500,
+                            showConfirmButton: false
+                        }).then(() => {
+                            window.location.href = 'profile.html';
+                        });
+
+                    } catch (err) {
+                        message.text = 'Network error - please try again';
+                        message.type = 'error';
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: message.text
+                        });
+                    } finally {
+                        isVerifying.value = false;
+                    }
+                };
+
+                const resendOtp = async () => {
+                    isResending.value = true;
+                    message.text = '';
+
+                    try {
+                        const res = await fetch('http://127.0.0.1:8000/api/request-email-change/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                current_email: sessionStorage.getItem('userEmail'),
+                                new_email: newEmail.value,
+                                resend: true
+                            })
+                        });
+
+                        const data = await res.json();
+
+                        if (!res.ok) {
+                            message.text = data.detail || 'Failed to resend code';
+                            message.type = 'error';
+                            return;
+                        }
+
+                        message.text = 'New code sent to your email!';
+                        message.type = 'success';
+                        otp.value = ''; // Clear input
+
+                    } catch (err) {
+                        message.text = 'Network error - please try again';
+                        message.type = 'error';
+                    } finally {
+                        isResending.value = false;
+                    }
+                };
+
+                // Automatically send OTP when component mounts
+                onMounted(() => {
+                    sendInitialOtp();
+                });
+
+                return {
+                    newEmail,
+                    maskedEmail,
+                    otp,
+                    isVerifying,
+                    isResending,
+                    message,
+                    verifyOtp,
+                    resendOtp,
+                    handleOtpPaste
+                };
+            }
+        });
+
+        registerOtpComponent(app);
+        app.mount('#app');
+    </script>
+</body>
+</html>

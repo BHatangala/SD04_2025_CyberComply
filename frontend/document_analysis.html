@@ -62,9 +62,9 @@
             align-items: center;
             position: fixed;
             z-index: 100;
-            top: 0;             
-            left: 0;             
-            width: 100%; 
+            top: 0;
+            left: 0;
+            width: 100%;
             border-bottom: 1px solid rgba(74,143,231,0.18);
         }
 
@@ -327,7 +327,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             gap: 4px;
         }
 
@@ -353,6 +353,11 @@
             display: block;
             margin-bottom: 3px;
             color: #ffffff;
+        }
+
+        .recommendations-section .section-header {
+            align-items: flex-start;
+            padding-top: 42px;
         }
 
         /* ─── Action Buttons ─── */
@@ -653,9 +658,6 @@
                         </button>
                     </div>
                     <div class="recommendations-list">
-                        <div class="recommendation-item" v-if="topRecommendation">
-                            {{ topRecommendation }}
-                        </div>
                         <!-- Per-clause findings from AI -->
                         <div
                             class="recommendation-item"
@@ -718,16 +720,18 @@
 
         // ─────────────────────────────────────────────────────────────
         // ADMIN ROLE FLAG
-        // Replace this with your backend authentication check when ready.
+        // Resolved at runtime from sessionStorage (set by login flow).
+        // The mounted() hook overwrites this with the server-confirmed
+        // role so the hardcoded default below is only a safe fallback.
         //
         // Example (once backend exists):
         //   const isAdminUser = await fetch('/api/auth/me')
         //                         .then(r => r.json())
         //                         .then(u => u.role === 'admin');
-        //
-        // For now, set manually:  true = admin,  false = general user
-        const isAdminUser = true;  // <-- swap to `true` to test admin view
+        const isAdminUser = true;  // fallback — overridden in mounted()
         // ─────────────────────────────────────────────────────────────
+
+        const BASE = 'http://127.0.0.1:8000/ai';
 
         const app = createApp({
             data() {
@@ -738,51 +742,103 @@
                     toastTimer: null,
 
                     // ── AI Result Fields ──
-                    // TODO: Replace this localStorage read with a fetch('/api/results/latest') once PostgreSQL is connected.
                     complianceScore: 0,
                     complianceLabel: 'Loading...',
                     barWidth: '0%',
                     analysedFilename: 'DOCUMENT ANALYSIS',
                     analysedCompany: '',
                     topRecommendation: '',
-                    complianceDetails: []
+                    complianceDetails: [],
+
+                    // ── Sidebar History ──
+                    last7Days: [],
+                    last30Days: [],
+                    filteredLast7Days: [],
+                    filteredLast30Days: [],
+
+                    // Loading / error state
+                    isLoading: true,
+                    loadError: ''
                 }
             },
-            mounted() {
-                // ── Load AI result from localStorage ──
-                const raw = localStorage.getItem('latestAnalysisResult');
-                if (raw) {
-                    try {
-                        const result = JSON.parse(raw);
-
-                        // Metadata (set by home.html before redirect)
-                        this.analysedFilename = result._meta?.filename || 'Document Analysis';
-                        this.analysedCompany  = result._meta?.company  || '';
-
-                        // Compliance score and label
-                        const score = result.compliance?.compliance_score ?? 0;
-                        this.complianceScore = Math.round(score);
-                        this.complianceLabel = score >= 75 ? 'High Compliance Level'
-                                            : score >= 40 ? 'Medium Compliance Level'
-                                            :               'Low Compliance Level';
-
-                        // Per-clause details for Recommendations section
-                        this.complianceDetails = (result.compliance?.details || []).filter(
-                            d => d.status === 'non-compliant' || d.status === 'partial' || d.status === 'non_compliant'
-                        );
-
-                        // Top recommendation from Flask placeholder
-                        this.topRecommendation = result.recommendations?.top_action || '';
-
-                        // Animate bar after a short delay (allows CSS transition to fire)
-                        setTimeout(() => {
-                            this.barWidth = `${this.complianceScore}%`;
-                        }, 300);
-
-                    } catch (e) {
-                        console.error('Failed to parse analysis result from localStorage:', e);
-                    }
+            async mounted() {
+                const token = sessionStorage.getItem('authToken');
+                if (!token) {
+                    window.location.href = 'login.html';
+                    return;
                 }
+
+                // ── Resolve admin flag from session (server-confirmed) ────
+                const roleRaw = sessionStorage.getItem('userRole');
+                this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
+
+                // ── Determine which result to display ────────────────────
+                // Prefer an explicit result_id written by home.html after save.
+                // Fall back to /api/analysis/latest/ if none is stored.
+                const resultId = sessionStorage.getItem('latestResultId');
+                const url = resultId
+                    ? `${BASE}/api/analysis/${resultId}/`
+                    : `${BASE}/api/analysis/latest/`;
+
+                try {
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (res.status === 401 || res.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (!res.ok) {
+                        this.loadError = 'No analysis results found. Please upload and analyse a document first.';
+                        this.complianceLabel = 'No results yet';
+                        this.isLoading = false;
+                        return;
+                    }
+
+                    const data = await res.json();
+
+                    // ── Populate UI fields ────────────────────────────────
+                    this.analysedFilename = data.original_filename || 'Document Analysis';
+                    this.analysedCompany = data.company_name || '';
+                    this.complianceScore  = Math.round(data.compliance_score ?? 0);
+                    this.complianceLabel  = data.compliance_label || (
+                        this.complianceScore >= 75 ? 'High Compliance Level' :
+                        this.complianceScore >= 40 ? 'Medium Compliance Level' :
+                                                     'Low Compliance Level'
+                    );
+
+                    // Per-clause details for the Recommendations panel
+                    this.complianceDetails = (
+                        (data.compliance?.details || []).filter(
+                            d => d.status === 'non-compliant'
+                              || d.status === 'partial'
+                              || d.status === 'non_compliant'
+                        )
+                    );
+
+                    // Top-level recommendation from the AI payload
+                    this.topRecommendation = data.recommendations?.top_action || '';
+
+                    // Store result_id so sub-pages (compliance, recommendations) can pick it up
+                    if (data.result_id) {
+                        sessionStorage.setItem('latestResultId', data.result_id);
+                    }
+
+                    // Animate progress bar
+                    setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 300);
+
+                } catch (e) {
+                    console.error('Failed to load analysis result:', e);
+                    this.loadError = 'Could not reach the server. Please check your connection.';
+                } finally {
+                    this.isLoading = false;
+                }
+
+                // ── Populate sidebar history ──────────────────────────────
+                await this.fetchHistory(token);
             },
             methods: {
                 toggleSidebar() {
@@ -796,6 +852,34 @@
                 },
                 goBack() {
                     window.location.href = 'home.html';
+                },
+
+                // ── Sidebar history navigation ──
+                openReport(report) {
+                    // report may be a history object { resultId, label } or a plain string
+                    const resultId = report.resultId || null;
+                    if (resultId) {
+                        sessionStorage.setItem('latestResultId', resultId);
+                        window.location.href = 'document_analysis.html';
+                    } else {
+                        window.location.href = `report_viewing.html?report=${encodeURIComponent(report.label || report)}`;
+                    }
+                },
+
+                async fetchHistory(token) {
+                    try {
+                        const res = await fetch(`${BASE}/api/analysis/history/`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        this.last7Days  = (data.last_7_days  || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
+                        this.last30Days = (data.last_30_days || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
+                        this.filteredLast7Days  = [...this.last7Days];
+                        this.filteredLast30Days = [...this.last30Days];
+                    } catch (e) {
+                        console.warn('Could not load analysis history:', e);
+                    }
                 },
 
                 // ── Compliance Score: open to all ──
@@ -814,7 +898,7 @@
                 },
                 // ── Generate Reports: open to all ──
                 generateReports() {
-                    window.location.href = 'report_viewing.html';
+                    window.location.href = 'report_viewing.html?generate=true';
                 },
 
                 showAccessDenied() {

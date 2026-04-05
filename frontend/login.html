@@ -8,6 +8,8 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
     <style>
         body {
@@ -19,6 +21,7 @@
             background-color: #0F3456;
             border: 1px solid #2563EB;
             color: #E2E8F0;
+            border-radius: 6px;
             transition: all 0.3s ease;
         }
 
@@ -29,15 +32,29 @@
         }
 
         .custom-btn {
-            background-color: #BEE3F8;
-            color: #000;
-            font-weight: 600;
-            transition: opacity 0.3s ease;
+            margin-top: 20px;
+            width: 100%;
+            padding: 10px;
+            background-color: #a2b8c8;
+            border: none;
+            color: #123456;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
         }
 
         .custom-btn:hover {
-            opacity: 0.9;
+            opacity: 0.95;
+            transform: translateY(-1px);
         }
+
+        /* Disabled login button styling */
+        .custom-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }        
 
         .right-wave {
             position: fixed;
@@ -48,10 +65,148 @@
             z-index: 0;
             pointer-events: none;
         }
+
+        /* Password wrapper for eye toggle */
+        .password-wrapper {
+            position: relative;
+        }
+
+        /* Eye icon styling */
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            font-size: 16px;
+            color: #cbd5e1;
+        }
+
+        .toggle-password:hover {
+            color: #ffffff;
+        }  
+        
+        /* Click effect */
+        .toggle-password:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        /* Keyboard focus (accessibility) */
+        .toggle-password:focus {
+            outline: none;
+            color: #a9c7ff;
+        }
+
+        .password-wrapper input {
+            padding-right: 55px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            animation: fadeIn 0.25s ease;
+        }
+
+        .success-modal-content {
+            line-height: 1.6;
+            background: #234561;
+            color: #f0f4ff;
+            padding: 24px 20px;
+            width: 100%;
+            max-width: 360px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #90a0b5;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+            animation: popIn 0.25s ease;
+        }
+
+        .success-modal-content h3 {
+            margin: 0 0 10px;
+            font-size: 22px;
+            color: #ffffff;
+        }
+
+        .success-modal-content p {
+            margin: 0;
+            font-size: 14px;
+            color: #e6eef7;
+            line-height: 1.5;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes popIn {
+            from {
+            transform: scale(0.9);
+            opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Page entry animations */
+        html.pre-enter-left #app,
+        html.pre-enter-right #app {
+            opacity: 0;
+        }
+
+        html.pre-enter-right #app {
+            animation: slideFromRight 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        html.pre-enter-left #app {
+            animation: slideFromLeft 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        @keyframes slideFromRight {
+            from {
+                opacity: 0;
+                transform: translateX(22px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideFromLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-22px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
     </style>
+    <script>
+        (function () {
+            const direction = sessionStorage.getItem("navDirection");
+            if (direction === "left") {
+                document.documentElement.classList.add("pre-enter-left");
+            } else if (direction === "right") {
+                document.documentElement.classList.add("pre-enter-right");
+            }
+        })();
+    </script>
 </head>
 
-<body class="h-screen w-full flex flex-col text-white overflow-hidden relative">
+<body id="pageBody" class="h-screen w-full flex flex-col text-white overflow-hidden relative">
 
     <div id="app" class="h-full w-full flex flex-col relative z-10">
 
@@ -67,7 +222,7 @@
                         <p class="text-gray-400 text-sm tracking-wide">Sign in to continue</p>
                     </div>
 
-                    <form @submit.prevent class="space-y-6 text-left w-3/4 mx-auto" novalidate>
+                    <form @submit.prevent="handleLogin" class="space-y-6 text-left w-3/4 mx-auto" novalidate>
 
                         <transition name="fade">
                             <div v-if="message.text" :class="[
@@ -79,25 +234,34 @@
                         </transition>
 
                         <div class="space-y-2">
-                            <label class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Email</label>
-                            <input v-model="form.email" type="email" placeholder="hello@reallygreatsite.com"
-                                class="custom-input w-full p-3 text-sm placeholder-gray-400">
+                            <label for="email" class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Email</label>
+                            <input id="email" v-model="form.email" type="email" placeholder="Enter your email address" class="custom-input w-full p-3 text-sm placeholder-gray-400">
                         </div>
 
                         <div class="space-y-2">
-                            <label
-                                class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Password</label>
-                            <input v-model="form.password" type="password" placeholder="******"
-                                class="custom-input w-full p-3 text-sm placeholder-gray-400">
+                            <label for="password" class="text-xs font-bold tracking-widest text-gray-300 uppercase ml-1">Password</label>
+                            <div class="password-wrapper">
+                                <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" placeholder="Enter your password" class="custom-input w-full p-3 text-sm placeholder-gray-400">
+
+                                <span class="toggle-password" @click="showPassword = !showPassword">
+                                    <i :class="showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+                                </span>  
+                            </div>                              
                         </div>
 
                         <div class="pt-2 space-y-4 text-center">
-                            <button @click.prevent="handleLogin"
-                                class="custom-btn w-full py-3 uppercase tracking-wider text-sm shadow-lg">
-                                Log In
+                            <!-- Loading state for login button -->
+                            <button
+                                type="submit"
+                                :disabled="loading"
+                                class="custom-btn"
+                            >
+                                {{ loading ? "Signing In..." : "Log In" }}
                             </button>
+
                             <div>
                                 <a href="forgot_password.html"
+                                    @click.prevent="goToForgotPassword"
                                     class="text-sm text-white font-medium hover:text-blue-300 transition-colors tracking-wide">
                                     Forgot Password?
                                 </a>
@@ -116,7 +280,7 @@
                     <!-- Page-level success banner (e.g. "OTP sent to ...") -->
                     <transition name="fade">
                         <div v-if="message.text" :class="[
-                            'text-sm p-3 mb-4 rounded text-center shadow-lg border w-3/4 mx-auto',
+                            'text-sm p-3 mb-6 rounded text-center shadow-lg border w-3/4 mx-auto',
                             message.type === 'error' ? 'bg-gray-200 text-red-600 border-red-400' : 'bg-green-600 text-white border-green-400'
                         ]">
                             {{ message.text }}
@@ -124,7 +288,8 @@
                     </transition>
 
                     <!-- Shared OTP component handles input, validation & verify button -->
-                    <div class="w-3/4 mx-auto space-y-4">
+                    <div class="w-3/4 mx-auto space-y-6">
+
                         <otp-verification :email="form.email" @verified="handleOtpVerified">
                         </otp-verification>
 
@@ -137,6 +302,13 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+        <!-- Login Success Popup -->
+        <div v-if="showSuccessPopup" class="modal">
+            <div class="success-modal-content">
+                <h3>Login Successful</h3>
+                <p>Your login was successful. Redirecting to home...</p>
             </div>
         </div>
     </div>
@@ -159,24 +331,81 @@
 
                 const step = ref(1); // 1: credentials | 2: otp
                 const message = reactive({ text: '', type: '' });
+                const showSuccessPopup = ref(false);
+
+                // Password visibility toggle
+                const showPassword = ref(false);
+
+                // Loading state for login button
+                const loading = ref(false);                
 
                 const setMessage = (type, text) => {
                     message.type = type;
                     message.text = text;
                 };
 
+                // ── Shared helper: exchange email for a signed session token ──────
+                // Called after every successful login path (direct + OTP).
+                // Stores authToken in sessionStorage under the JWT-ready key so
+                // home.html can send it as Authorization: Bearer <token>.
+                // When full JWT is implemented, this call is replaced by the
+                // api/token/ endpoint — home.html needs no changes.
+                const SESSION_TOKEN_URL = "http://127.0.0.1:8000/ai/api/session-token/";
+
+                const fetchAndStoreSessionToken = async (email) => {
+                    try {
+                        const res = await fetch(SESSION_TOKEN_URL, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ email })
+                        });
+                        if (!res.ok) throw new Error("Token fetch failed");
+                        const tokenData = await res.json();
+                        sessionStorage.setItem("authToken", tokenData.token);
+                    } catch (err) {
+                        // Non-fatal: home.html will catch the missing token and
+                        // redirect back to login if needed.
+                        console.warn("Could not obtain session token:", err);
+                    }
+                };
+
+                // Set direction before navigating to forgot password page
+                const goToForgotPassword = () => {
+                    sessionStorage.setItem("navDirection", "right");
+                    window.location.href = "forgot_password.html";
+                };
+
                 // Step 1: Login (email+password)
                 const handleLogin = async () => {
+                    if (loading.value) return; // prevent double login
                     message.text = '';
 
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                    if (!form.email || !emailRegex.test(form.email)) {
-                        setMessage('error', 'Please enter a valid email address.');
+                    loading.value = true;
+
+                    const trimmedEmail = form.email.trim();
+
+                    if (!trimmedEmail && !form.password) {
+                        setMessage('error', 'Please enter your email and password.');
+                        loading.value = false;
                         return;
                     }
 
+                    if (!trimmedEmail) {
+                        setMessage('error', 'Please enter your email address.')
+                        loading.value = false;
+                        return;
+                    }
+
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(trimmedEmail)) {
+                        setMessage('error', 'Please enter a valid email address.');
+                        loading.value = false;
+                        return;
+                    }    
+
                     if (!form.password) {
                         setMessage('error', 'Please enter your password.');
+                        loading.value = false;
                         return;
                     }
 
@@ -185,50 +414,107 @@
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                                email: form.email,
+                                email: trimmedEmail,
                                 password: form.password
                             })
                         });
 
                         const data = await response.json();
 
+                        // Backend error handling
                         if (!response.ok) {
-                            setMessage("error", data.detail || "Login failed.");
+
+                            if (response.status === 401) {
+                                setMessage("error", "Invalid email or password.");
+                                form.password = "";
+                            }
+                            else if (response.status === 423) {
+                                setMessage("error", data.detail);
+                            }
+                            else if (response.status === 400) {
+                                setMessage("error", data.detail);
+                            }
+                            else if (response.status === 500) {
+                                setMessage("error", data.detail || "Login failed. Please try again.");
+                            }    
+                            else {
+                                setMessage("error", "Login failed. Please try again.");
+                            }
+
+                            loading.value = false;
                             return;
                         }
 
-                        // If OTP required → go to step 2
                         if (data.requires_otp) {
                             step.value = 2;
-                            setMessage("success", data.detail || `OTP sent to ${form.email}`);
+                            setMessage("success", data.detail || `OTP sent to ${trimmedEmail}`);
+                            loading.value = false;
                             return;
                         }
 
-                        // If OTP not required → direct login
-                        setMessage("success", "Login successful! Redirecting...");
+                        sessionStorage.setItem("userFullName", data.full_name);
+                        sessionStorage.setItem("userEmail", data.email);
+                        sessionStorage.setItem("userRole", data.role);
+                        localStorage.setItem("email", data.email);
+
+                        // Obtain signed session token for home.html API calls
+                        await fetchAndStoreSessionToken(trimmedEmail);
+
+                        message.text = "";
+                        showSuccessPopup.value = true;
+
                         setTimeout(() => {
                             window.location.href = "home.html";
-                        }, 1000);
+                        }, 1500);
 
-                    } catch (err) {
+                    }
+                    catch (err) {
                         setMessage("error", "Cannot connect to backend server.");
                     }
-                };
+                    finally {
+                        // Stop loading
+                        loading.value = false;
+                    }
+                }
 
                 // Step 2: OTP success handler (called by otp component)
-                const handleOtpVerified = () => {
-                    setMessage("success", "Login successful! Redirecting...");
+                const handleOtpVerified = async (data) => {
+                    sessionStorage.setItem("userFullName", data.full_name);
+                    sessionStorage.setItem("userEmail", data.email);
+                    sessionStorage.setItem("userRole", data.role);
+                    localStorage.setItem("email", data.email);
+
+                    // Obtain signed session token for home.html API calls
+                    await fetchAndStoreSessionToken(data.email);
+
+                    showSuccessPopup.value = false;
+                    setMessage("success", "Login successful! Redirecting to home...");
+
                     setTimeout(() => {
                         window.location.href = "home.html";
-                    }, 1000);
+                    }, 1500);
                 };
 
-                return { form, step, message, handleLogin, handleOtpVerified };
+                 return {
+                    form,
+                    step,
+                    message,
+                    handleLogin,
+                    handleOtpVerified,
+                    goToForgotPassword,
+
+                    loading,
+                    showPassword,
+                    showSuccessPopup
+                }
             }
         });
 
         registerOtpComponent(app);
         app.mount('#app');
+    </script>
+    <script>
+        sessionStorage.removeItem("navDirection");
     </script>
 </body>
 </html>

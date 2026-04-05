@@ -1,0 +1,27 @@
+LEGAL DEPARTMENT CASE MANAGEMENT AND DATA HANDLING POLICY
+Department: Legal
+Version: 1.1 | Effective: June 2025 | Review: June 2026
+
+1. PURPOSE
+This policy governs the collection, use, storage, and disposal of personal data processed by the Legal Department in managing legal matters, litigation, contracts, and regulatory correspondence for Nexacore Technologies Sdn Bhd.
+
+2. LAWFUL BASIS — LEGAL OBLIGATION AND LEGITIMATE INTERESTS
+Legal data processing is carried out under legal obligation (court orders, statutory requirements, regulatory obligations) and legitimate interests (defence of legal proceedings, protection of organisational assets). Personal data in litigation matters is processed without seeking consent from the parties involved, as consent is not the applicable lawful basis. No consent records are maintained for legal matter processing.
+
+3. DATA HELD IN CASE FILES
+Case files are opened for each legal matter. The Legal Department controls what information is held in each file based on the needs of the matter. Files contain contracts, correspondence, court documents, and supporting evidence as required. External counsel receive file materials relevant to their instructions.
+
+4. DATA MINIMISATION IN CASE FILES
+Case files must contain only the personal data directly necessary for the specific legal matter. Before opening a case file, the assigned lawyer confirms that all data elements to be included are necessary for and limited to the specific legal purpose. Personal data that is not required for the matter is not included in the case file. Data that becomes irrelevant during the life of a case is removed from the active file. Processing is strictly limited to what is necessary for the legal objective.
+
+5. DATA SECURITY
+Case files are stored in the Legal document management system, access-controlled and restricted to the assigned legal team. External counsel must sign confidentiality agreements before receiving materials. All electronic access is logged.
+
+6. DATA RETENTION
+Active litigation: case duration plus 10 years. Contracts: term plus 7 years. Regulatory correspondence: 7 years. Corporate resolutions: permanent. Secure disposal is applied upon reaching retention limits.
+
+7. THIRD-PARTY SHARING
+Legal data is shared with external counsel (under confidentiality agreement), courts and regulatory bodies (as required by law), and expert witnesses. Sharing is limited to what is required for the legal matter.
+
+8. COMPLIANCE
+Breaches of this policy are subject to disciplinary action. The Legal Department Head is responsible for ensuring legal staff receive appropriate data handling training.
