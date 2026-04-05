@@ -62,9 +62,9 @@
             align-items: center;
             position: fixed;
             z-index: 100;
-            top: 0;             
-            left: 0;             
-            width: 100%; 
+            top: 0;
+            left: 0;
+            width: 100%;
             border-bottom: 1px solid rgba(74,143,231,0.18);
         }
 
@@ -327,7 +327,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             gap: 4px;
         }
 
@@ -353,6 +353,11 @@
             display: block;
             margin-bottom: 3px;
             color: #ffffff;
+        }
+
+        .recommendations-section .section-header {
+            align-items: flex-start;
+            padding-top: 42px;
         }
 
         /* ─── Action Buttons ─── */
@@ -548,6 +553,12 @@
             transform: translateX(-50%) translateY(0);
         }
 
+        /* ─── Scrollbar ─── */
+        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar::-webkit-scrollbar-track { background: #0d1420; }
+        .sidebar::-webkit-scrollbar-thumb { background: #2a4a7c; border-radius: 3px; }
+        .sidebar::-webkit-scrollbar-thumb:hover { background: #4a8fe7; }
+
         @media screen and (max-width: 1200px) {
             .sidebar {
                 position: fixed;
@@ -647,9 +658,6 @@
                         </button>
                     </div>
                     <div class="recommendations-list">
-                        <div class="recommendation-item" v-if="topRecommendation">
-                            {{ topRecommendation }}
-                        </div>
                         <!-- Per-clause findings from AI -->
                         <div
                             class="recommendation-item"
@@ -712,15 +720,15 @@
 
         // ─────────────────────────────────────────────────────────────
         // ADMIN ROLE FLAG
-        // Replace this with your backend authentication check when ready.
+        // Resolved at runtime from sessionStorage (set by login flow).
+        // The mounted() hook overwrites this with the server-confirmed
+        // role so the hardcoded default below is only a safe fallback.
         //
         // Example (once backend exists):
         //   const isAdminUser = await fetch('/api/auth/me')
         //                         .then(r => r.json())
         //                         .then(u => u.role === 'admin');
-        //
-        // For now, set manually:  true = admin,  false = general user
-        const isAdminUser = true;  // <-- swap to `true` to test admin view
+        const isAdminUser = true;  // fallback — overridden in mounted()
         // ─────────────────────────────────────────────────────────────
 
         const BASE = 'http://127.0.0.1:8000/ai';
@@ -742,18 +750,27 @@
                     topRecommendation: '',
                     complianceDetails: [],
 
+                    // ── Sidebar History ──
+                    last7Days: [],
+                    last30Days: [],
+                    filteredLast7Days: [],
+                    filteredLast30Days: [],
+
                     // Loading / error state
                     isLoading: true,
                     loadError: ''
                 }
             },
             async mounted() {
-
                 const token = sessionStorage.getItem('authToken');
                 if (!token) {
                     window.location.href = 'login.html';
                     return;
                 }
+
+                // ── Resolve admin flag from session (server-confirmed) ────
+                const roleRaw = sessionStorage.getItem('userRole');
+                this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
 
                 // ── Determine which result to display ────────────────────
                 // Prefer an explicit result_id written by home.html after save.
@@ -775,9 +792,9 @@
                     }
 
                     if (!res.ok) {
-                        this.loadError    = 'No analysis results found. Please upload and analyse a document first.';
+                        this.loadError = 'No analysis results found. Please upload and analyse a document first.';
                         this.complianceLabel = 'No results yet';
-                        this.isLoading    = false;
+                        this.isLoading = false;
                         return;
                     }
 
@@ -785,7 +802,7 @@
 
                     // ── Populate UI fields ────────────────────────────────
                     this.analysedFilename = data.original_filename || 'Document Analysis';
-                    this.analysedCompany  = data.org || '';
+                    this.analysedCompany = data.company_name || '';
                     this.complianceScore  = Math.round(data.compliance_score ?? 0);
                     this.complianceLabel  = data.compliance_label || (
                         this.complianceScore >= 75 ? 'High Compliance Level' :
@@ -822,10 +839,6 @@
 
                 // ── Populate sidebar history ──────────────────────────────
                 await this.fetchHistory(token);
-
-                // ── Resolve admin flag from session (server-confirmed) ────
-                const roleRaw = sessionStorage.getItem('userRole');
-                this.isAdmin  = (roleRaw === 'ADMINISTRATIVE_USER');
             },
             methods: {
                 toggleSidebar() {
@@ -840,6 +853,8 @@
                 goBack() {
                     window.location.href = 'home.html';
                 },
+
+                // ── Sidebar history navigation ──
                 openReport(report) {
                     // report may be a history object { resultId, label } or a plain string
                     const resultId = report.resultId || null;

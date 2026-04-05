@@ -310,7 +310,7 @@ class AuditLog(models.Model):
     user = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_logs")
     action_type = models.CharField(max_length=50)
     target_type = models.CharField(max_length=50)
-    target_id = models.UUIDField()
+    target_id = models.UUIDField(null=True, blank=True)
     success = models.BooleanField()
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

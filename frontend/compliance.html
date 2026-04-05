@@ -28,16 +28,16 @@
             min-height: 100vh;
         }
 
-        /* --- TOP HEADER --- */
+        /* --- TOP HEADER (fixed — sprint-2) --- */
         .top-header {
             background-color: #1a2845;
             padding: 15px 30px;
             display: flex;
             align-items: center;
-            position: fixed;       
-            top: 0;                
-            left: 0;                
-            width: 100%;            
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
             z-index: 100;
         }
 
@@ -173,7 +173,7 @@
             margin-left: 280px;
         }
 
-        /* Page Specific Styles */
+        /* Page title pushed down to clear the fixed header (sprint-2) */
         .page-title {
             text-align: center;
             font-size: 3rem;
@@ -193,24 +193,13 @@
             border-left: 5px solid #4a8fe7;
         }
 
+        /* section-header margin-bottom updated to 15px (sprint-2) */
         .section-header {
             font-size: 1.2rem;
             font-weight: bold;
             letter-spacing: 1px;
             margin-bottom: 15px;
             color: #ffffff;
-        }
-
-        .bullet-list {
-            margin-top: 10px;
-            padding-left: 20px;
-        }
-
-        .bullet-list li {
-            font-size: 1rem;
-            margin-bottom: 8px;
-            color: #c5d0e6;
-            letter-spacing: normal;
         }
 
         /* --- WAVY BACKGROUND --- */
@@ -231,34 +220,251 @@
         }
 
         /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        /* --- SUMMARY CHIPS (ai-development) --- */
+        .summary-bar {
+            max-width: 900px;
+            margin: 0 auto 30px;
+            display: flex;
+            gap: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
-        ::-webkit-scrollbar-track {
-            background: transparent;
+        .summary-chip {
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            opacity: 0.95;
         }
 
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
+        .summary-chip:hover,
+        .summary-chip.chip-active {
+            opacity: 1;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.3);
         }
 
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.2);
+        .summary-bar.has-filter .summary-chip:not(.chip-active) {
+            opacity: 0.35;
+        }
+
+        .filter-label {
+            max-width: 900px;
+            margin: 0 auto 20px;
+            font-size: 12px;
+            color: #6b7a99;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .filter-clear {
+            color: #4a8fe7;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .filter-clear:hover { text-decoration: underline; }
+
+        /* --- SECTION META --- */
+        .section-meta {
+            font-size: 12px;
+            color: #6b7a99;
+            margin-bottom: 20px;
+            letter-spacing: 0.4px;
+        }
+
+        /* --- GAP / RISK ITEMS (ai-development) --- */
+        .gap-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 13px 0;
+            border-bottom: 1px solid rgba(74,143,231,0.1);
+        }
+
+        .gap-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .gap-id {
+            font-size: 11px;
+            font-weight: 700;
+            color: #4a8fe7;
+            letter-spacing: 0.8px;
+            min-width: 20px;
+            padding-top: 3px;
+            flex-shrink: 0;
+        }
+
+        .gap-text {
+            flex: 1;
+        }
+
+        .gap-clause {
+            font-size: 14px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .gap-reasoning {
+            font-size: 13px;
+            color: #8b9dc3;
+            line-height: 1.55;
+        }
+
+        /* --- RISK BADGES (ai-development) --- */
+        .risk-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            padding: 3px 9px;
+            border-radius: 99px;
+            text-transform: uppercase;
+            flex-shrink: 0;
+            align-self: flex-start;
+            margin-top: 3px;
+            white-space: nowrap;
+        }
+
+        .risk-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: #c5d0e6;
+            margin-bottom: 4px;
+        }
+
+        .impact-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+
+        .impact-pill {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 99px;
+            background: rgba(74,143,231,0.1);
+            color: #8bb8f0;
+            border: 1px solid rgba(74,143,231,0.25);
+            letter-spacing: 0.3px;
+        }
+
+        .risk-critical {
+            background: rgba(231,74,74,0.15);
+            color: #e74a4a;
+            border: 1px solid rgba(231,74,74,0.4);
+        }
+        .risk-high {
+            background: rgba(231,150,74,0.15);
+            color: #e7964a;
+            border: 1px solid rgba(231,150,74,0.4);
+        }
+        .risk-medium {
+            background: rgba(231,210,74,0.15);
+            color: #d4bf2e;
+            border: 1px solid rgba(231,210,74,0.4);
+        }
+        .risk-low {
+            background: rgba(144,238,144,0.15);
+            color: #66cc66;
+            border: 1px solid rgba(144,238,144,0.4);
+        }
+        .risk-unknown {
+            background: rgba(139,157,195,0.15);
+            color: #8b9dc3;
+            border: 1px solid rgba(139,157,195,0.3);
+        }
+
+        /* Chip colours mirror badge colours */
+        .chip-critical { background: rgba(231,74,74,0.15);  color: #e74a4a; border: 1px solid rgba(231,74,74,0.35); }
+        .chip-high     { background: rgba(231,150,74,0.15); color: #e7964a; border: 1px solid rgba(231,150,74,0.35); }
+        .chip-medium   { background: rgba(231,210,74,0.15); color: #d4bf2e; border: 1px solid rgba(231,210,74,0.35); }
+        .chip-low      { background: rgba(74,143,231,0.15); color: #66cc66; border: 1px solid rgba(144,238,144,0.4); }
+
+        .status-partial {
+            font-size: 11px;
+            font-weight: 600;
+            color: #e7964a;
+            background: rgba(231,150,74,0.12);
+            border: 1px solid rgba(231,150,74,0.3);
+            padding: 1px 7px;
+            border-radius: 99px;
+            letter-spacing: 0.5px;
+        }
+
+        .empty-state {
+            color: #6b7a99;
+            font-size: 14px;
+            font-style: italic;
+            padding: 10px 0;
+        }
+
+        /* --- NO DATA / ERROR BANNERS --- */
+        .no-data-banner {
+            max-width: 900px;
+            margin: 0 auto 30px;
+            background: rgba(231,74,74,0.08);
+            border: 1px solid rgba(231,74,74,0.25);
+            border-radius: 10px;
+            padding: 18px 24px;
+            font-size: 14px;
+            color: #e74a4a;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Loading state */
+        .loading-banner {
+            max-width: 900px;
+            margin: 0 auto 30px;
+            background: rgba(74,143,231,0.08);
+            border: 1px solid rgba(74,143,231,0.25);
+            border-radius: 10px;
+            padding: 18px 24px;
+            font-size: 14px;
+            color: #8bb8f0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        @media screen and (max-width: 1200px) {
+            .main-content.shifted { margin-left: 0; }
         }
     </style>
 </head>
 
 <body>
     <div id="app">
+
         <!-- Top Header -->
         <div class="top-header">
             <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
             <div class="user-profile" @click="showProfile">
                 <svg viewBox="0 0 24 24">
-                    <path
-                        d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                 </svg>
             </div>
         </div>
@@ -273,7 +479,7 @@
             </svg>
         </div>
 
-        <!-- SHARED SIDEBAR -->
+        <!-- Sidebar (external component — sprint-2) -->
         <cybercomply-sidebar
             :sidebar-open="sidebarOpen"
             @toggle="sidebarOpen = !sidebarOpen"
@@ -283,28 +489,125 @@
         <div class="main-content" :class="{ shifted: sidebarOpen }">
             <h1 class="page-title">COMPLIANCE SCORE</h1>
 
-            <div class="info-section">
-                <h2 class="section-header">Gap Identification</h2>
-                <ul class="bullet-list">
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                </ul>
+            <!-- Loading state -->
+            <div class="loading-banner" v-if="isLoading">
+                ⏳ Loading analysis results…
             </div>
 
-            <div class="info-section">
+            <!-- Error / no-data state -->
+            <div class="no-data-banner" v-if="!isLoading && (loadError || allDetails.length === 0)">
+                ⚠ {{ loadError || 'No analysis result found. Please run a document analysis first from the home page.' }}
+            </div>
+
+            <!-- Summary chips — shown only when data is available -->
+            <div
+                class="summary-bar"
+                :class="{ 'has-filter': activeFilter !== null }"
+                v-if="!isLoading && allDetails.length > 0"
+            >
+                <div class="summary-chip chip-critical"
+                    :class="{ 'chip-active': activeFilter === 'critical' }"
+                    @click="toggleFilter('critical')">
+                    {{ riskCounts.critical }} Critical
+                </div>
+                <div class="summary-chip chip-high"
+                    :class="{ 'chip-active': activeFilter === 'high' }"
+                    @click="toggleFilter('high')">
+                    {{ riskCounts.high }} High
+                </div>
+                <div class="summary-chip chip-medium"
+                    :class="{ 'chip-active': activeFilter === 'medium' }"
+                    @click="toggleFilter('medium')">
+                    {{ riskCounts.medium }} Medium
+                </div>
+                <div class="summary-chip chip-low"
+                    :class="{ 'chip-active': activeFilter === 'low' }"
+                    @click="toggleFilter('low')">
+                    {{ riskCounts.low }} Low Risk
+                </div>
+            </div>
+
+            <!-- Active filter label -->
+            <div class="filter-label" v-if="activeFilter">
+                Showing <strong style="color:#c5d0e6">{{ activeFilter }}</strong> severity only —
+                <span class="filter-clear" @click="toggleFilter(activeFilter)">Clear filter ✕</span>
+            </div>
+
+            <!-- Gap Identification -->
+            <div class="info-section" v-if="!isLoading && allDetails.length > 0">
+                <h2 class="section-header">Gap Identification</h2>
+                <p class="section-meta">
+                    Requirements completely absent from the policy —
+                    {{ gaps.length }} gap{{ gaps.length !== 1 ? 's' : '' }} identified,
+                    sorted by severity
+                </p>
+
+                <div v-if="gaps.length === 0" class="empty-state">
+                    No compliance gaps detected. All requirements are at least partially addressed.
+                </div>
+
+                <div v-for="(item, index) in gaps" :key="'gap-' + item.requirement_id" class="gap-item">
+                    <div class="gap-id">{{ index + 1 }}</div>
+                    <div class="gap-text">
+                        <div class="gap-clause">{{ item.clause }}</div>
+                        <div class="gap-reasoning">{{ item.reasoning }}</div>
+                    </div>
+                    <span class="risk-badge" :class="`risk-${item.risk_level || 'unknown'}`">
+                        {{ item.risk_level || 'unknown' }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Risk Assessment -->
+            <div class="info-section" v-if="!isLoading && allDetails.length > 0">
                 <h2 class="section-header">Risk Assessment</h2>
-                <ul class="bullet-list">
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                    <li>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</li>
-                </ul>
+                <p class="section-meta">
+                    All non-compliant and partially compliant requirements, sorted by severity —
+                    {{ risks.length }} item{{ risks.length !== 1 ? 's' : '' }} flagged
+                </p>
+
+                <div v-if="risks.length === 0" class="empty-state">
+                    No risks identified. The document appears fully compliant.
+                </div>
+
+                <div v-for="(item, index) in risks" :key="'risk-' + item.requirement_id" class="gap-item">
+                    <div class="gap-id">{{ index + 1 }}</div>
+                    <div class="gap-text">
+                        <div class="gap-clause">
+                            {{ item.clause }}
+                            <span v-if="item.status === 'partial'" class="status-partial">Partially Implemented</span>
+                        </div>
+
+                        <!-- Risk title from static mapping file -->
+                        <div class="risk-title" v-if="riskMapping[item.requirement_id]">
+                            {{ riskMapping[item.requirement_id].risk_title }}
+                        </div>
+
+                        <!-- Consequence from mapping; falls back to AI reasoning if not mapped -->
+                        <div class="gap-reasoning">
+                            {{ riskMapping[item.requirement_id]
+                                ? riskMapping[item.requirement_id].consequence
+                                : item.reasoning }}
+                        </div>
+
+                        <!-- Business impact pills -->
+                        <div class="impact-pills"
+                            v-if="riskMapping[item.requirement_id]?.business_impact?.length">
+                            <span class="impact-pill"
+                                v-for="impact in riskMapping[item.requirement_id].business_impact"
+                                :key="impact">
+                                {{ impact }}
+                            </span>
+                        </div>
+                    </div>
+                    <span class="risk-badge" :class="`risk-${item.risk_level || 'unknown'}`">
+                        {{ item.risk_level || 'unknown' }}
+                    </span>
+                </div>
             </div>
         </div>
 
-        <!-- WAVY Background -->
+        <!-- Wavy Background -->
         <div class="wavy-background">
             <img src="img3.png" alt="Wavy Design">
         </div>
@@ -313,27 +616,159 @@
     <script>
         const { createApp } = Vue;
 
+        // Severity sort order — critical surfaces first
+        const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+
+        const BASE = 'http://127.0.0.1:8000/ai';
+
         const app = createApp({
             data() {
                 return {
                     sidebarOpen: true,
+
+                    activeFilter: null,
+
+                    // Static risk mapping — loaded from local JSON file (ai-development).
+                    // This file is NOT served by Django; it is fetched directly from
+                    // the filesystem path ../AIModel/data/risk_mapping.json.
+                    riskMapping: {},
+
+                    // Raw compliance details array — populated from the DB via fetch
+                    allDetails: [],
+
+                    // Loading / error state
+                    isLoading: true,
+                    loadError: ''
+                };
+            },
+
+            computed: {
+                // Gaps: requirements completely missing (non_compliant only)
+                gaps() {
+                    return this.allDetails
+                        .filter(d => {
+                            if (d.status !== 'non_compliant') return false;
+                            if (this.activeFilter) return d.risk_level === this.activeFilter;
+                            return true;
+                        })
+                        .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
+                },
+
+                // Risks: non_compliant + partial, sorted by severity
+                risks() {
+                    return this.allDetails
+                        .filter(d => {
+                            if (d.status !== 'non_compliant' && d.status !== 'partial') return false;
+                            if (this.activeFilter) return d.risk_level === this.activeFilter;
+                            return true;
+                        })
+                        .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
+                },
+
+                // Count items per severity level for the summary chips
+                riskCounts() {
+                    const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+                    for (const item of this.risks) {
+                        if (item.risk_level && counts[item.risk_level] !== undefined) {
+                            counts[item.risk_level]++;
+                        }
+                    }
+                    return counts;
                 }
             },
+
+            async mounted() {
+                // ── Auth guard ──────────────────────────────────────────────
+                const token = sessionStorage.getItem('authToken');
+                if (!token) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                // ── Load static risk mapping from local file (ai-development) ──
+                // Not a Django endpoint — fetched directly from the filesystem.
+                this.loadRiskMapping();
+
+                // ── Fetch compliance details from DB ────────────────────────
+                // Reads result_id written by home.html after the analysis was saved.
+                // Falls back to the /latest/ endpoint if no id is stored.
+                const resultId = sessionStorage.getItem('latestResultId');
+                const url = resultId
+                    ? `${BASE}/api/analysis/${resultId}/`
+                    : `${BASE}/api/analysis/latest/`;
+
+                try {
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (res.status === 401 || res.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (!res.ok) {
+                        this.loadError = 'No analysis results found. Please upload and analyse a document first.';
+                        this.isLoading = false;
+                        return;
+                    }
+
+                    const data = await res.json();
+
+                    // Pull the compliance details array out of the DB response —
+                    // same shape as what was previously stored in localStorage
+                    // under result.compliance.details
+                    this.allDetails = data.compliance?.details || [];
+
+                } catch (e) {
+                    console.error('Failed to load compliance details:', e);
+                    this.loadError = 'Could not reach the server. Please check your connection.';
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
             methods: {
-                toggleSidebar() {
-                    this.sidebarOpen = !this.sidebarOpen;
+                // Fetches the static risk mapping JSON from the AIModel directory.
+                // This is intentionally NOT a Django endpoint — the file lives at
+                // ../AIModel/data/risk_mapping.json relative to the frontend folder.
+                async loadRiskMapping() {
+                    const MAPPING_PATH = '../AIModel/data/risk_mapping.json';
+                    try {
+                        const res = await fetch(MAPPING_PATH);
+                        if (res.ok) {
+                            this.riskMapping = await res.json();
+                            console.log('[INFO] Risk mapping loaded —', Object.keys(this.riskMapping).length, 'entries');
+                        } else {
+                            console.warn('[WARN] risk_mapping.json not found — falling back to AI reasoning.');
+                        }
+                    } catch (e) {
+                        console.warn('[WARN] Could not fetch risk_mapping.json:', e.message);
+                    }
                 },
+
+                toggleFilter(level) {
+                    this.activeFilter = this.activeFilter === level ? null : level;
+                },
+
                 showProfile() {
                     window.location.href = 'profile.html';
                 },
-                goBack() {
-                    window.history.back();
+                openReport(report) {
+                    const resultId = report.resultId || null;
+                    if (resultId) {
+                        sessionStorage.setItem('latestResultId', resultId);
+                        window.location.href = 'document_analysis.html';
+                    } else {
+                        window.location.href = `report_viewing.html?report=${encodeURIComponent(report.label || report)}`;
+                    }
                 },
-                goToHome() {
-                    window.location.href = 'home.html';
-                }
+                goBack()   { window.history.back(); },
+                goToHome() { window.location.href = 'home.html'; }
             }
         });
+
         registerSidebarComponent(app);
         app.mount('#app');
     </script>
