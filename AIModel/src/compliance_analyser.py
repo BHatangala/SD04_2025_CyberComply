@@ -98,8 +98,9 @@ class ComplianceAnalyzer:
 
             # Courtesy delay between batches — keeps requests well under the
             # 20 req/min free-tier limit and avoids 429s proactively.
+            # 10s gap also helps when routing through fallback models with tighter limits.
             if i < len(batches) - 1:
-                time.sleep(3)
+                time.sleep(10)
 
         score = self._calculate_score(all_results)
         print(f"[INFO] Analysis complete — Compliance Score: {score}%")
@@ -148,7 +149,7 @@ Return a JSON ARRAY with exactly {len(requirements)} objects in this order: {req
 
 Each object MUST contain these keys:
   "requirement_id"  — copy from the ID field above
-  "clause"          — copy from the Clause field above
+  "clause"          — copy the "clause_title" field value without prepending any section numbers or any "Section X" prefix
   "status"          — one of: compliant | partial | non_compliant
   "confidence"      — integer 0-100
   "reasoning"       — 2-3 sentences explaining the finding
@@ -160,7 +161,17 @@ Return ONLY the JSON array. No preamble, no explanation outside the array.
         print(f"[DEBUG] Sending batch to model — requirements: {req_ids}")
         print(f"[DEBUG] Prompt length: {len(prompt)} chars")
 
-        raw_response = self.model.generate_response(prompt, max_length=2000, temperature=0.1)
+        # Minimum viable response length: each object needs ~200 chars minimum.
+        # If the response is shorter than this the model was cut off mid-array
+        # and parsing will fail — retry once before falling back to error entries.
+        min_expected_chars = len(requirements) * 200
+
+        raw_response = self.model.generate_response(prompt, max_length=4000, temperature=0.1)
+
+        if len(raw_response) < min_expected_chars:
+            print(f"[WARN] Response too short ({len(raw_response)} chars, expected >{min_expected_chars}). Retrying batch...")
+            time.sleep(5)
+            raw_response = self.model.generate_response(prompt, max_length=4000, temperature=0.1)
 
         print(f"[DEBUG] Raw response preview: {raw_response[:300]}")
 
@@ -170,18 +181,73 @@ Return ONLY the JSON array. No preamble, no explanation outside the array.
     # 6. RESPONSE PARSER
     # ──────────────────────────────────────────────
     def _extract_json_array(self, text: str, requirements: List[Dict]) -> List[Dict]:
-        """Strip DeepSeek <think> tags and parse the JSON array."""
+        """Strip DeepSeek <think> tags and parse the JSON array.
+
+        Handles three common failure modes from free/fallback models:
+          1. Metadata wrapper — openrouter/free returns the raw API JSON body
+             which contains brackets before the actual requirements array.
+             Fixed by finding the [...] block that contains "requirement_id".
+          2. Truncated response — json.loads fails on an incomplete array;
+             we salvage complete individual objects that parsed cleanly.
+          3. Markdown fences — some models wrap output in ```json ... ```;
+             stripped before searching.
+        """
         try:
             # Remove chain-of-thought block that DeepSeek R1 emits
             text_clean = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
 
-            # Isolate the JSON array
-            match = re.search(r'\[.*\]', text_clean, re.DOTALL)
+            # Strip markdown fences that some free models wrap output in
+            text_clean = re.sub(r'```(?:json)?\s*', '', text_clean).strip()
+
+            # Find ALL [...] blocks, then pick the one that:
+            #   a) contains "requirement_id" (uniquely identifies our array), AND
+            #   b) is the longest such block (most complete response)
+            # This avoids accidentally matching metadata brackets that
+            # openrouter/free sometimes prepends to the response.
+            all_matches = list(re.finditer(r'\[.*\]', text_clean, re.DOTALL))
+            best_match = None
+            for m in all_matches:
+                if 'requirement_id' in m.group():
+                    if best_match is None or len(m.group()) > len(best_match.group()):
+                        best_match = m
+            # Last resort: use the final [...] block if none contain requirement_id
+            match = best_match or (all_matches[-1] if all_matches else None)
+
             if match:
-                parsed = json.loads(match.group())
-                if isinstance(parsed, list) and len(parsed) > 0:
-                    print(f"[DEBUG] Parsed {len(parsed)} results from batch response")
-                    return parsed
+                try:
+                    parsed = json.loads(match.group())
+                    if isinstance(parsed, list) and len(parsed) > 0 and parsed[0].get("requirement_id"):
+                        print(f"[DEBUG] Parsed {len(parsed)} results from batch response")
+                        parsed = [{**r, "clause": self._strip_section_prefix(r["clause"])} if r.get("clause") else r for r in parsed]
+                        return parsed
+                except json.JSONDecodeError as e:
+                    # Full array parse failed — response may be truncated.
+                    # Salvage any complete individual objects that parsed cleanly.
+                    print(f"[WARN] Full JSON array parse failed: {e}")
+                    salvaged = []
+                    for obj_match in re.finditer(r'\{[^{}]*"requirement_id"[^{}]*\}', match.group(), re.DOTALL):
+                        try:
+                            obj = json.loads(obj_match.group())
+                            if obj.get("requirement_id"):
+                                obj["clause"] = self._strip_section_prefix(obj.get("clause", ""))
+                                salvaged.append(obj)
+                        except json.JSONDecodeError:
+                            continue
+                    if salvaged:
+                        print(f"[WARN] Salvaged {len(salvaged)}/{len(requirements)} objects from truncated response")
+                        # Fill in error entries for any requirements not in the salvaged set
+                        salvaged_ids = {o["requirement_id"] for o in salvaged}
+                        for req in requirements:
+                            if req["id"] not in salvaged_ids:
+                                salvaged.append({
+                                    "requirement_id": req["id"],
+                                    "clause": req.get("clause_title", req.get("clause", "Unknown")),
+                                    "status": "error",
+                                    "confidence": 0,
+                                    "reasoning": "Response was truncated before this requirement was evaluated.",
+                                    "risk_level": req.get("risk_weight", "unknown")
+                                })
+                        return salvaged
 
         except Exception as e:
             print(f"[WARN] JSON array parse failed: {e}")
@@ -210,3 +276,11 @@ Return ONLY the JSON array. No preamble, no explanation outside the array.
         weights = {"compliant": 100, "partial": 50, "non_compliant": 0, "error": 0}
         total = sum(weights.get(r.get("status", "error"), 0) for r in results)
         return round(total / len(results), 2)
+
+    # ──────────────────────────────────────────────
+    # 8. CLAUSE SANITISER
+    # ──────────────────────────────────────────────
+    @staticmethod
+    def _strip_section_prefix(clause: str) -> str:
+        """Remove any leading 'Section X(Y) — ' or 'Section X ' the model adds."""
+        return re.sub(r'^Section\s+[\d]+(?:\(\d+\))?\s*[\-—–]?\s*', '', clause).strip()

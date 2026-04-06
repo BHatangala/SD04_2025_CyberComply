@@ -87,6 +87,11 @@ class DeepSeekLoader:
 
                 if isinstance(result, dict) and "choices" in result:
                     content = result["choices"][0]["message"]["content"]
+                    if not content:
+                        # Empty body on a 200 — treat as transient, retry
+                        print(f"[DEBUG] Empty response body on attempt {attempt}. Retrying...")
+                        time.sleep(3)
+                        continue
                     print(f"[DEBUG] Success — Response length: {len(content)} chars")
                     print(f"[DEBUG] Response content: {content[:300]}")
                     return content
