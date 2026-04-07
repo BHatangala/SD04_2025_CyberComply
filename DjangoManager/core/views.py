@@ -431,14 +431,17 @@ def analyze_compliance(request):
 
 
 # ──────────────────────────────────────────────
-# Phase 2b — Analyse multiple files (batch)
+# Phase 2b — Analyse multiple files (batch SSE)
 # Triggered by the Analyse button (multiple files).
 # ──────────────────────────────────────────────
 
 @csrf_exempt
 def analyze_batch(request):
     """
-    Expected request body:
+    Processes multiple files sequentially, calling /api/analyze once per file.
+    Streams SSE events so the frontend can update each file card in real time.
+
+    Expected POST body (JSON):
     {
         "company_name": "Acme Corp",
         "files": [
@@ -446,9 +449,20 @@ def analyze_batch(request):
             {"file_name": "report.docx", "department": "Finance"}
         ]
     }
+
+    SSE events emitted:
+        data: {"status": "analysing",     "file_name": "policy.pdf"}
+        data: {"status": "analysed",      "file_name": "policy.pdf",  "result_id": "<uuid>"}
+        data: {"status": "error",         "file_name": "policy.pdf",  "message": "..."}
+        data: {"status": "batch_complete","result_ids": ["<uuid>", ...]}
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
 
     try:
         payload = json.loads(request.body.decode('utf-8'))
@@ -461,6 +475,8 @@ def analyze_batch(request):
     if not files or not isinstance(files, list):
         return JsonResponse({'error': 'A non-empty "files" list is required'}, status=400)
 
+    # Validate all files and pull bytes from cache before starting the stream.
+    # Failing early here avoids opening an SSE connection only to error immediately.
     multipart_files = []
     for entry in files:
         file_name  = (entry.get('file_name') or '').strip()
@@ -473,29 +489,252 @@ def analyze_batch(request):
                 {'error': f'File bytes for "{file_name}" not found in cache. Please re-upload.'},
                 status=400,
             )
-        multipart_files.append({'file_name': file_name, 'department': department, 'file_bytes': file_bytes})
+        multipart_files.append({
+            'file_name':  file_name,
+            'department': department,
+            'file_bytes': file_bytes,
+        })
 
-    try:
-        files_payload = [
-            ('files', (f['file_name'], f['file_bytes'], _mime_type_for(f['file_name'])))
-            for f in multipart_files
-        ]
-        data_payload = {
-            'company_name': company_name,
-            'departments':  ','.join(f['department'] for f in multipart_files),
-        }
-        response = requests.post(f"{AI_API_URL}/analyze-batch", files=files_payload, data=data_payload, timeout=1200)
-        result   = response.json()
+    def event_stream():
+        collected_result_ids = []
 
         for f in multipart_files:
-            cache.delete(f'file_bytes_{f["file_name"]}')
+            file_name  = f['file_name']
+            department = f['department']
+            file_bytes = f['file_bytes']
 
-        return JsonResponse({'status': 'analysed', 'result': result})
+            yield f"data: {json.dumps({'status': 'analysing', 'file_name': file_name})}\n\n".encode('utf-8')
 
-    except requests.exceptions.ConnectionError:
-        return JsonResponse({'error': 'AI Server is not running.'}, status=503)
+            try:
+                ai_response = requests.post(
+                    f"{AI_API_URL}/analyze",
+                    files={'file': (file_name, file_bytes, _mime_type_for(file_name))},
+                    data={'company_name': company_name, 'department': department},
+                    timeout=1200,
+                )
+                result = ai_response.json()
+
+                # Persist AnalysisResult + Findings to DB for this file.
+                try:
+                    document = Document.objects.filter(
+                        s3_key=file_name, deleted_at__isnull=True
+                    ).order_by('-uploaded_at').first()
+
+                    if document is not None:
+                        raw_score        = result.get('compliance', {}).get('compliance_score', 0)
+                        compliance_score = max(0, min(100, int(round(float(raw_score)))))
+                        risk_level       = _score_to_risk_level(compliance_score)
+                        summary          = (
+                            result.get('summary')
+                            or result.get('recommendations', {}).get('top_action')
+                            or None
+                        )
+
+                        with transaction.atomic():
+                            AnalysisResult.objects.filter(document=document).delete()
+                            analysis = AnalysisResult.objects.create(
+                                document=document,
+                                compliance_score=compliance_score,
+                                risk_level=risk_level,
+                                summary=summary,
+                                raw_output=result,
+                            )
+
+                            findings_to_create = []
+                            for d in result.get('compliance', {}).get('details', []):
+                                raw_status = (d.get('status') or '').lower().replace('-', '_')
+                                if raw_status in ('non_compliant', 'partial'):
+                                    findings_to_create.append(Finding(
+                                        result=analysis,
+                                        finding_type=Finding.FindingType.GAP,
+                                        title=(d.get('clause') or 'Unknown Clause')[:200],
+                                        description=d.get('reasoning') or '',
+                                    ))
+                            for r in result.get('risk_assessment', []):
+                                if isinstance(r, str):
+                                    title_text, desc_text = r[:200], ''
+                                else:
+                                    title_text = (r.get('title') or r.get('risk') or 'Risk Item')[:200]
+                                    desc_text  = r.get('description') or r.get('detail') or ''
+                                findings_to_create.append(Finding(
+                                    result=analysis,
+                                    finding_type=Finding.FindingType.RISK,
+                                    title=title_text,
+                                    description=desc_text,
+                                ))
+                            if findings_to_create:
+                                Finding.objects.bulk_create(findings_to_create)
+
+                        if document.status != Document.Status.COMPLETED:
+                            document.status = Document.Status.COMPLETED
+                            document.save(update_fields=['status'])
+
+                        _record_audit_log(profile, 'ANALYSE', 'analysis_result', analysis.result_id, True, request)
+                        collected_result_ids.append(str(analysis.result_id))
+
+                        yield f"data: {json.dumps({'status': 'analysed', 'file_name': file_name, 'result_id': str(analysis.result_id)})}\n\n".encode('utf-8')
+                    else:
+                        # Document record not found — emit analysed without a result_id
+                        yield f"data: {json.dumps({'status': 'analysed', 'file_name': file_name})}\n\n".encode('utf-8')
+
+                except Exception as db_err:
+                    # DB save failed — still emit analysed so the card updates,
+                    # but include the error for debugging
+                    logger.error("Batch DB save failed for %s: %s", file_name, str(db_err))
+                    yield f"data: {json.dumps({'status': 'analysed', 'file_name': file_name})}\n\n".encode('utf-8')
+
+            except requests.exceptions.ConnectionError:
+                yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': 'AI Server is not running.'})}\n\n".encode('utf-8')
+            except Exception as e:
+                yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': str(e)})}\n\n".encode('utf-8')
+            finally:
+                cache.delete(f'file_bytes_{file_name}')
+
+        # All files processed — emit the final event with all collected result IDs
+        yield f"data: {json.dumps({'status': 'batch_complete', 'result_ids': collected_result_ids})}\n\n".encode('utf-8')
+
+    return StreamingHttpResponse(
+        event_stream(),
+        content_type='text/event-stream',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'},
+    )
+
+
+# ──────────────────────────────────────────────
+# Org-level comparison data for admin dashboard
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_org_comparison(request):
+    """
+    GET /api/analysis/org-comparison/?result_ids=id1,id2,id3
+
+    Returns per-department compliance data for all supplied result IDs.
+    Used by comparison.html and comparison_dashboard_graphical.html. (Admin only)
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
+    if profile.role != UserProfile.Role.ADMIN:
+        return JsonResponse({'error': 'Only administrative users can access comparison data'}, status=403)
+
+    raw_ids = request.GET.get('result_ids', '').strip()
+    if not raw_ids:
+        return JsonResponse({'error': 'result_ids query parameter is required'}, status=400)
+
+    result_ids = [rid.strip() for rid in raw_ids.split(',') if rid.strip()]
+    if not result_ids:
+        return JsonResponse({'error': 'No valid result IDs provided'}, status=400)
+
+    try:
+        analyses = (
+            AnalysisResult.objects
+            .select_related('document__org', 'document__dept')
+            .filter(result_id__in=result_ids)
+        )
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+    if not analyses:
+        return JsonResponse({'error': 'No analysis results found for the provided IDs'}, status=404)
+
+    # Verify the requesting admin belongs to the same org as the results
+    org_name = ''
+    departments = []
+
+    # Risk severity order for sorting — critical ranks highest
+    RISK_RANK = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
+
+    for analysis in analyses:
+        doc  = analysis.document
+        org  = doc.org
+        dept = doc.dept
+
+        # Access guard — admin can only view results belonging to their own org
+        if profile.org_id and org and str(org.org_id) != str(profile.org_id):
+            continue
+
+        if not org_name and org:
+            org_name = org.org_name
+
+        details = (analysis.raw_output or {}).get('compliance', {}).get('details', [])
+
+        # All non-compliant and partial items — used by comparison.html
+        all_issues = [
+            d for d in details
+            if (d.get('status') or '').lower().replace('-', '_') in ('non_compliant', 'partial')
+        ]
+
+        # Top 5 by risk severity — used by comparison_dashboard_graphical.html
+        top_issues = sorted(
+            all_issues,
+            key=lambda d: RISK_RANK.get((d.get('risk_level') or '').lower(), 0),
+            reverse=True
+        )[:5]
+
+        # Full list for comparison.html — clause title + PDPA reference per item
+        all_recommendations = []
+        for d in all_issues:
+            req_id   = d.get('requirement_id') or ''
+            stripped = req_id.replace('SL-PDPA-S', '')
+            parts    = stripped.split('-')
+            ref      = f"Section {parts[0]}"
+            if len(parts) > 1:
+                ref += f"({parts[1]})"
+            ref += " of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)"
+            all_recommendations.append({
+                'clause':     d.get('clause') or d.get('requirement_id') or 'Unknown',
+                'reference':  ref,
+                'status':     d.get('status', ''),
+                'risk_level': d.get('risk_level', ''),
+                'reasoning':  d.get('reasoning', ''),
+            })
+
+        # Top 5 summary for comparison_dashboard_graphical.html
+        improvement_list = [
+            {
+                'clause':         d.get('clause') or d.get('requirement_id') or 'Unknown',
+                'requirement_id': d.get('requirement_id') or ''
+            }
+            for d in top_issues
+        ]
+        recommended_actions = []
+        for d in top_issues:
+            req_id   = d.get('requirement_id') or ''
+            stripped = req_id.replace('SL-PDPA-S', '')
+            parts    = stripped.split('-')
+            ref      = f"Section {parts[0]}"
+            if len(parts) > 1:
+                ref += f"({parts[1]})"
+            ref += " of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)"
+            recommended_actions.append(ref)
+
+        top_gap = improvement_list[0]['clause'] if improvement_list else 'None identified'
+        
+        risk = (
+            'Low'    if analysis.compliance_score >= 75
+            else 'Medium' if analysis.compliance_score >= 40
+            else 'High'
+        )
+
+        departments.append({
+            'id':                   str(analysis.result_id),
+            'dept_name':            dept.dept_name if dept else 'Unknown Department',
+            'compliance_score':     analysis.compliance_score,
+            'risk':                 risk,
+            # ── For comparison_dashboard_graphical.html ──
+            'improvements':         len(all_issues),
+            'top_gap':              top_gap,
+            'improvement_list':     improvement_list,       # top 5 by risk severity
+            'recommended_actions':  recommended_actions,    # top 5 PDPA references
+            # ── For comparison.html ──
+            'all_recommendations':  all_recommendations,    # full list, all issues
+        })
+
+    return JsonResponse({'org_name': org_name, 'departments': departments}, status=200)
 
 
 # ──────────────────────────────────────────────
