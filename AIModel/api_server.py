@@ -44,7 +44,8 @@ def analyze_document():
         # Create a safe version of the filename
         original_filename = secure_filename(file.filename)
         company_name = request.form.get('company_name', 'Unknown Organization')
-        
+        department   = request.form.get('department', '')
+
         # Extract extension safely for temp file creation
         _, extension = os.path.splitext(original_filename)
 
@@ -53,10 +54,16 @@ def analyze_document():
             file.save(temp_file.name)
             temp_path = temp_file.name
 
-        print(f"--- Processing started for: {company_name} ---")
+        print(f"--- Processing started for: {company_name} | Dept: {department or 'N/A'} ---")
         
         # 4. Run Analysis (DeepSeek Logic)
-        compliance_result = analyzer.analyze_document(temp_path)
+        # org_name and department are forwarded so the analyser can tailor
+        # risk severity and reasoning to the organisation's sector.
+        compliance_result = analyzer.analyze_document(
+            temp_path,
+            org_name=company_name,
+            department=department,
+        )
         
         # Placeholder logic for risks and recommendations
         risk_assessment = {"status": "low", "factors": ["Data encryption detected"]} 
@@ -72,6 +79,7 @@ def analyze_document():
             "recommendations": recommendations,
             "metadata": {
                 "company": company_name,
+                "department": department,
                 "file_analyzed": original_filename
             }
         })

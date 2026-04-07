@@ -72,19 +72,79 @@ class ComplianceAnalyzer:
         return [requirements[i:i + batch_size] for i in range(0, len(requirements), batch_size)]
 
     # ──────────────────────────────────────────────
-    # 4. MAIN ANALYSIS ENTRY POINT
-    #    (same signature as before — api_server.py unchanged)
+    # 4. ORG CONTEXT BLOCK BUILDER
     # ──────────────────────────────────────────────
-    def analyze_document(self, document_path: str) -> Dict:
-        raw_text  = self.processor.extract_text(document_path)
+    def _build_org_context(self, org_name: str, department: str) -> str:
+        """Build the <ORGANISATION_CONTEXT> block injected into every batch prompt.
+
+        If neither org_name nor department is provided (e.g. non-admin upload),
+        returns an empty string so the prompt is identical to the previous behaviour.
+        """
+        if not org_name and not department:
+            return ''
+
+        org_line  = f"Organisation: {org_name}" if org_name else "Organisation: Unknown"
+        dept_line = f"Department:   {department}" if department else ""
+        context_lines = [org_line]
+        if dept_line:
+            context_lines.append(dept_line)
+
+        context_body = "\n".join(context_lines)
+
+        return f"""<ORGANISATION_CONTEXT>
+{context_body}
+
+Using the organisation name and department above, infer the likely industry
+sector (e.g. Banking & Finance, Healthcare, IT & Technology, Retail, etc.)
+and the categories of personal data this department is most likely to process.
+
+Apply this sector understanding in two ways:
+
+1. RISK_LEVEL — Calibrate severity to reflect the sector's actual exposure.
+   High-sensitivity sectors (banking, healthcare, telecoms, legal) that handle
+   financial records, health data, or identity documents should have RISK_LEVEL
+   elevated where a gap is particularly damaging for that sector. Lower-risk
+   sectors may have the same gap assessed at a lower severity. The base
+   Risk Weight provided per requirement is the floor — elevate where the sector
+   justifies it, do not lower below it.
+
+2. REASONING — At the end of your reasoning for any non_compliant or partial
+   finding, add exactly one sentence explaining why this specific gap is
+   especially significant (or less so) for this type of organisation and
+   department. Keep this sentence concise and sector-specific.
+
+IMPORTANT: Do NOT change the compliance STATUS (compliant/partial/non_compliant)
+based on sector context. Status is determined solely by what the policy text
+explicitly states or omits.
+</ORGANISATION_CONTEXT>
+
+"""
+
+    # ──────────────────────────────────────────────
+    # 5. MAIN ANALYSIS ENTRY POINT
+    # ──────────────────────────────────────────────
+    def analyze_document(
+        self,
+        document_path: str,
+        org_name: str = '',
+        department: str = '',
+    ) -> Dict:
+        raw_text   = self.processor.extract_text(document_path)
         clean_text = self.processor.preprocess_text(raw_text)
-        chunks    = self.processor.chunk_text(clean_text)
+        chunks     = self.processor.chunk_text(clean_text)
 
         # Send the first 3 chunks as a single representative block.
         # This gives the model enough context without overwhelming the prompt.
         # Hard-capped at 6000 chars (~1 500 tokens) to stay well inside the
         # 32 K context window after adding the requirements text.
         representative_chunk = "\n\n---\n\n".join(chunks[:3])[:6000]
+
+        # Build the org context block once — reused across every batch.
+        org_context = self._build_org_context(org_name, department)
+        if org_context:
+            print(f"[INFO] Organisation context active — org: '{org_name}', dept: '{department}'")
+        else:
+            print(f"[INFO] No organisation context provided — generic analysis mode")
 
         batches = self._batch_requirements(self.pdpa_requirements, batch_size=6)
         total   = len(self.pdpa_requirements)
@@ -93,7 +153,9 @@ class ComplianceAnalyzer:
         all_results = []
         for i, batch in enumerate(batches):
             print(f"[INFO] Batch {i+1}/{len(batches)} — checking {len(batch)} requirements...")
-            batch_results = self._check_compliance_batch(representative_chunk, batch)
+            batch_results = self._check_compliance_batch(
+                representative_chunk, batch, org_context
+            )
             all_results.extend(batch_results)
 
             # Courtesy delay between batches — keeps requests well under the
@@ -121,50 +183,59 @@ class ComplianceAnalyzer:
         }
 
     # ──────────────────────────────────────────────
-    # 5. BATCH COMPLIANCE CHECK (one API call)
+    # 6. BATCH COMPLIANCE CHECK (one API call)
     # ──────────────────────────────────────────────
-    def _check_compliance_batch(self, chunk: str, requirements: List[Dict]) -> List[Dict]:
+    def _check_compliance_batch(
+        self,
+        chunk: str,
+        requirements: List[Dict],
+        org_context: str = '',
+    ) -> List[Dict]:
         """Send one document chunk + N requirements in a single API call."""
 
         req_blocks = [self._format_requirement_for_prompt(r) for r in requirements]
         requirements_text = "\n\n---\n\n".join(req_blocks)
         req_ids = [r["id"] for r in requirements]
 
-        prompt = f"""<SYSTEM>
+        prompt = f"""<s>
 You are a Sri Lankan Legal Compliance Officer. Analyze the POLICY TEXT below against
 MULTIPLE requirements from the Personal Data Protection Act No. 9 of 2022.
-</SYSTEM>
-
-<REQUIREMENTS_TO_CHECK>
+</s>
+ 
+{org_context}<REQUIREMENTS_TO_CHECK>
 {requirements_text}
 </REQUIREMENTS_TO_CHECK>
-
+ 
 <POLICY_TEXT>
 {chunk}
 </POLICY_TEXT>
-
+ 
 INSTRUCTION:
 Analyze the policy text against EACH of the {len(requirements)} requirements above.
 Return a JSON ARRAY with exactly {len(requirements)} objects in this order: {req_ids}
-
+ 
 Each object MUST contain these keys:
   "requirement_id"  — copy from the ID field above
   "clause"          — copy the "clause_title" field value without prepending any section numbers or any "Section X" prefix
   "status"          — one of: compliant | partial | non_compliant
   "confidence"      — integer 0-100
-  "reasoning"       — 2-3 sentences explaining the finding
+  "reasoning"       — 2-3 sentences explaining the finding (if non_compliant or partial,
+                      end with one sentence on why this gap is significant for the
+                      specific organisation and department provided above)
   "risk_level"      — one of: low | medium | high | critical
-
+                      (calibrated to the organisation's sector — see ORGANISATION_CONTEXT)
+ 
 Return ONLY the JSON array. No preamble, no explanation outside the array.
 """
 
         print(f"[DEBUG] Sending batch to model — requirements: {req_ids}")
         print(f"[DEBUG] Prompt length: {len(prompt)} chars")
 
-        # Minimum viable response length: each object needs ~200 chars minimum.
-        # If the response is shorter than this the model was cut off mid-array
-        # and parsing will fail — retry once before falling back to error entries.
-        min_expected_chars = len(requirements) * 200
+        # Minimum viable response length: each object needs ~350 chars minimum
+        # (reasoning alone averages 200+ chars; status/clause/confidence add more).
+        # If the response is shorter, the model was cut off mid-array and parsing
+        # will fail — retry once with a short pause before falling back to errors.
+        min_expected_chars = len(requirements) * 350
 
         raw_response = self.model.generate_response(prompt, max_length=4000, temperature=0.1)
 
@@ -175,20 +246,20 @@ Return ONLY the JSON array. No preamble, no explanation outside the array.
 
         print(f"[DEBUG] Raw response preview: {raw_response[:300]}")
 
-        return self._extract_json_array(raw_response, requirements)
+        return self._extract_json_array(raw_response, requirements, prompt)
 
     # ──────────────────────────────────────────────
-    # 6. RESPONSE PARSER
+    # 7. RESPONSE PARSER
     # ──────────────────────────────────────────────
-    def _extract_json_array(self, text: str, requirements: List[Dict]) -> List[Dict]:
+    def _extract_json_array(self, text: str, requirements: List[Dict], prompt: str = '') -> List[Dict]:
         """Strip DeepSeek <think> tags and parse the JSON array.
 
         Handles three common failure modes from free/fallback models:
-          1. Metadata wrapper — openrouter/free returns the raw API JSON body
-             which contains brackets before the actual requirements array.
+          1. Metadata wrapper — openrouter/free sometimes prepends the raw API
+             JSON body which contains brackets before the requirements array.
              Fixed by finding the [...] block that contains "requirement_id".
           2. Truncated response — json.loads fails on an incomplete array;
-             we salvage complete individual objects that parsed cleanly.
+             retry once, then salvage any complete individual objects.
           3. Markdown fences — some models wrap output in ```json ... ```;
              stripped before searching.
         """
@@ -201,9 +272,9 @@ Return ONLY the JSON array. No preamble, no explanation outside the array.
 
             # Find ALL [...] blocks, then pick the one that:
             #   a) contains "requirement_id" (uniquely identifies our array), AND
-            #   b) is the longest such block (most complete response)
-            # This avoids accidentally matching metadata brackets that
-            # openrouter/free sometimes prepends to the response.
+            #   b) is the longest such block (most complete response).
+            # This avoids false matches on OpenRouter metadata brackets that some
+            # models prepend to their response.
             all_matches = list(re.finditer(r'\[.*\]', text_clean, re.DOTALL))
             best_match = None
             for m in all_matches:
@@ -216,14 +287,38 @@ Return ONLY the JSON array. No preamble, no explanation outside the array.
             if match:
                 try:
                     parsed = json.loads(match.group())
+                    # Validate it's actually our requirements array, not metadata
                     if isinstance(parsed, list) and len(parsed) > 0 and parsed[0].get("requirement_id"):
                         print(f"[DEBUG] Parsed {len(parsed)} results from batch response")
                         parsed = [{**r, "clause": self._strip_section_prefix(r["clause"])} if r.get("clause") else r for r in parsed]
                         return parsed
                 except json.JSONDecodeError as e:
-                    # Full array parse failed — response may be truncated.
-                    # Salvage any complete individual objects that parsed cleanly.
-                    print(f"[WARN] Full JSON array parse failed: {e}")
+                    # Full parse failed — likely mid-sentence truncation on the last
+                    # object. Retry once with a short pause before falling to salvage.
+                    print(f"[WARN] Full JSON array parse failed: {e}. Retrying batch once...")
+                    if prompt:
+                        time.sleep(5)
+                        retry_resp = self.model.generate_response(prompt, max_length=4000, temperature=0.1)
+                        try:
+                            rc = re.sub(r'<think>.*?</think>', '', retry_resp, flags=re.DOTALL)
+                            rc = re.sub(r'```(?:json)?\s*', '', rc).strip()
+                            rm_all = list(re.finditer(r'\[.*\]', rc, re.DOTALL))
+                            rm_best = None
+                            for m in rm_all:
+                                if 'requirement_id' in m.group():
+                                    if rm_best is None or len(m.group()) > len(rm_best.group()):
+                                        rm_best = m
+                            rm = rm_best or (rm_all[-1] if rm_all else None)
+                            if rm:
+                                rp = json.loads(rm.group())
+                                if isinstance(rp, list) and len(rp) > 0 and rp[0].get("requirement_id"):
+                                    print(f"[DEBUG] Retry succeeded — parsed {len(rp)} results")
+                                    rp = [{**r, "clause": ComplianceAnalyzer._strip_section_prefix(r["clause"])} if r.get("clause") else r for r in rp]
+                                    return rp
+                        except Exception:
+                            pass  # Retry also failed — fall through to salvage
+
+                    # Salvage: extract any individually complete {...} objects
                     salvaged = []
                     for obj_match in re.finditer(r'\{[^{}]*"requirement_id"[^{}]*\}', match.group(), re.DOTALL):
                         try:
@@ -235,7 +330,6 @@ Return ONLY the JSON array. No preamble, no explanation outside the array.
                             continue
                     if salvaged:
                         print(f"[WARN] Salvaged {len(salvaged)}/{len(requirements)} objects from truncated response")
-                        # Fill in error entries for any requirements not in the salvaged set
                         salvaged_ids = {o["requirement_id"] for o in salvaged}
                         for req in requirements:
                             if req["id"] not in salvaged_ids:
@@ -268,7 +362,7 @@ Return ONLY the JSON array. No preamble, no explanation outside the array.
         ]
 
     # ──────────────────────────────────────────────
-    # 7. SCORE CALCULATOR (unchanged logic)
+    # 8. SCORE CALCULATOR (unchanged logic)
     # ──────────────────────────────────────────────
     def _calculate_score(self, results: List[Dict]) -> float:
         if not results:
@@ -278,7 +372,7 @@ Return ONLY the JSON array. No preamble, no explanation outside the array.
         return round(total / len(results), 2)
 
     # ──────────────────────────────────────────────
-    # 8. CLAUSE SANITISER
+    # 9. CLAUSE SANITISER
     # ──────────────────────────────────────────────
     @staticmethod
     def _strip_section_prefix(clause: str) -> str:
