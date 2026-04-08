@@ -2612,8 +2612,20 @@ def verify_admin_access(request):
         profile.updated_at = now
         profile.save(update_fields=["role", "updated_at"])
 
+        # Update the user's email to the verified org email
+        profile.auth_user.username = access_request.org_email
+        profile.auth_user.email = access_request.org_email
+        profile.auth_user.save(update_fields=["email", "username"])
+
     _record_audit_log(profile, "ADMIN_ACCESS_APPROVED", "admin_access_request", access_request.request_id, True, request)
-    return JsonResponse({"detail": "Administrative access granted successfully.", "role": profile.role}, status=200)
+    return JsonResponse(
+        {
+            "detail": "Administrative access granted successfully.", 
+            "role": profile.role,
+            "org_email": access_request.org_email,
+        }, 
+        status=200,
+    )
 
 
 @csrf_exempt
