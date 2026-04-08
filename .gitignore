@@ -63,3 +63,7 @@ __pycache__/
 # Local SQLite database (Django development only)
 db.sqlite3
 **/db.sqlite3
+
+# Backups
+backups/dumps/
+*.dump
