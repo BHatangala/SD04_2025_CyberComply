@@ -67,3 +67,14 @@ db.sqlite3
 # Backups
 backups/dumps/
 *.dump
+
+# Playwright
+node_modules/
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/blob-report/
+/frontend/.playwright/.cache/
+/frontend/.playwright/.auth/
+
+# Stress Testing
+tests/load_test_results.txt

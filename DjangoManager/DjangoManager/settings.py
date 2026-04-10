@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import boto3
 
 #load_dotenv()
 
@@ -81,6 +82,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'core.performance.PerformanceLoggingMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -197,3 +199,39 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5500",
     # Add production domain here when deployed, e.g. "https://yourdomain.com",
 ]
+
+# PERFORMANCE MONITORING (CloudWatch) 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'json': {
+            'format': '%(message)s',
+        },
+    },
+    'handlers': {
+        'cloudwatch': {
+            'level': 'INFO',
+            'class': 'watchtower.CloudWatchLogHandler',
+            'boto3_client': boto3.client(
+                'logs',
+                aws_access_key_id=AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+                region_name=AWS_S3_REGION_NAME,
+            ),
+            'log_group':   'cybercomply-performance',
+            'stream_name': 'api-response-times',
+            'formatter':   'json',
+        },
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'core.performance': {                  # ← matches core/performance.py
+            'handlers':  ['cloudwatch', 'console'],
+            'level':     'INFO',
+            'propagate': False,
+        },
+    },
+}
