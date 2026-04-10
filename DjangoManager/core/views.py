@@ -26,6 +26,7 @@ import boto3
 import re
 import uuid
 from botocore.exceptions import BotoCoreError, ClientError
+import time as _time
 import logging
 logger = logging.getLogger(__name__)
 
@@ -347,47 +348,93 @@ def upload_file(request):
 @csrf_exempt
 def analyze_compliance(request):
     """
-    Reads file bytes from cache, forwards to AI service, streams SSE events back,
-    and persists the result + report to the database.
-
-    SSE events emitted:
+    Submits a file to the Celery-backed /api/analyze-queued endpoint, then
+    polls /api/job-status/<job_id> until the result is ready, streaming SSE
+    events back to the browser exactly as before.
+ 
+    SSE events emitted (unchanged contract):
         data: {"status": "analysing"}
         data: {"status": "analysed", "result": {...}}
         data: {"status": "error",    "message": "..."}
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
-
+ 
     file_name    = request.POST.get('file_name', '').strip()
     company_name = request.POST.get('company_name', '')
     department   = request.POST.get('department', '')
-
+ 
     if not file_name:
         return JsonResponse({'error': 'file_name is required'}, status=400)
-
+ 
     file_bytes = cache.get(f'file_bytes_{file_name}')
     if file_bytes is None:
         return JsonResponse(
             {'error': f'File bytes for "{file_name}" not found in cache. Please re-upload.'},
             status=400,
         )
-
+ 
     def event_stream():
         try:
             yield f"data: {json.dumps({'status': 'analysing'})}\n\n".encode('utf-8')
-
-            files    = {'file': (file_name, file_bytes, _mime_type_for(file_name))}
-            data     = {'company_name': company_name, 'department': department}
-            response = requests.post(f"{AI_API_URL}/analyze", files=files, data=data, timeout=1200)
-            result   = response.json()
-
-            # Persist AnalysisResult + Report to database (non-critical — don't break SSE)
+ 
+            # ── Submit to Celery queue ─────────────────────────────────────────
+            submit_response = requests.post(
+                f"{AI_API_URL}/analyze-queued",
+                files={'file': (file_name, file_bytes, _mime_type_for(file_name))},
+                data={'company_name': company_name, 'department': department},
+                timeout=30,   # just the submission, not the analysis
+            )
+ 
+            # ── Queue full — surface 503 gracefully ───────────────────────────
+            if submit_response.status_code == 503:
+                err = submit_response.json().get('error', 'AI service is at capacity.')
+                yield f"data: {json.dumps({'status': 'error', 'message': err})}\n\n".encode('utf-8')
+                return
+ 
+            submit_response.raise_for_status()
+            job_id = submit_response.json()['job_id']
+ 
+            # ── Poll until done (max 25 min = 1500 s, matches task hard limit) ─
+            poll_interval = 5    # seconds between polls
+            max_polls     = 300  # 300 × 5 s = 1500 s ceiling
+            result        = None
+ 
+            for _ in range(max_polls):
+                _time.sleep(poll_interval)
+                try:
+                    status_resp = requests.get(
+                        f"{AI_API_URL}/job-status/{job_id}",
+                        timeout=10,
+                    )
+                    status_data = status_resp.json()
+                except Exception:
+                    continue   # transient network blip — keep polling
+ 
+                job_state = status_data.get('status')
+ 
+                if job_state == 'success':
+                    result = status_data.get('result', {})
+                    break
+                if job_state == 'failure':
+                    yield f"data: {json.dumps({'status': 'error', 'message': status_data.get('error', 'Analysis failed.')})}\n\n".encode('utf-8')
+                    return
+                if job_state == 'timeout':
+                    yield f"data: {json.dumps({'status': 'error', 'message': 'Analysis timed out. Please try again or use a smaller document.'})}\n\n".encode('utf-8')
+                    return
+                # pending / started / unknown — keep waiting
+ 
+            if result is None:
+                yield f"data: {json.dumps({'status': 'error', 'message': 'Analysis did not complete within the allowed time.'})}\n\n".encode('utf-8')
+                return
+ 
+            # ── Persist AnalysisResult + Report to DB (non-critical) ──────────
             try:
                 import json as _json
                 document = Document.objects.filter(
                     s3_key=file_name, deleted_at__isnull=True
                 ).order_by('-uploaded_at').first()
-
+ 
                 if document is not None:
                     AnalysisResult.objects.filter(document=document).delete()
                     analysis_result = AnalysisResult.objects.create(
@@ -414,15 +461,15 @@ def analyze_compliance(request):
                     )
             except Exception:
                 pass
-
+ 
             yield f"data: {json.dumps({'status': 'analysed', 'result': result})}\n\n".encode('utf-8')
             cache.delete(f'file_bytes_{file_name}')
-
+ 
         except requests.exceptions.ConnectionError:
             yield f"data: {json.dumps({'status': 'error', 'message': 'AI Server is not running.'})}\n\n".encode('utf-8')
         except Exception as e:
             yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n".encode('utf-8')
-
+ 
     return StreamingHttpResponse(
         event_stream(),
         content_type='text/event-stream',
@@ -436,21 +483,13 @@ def analyze_compliance(request):
 # ──────────────────────────────────────────────
 
 @csrf_exempt
+@csrf_exempt
 def analyze_batch(request):
     """
-    Processes multiple files sequentially, calling /api/analyze once per file.
-    Streams SSE events so the frontend can update each file card in real time.
-
-    Expected POST body (JSON):
-    {
-        "company_name": "Acme Corp",
-        "files": [
-            {"file_name": "policy.pdf",  "department": "IT"},
-            {"file_name": "report.docx", "department": "Finance"}
-        ]
-    }
-
-    SSE events emitted:
+    Submits each file to /api/analyze-queued, then polls /api/job-status per file,
+    streaming SSE events so the frontend updates each file card in real time.
+ 
+    SSE events emitted (unchanged contract):
         data: {"status": "analysing",     "file_name": "policy.pdf"}
         data: {"status": "analysed",      "file_name": "policy.pdf",  "result_id": "<uuid>"}
         data: {"status": "error",         "file_name": "policy.pdf",  "message": "..."}
@@ -458,23 +497,23 @@ def analyze_batch(request):
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
-
+ 
     profile, auth_error = _get_profile_from_token(request)
     if auth_error:
         return auth_error
     assert profile is not None
-
+ 
     try:
         payload = json.loads(request.body.decode('utf-8'))
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON body'}, status=400)
-
+ 
     company_name = payload.get('company_name', '')
     files        = payload.get('files', [])
-
+ 
     if not files or not isinstance(files, list):
         return JsonResponse({'error': 'A non-empty "files" list is required'}, status=400)
-
+ 
     # Validate all files and pull bytes from cache before starting the stream.
     # Failing early here avoids opening an SSE connection only to error immediately.
     multipart_files = []
@@ -494,32 +533,77 @@ def analyze_batch(request):
             'department': department,
             'file_bytes': file_bytes,
         })
-
+ 
     def event_stream():
         collected_result_ids = []
-
+ 
         for f in multipart_files:
             file_name  = f['file_name']
             department = f['department']
             file_bytes = f['file_bytes']
-
+ 
             yield f"data: {json.dumps({'status': 'analysing', 'file_name': file_name})}\n\n".encode('utf-8')
-
+ 
             try:
-                ai_response = requests.post(
-                    f"{AI_API_URL}/analyze",
+                # ── Submit to Celery queue ─────────────────────────────────────
+                submit_response = requests.post(
+                    f"{AI_API_URL}/analyze-queued",
                     files={'file': (file_name, file_bytes, _mime_type_for(file_name))},
                     data={'company_name': company_name, 'department': department},
-                    timeout=1200,
+                    timeout=30,
                 )
-                result = ai_response.json()
-
-                # Persist AnalysisResult + Findings to DB for this file.
+ 
+                if submit_response.status_code == 503:
+                    err = submit_response.json().get('error', 'AI service is at capacity.')
+                    yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': err})}\n\n".encode('utf-8')
+                    cache.delete(f'file_bytes_{file_name}')
+                    continue
+ 
+                submit_response.raise_for_status()
+                job_id = submit_response.json()['job_id']
+ 
+                # ── Poll until done ────────────────────────────────────────────
+                poll_interval = 5
+                max_polls     = 300
+                result        = None
+ 
+                for _ in range(max_polls):
+                    _time.sleep(poll_interval)
+                    try:
+                        status_resp = requests.get(
+                            f"{AI_API_URL}/job-status/{job_id}",
+                            timeout=10,
+                        )
+                        status_data = status_resp.json()
+                    except Exception:
+                        continue
+ 
+                    job_state = status_data.get('status')
+ 
+                    if job_state == 'success':
+                        result = status_data.get('result', {})
+                        break
+                    if job_state == 'failure':
+                        yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': status_data.get('error', 'Analysis failed.')})}\n\n".encode('utf-8')
+                        result = None
+                        break
+                    if job_state == 'timeout':
+                        yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': 'Analysis timed out.'})}\n\n".encode('utf-8')
+                        result = None
+                        break
+ 
+                if result is None:
+                    # Either poll exhausted or an error path set result=None above
+                    cache.delete(f'file_bytes_{file_name}')
+                    continue
+ 
+                # ── Persist AnalysisResult + Findings to DB ────────────────────
+                # Logic below is identical to the original analyze_batch — untouched.
                 try:
                     document = Document.objects.filter(
                         s3_key=file_name, deleted_at__isnull=True
                     ).order_by('-uploaded_at').first()
-
+ 
                     if document is not None:
                         raw_score        = result.get('compliance', {}).get('compliance_score', 0)
                         compliance_score = max(0, min(100, int(round(float(raw_score)))))
@@ -529,7 +613,7 @@ def analyze_batch(request):
                             or result.get('recommendations', {}).get('top_action')
                             or None
                         )
-
+ 
                         with transaction.atomic():
                             AnalysisResult.objects.filter(document=document).delete()
                             analysis = AnalysisResult.objects.create(
@@ -539,7 +623,7 @@ def analyze_batch(request):
                                 summary=summary,
                                 raw_output=result,
                             )
-
+ 
                             findings_to_create = []
                             for d in result.get('compliance', {}).get('details', []):
                                 raw_status = (d.get('status') or '').lower().replace('-', '_')
@@ -564,35 +648,31 @@ def analyze_batch(request):
                                 ))
                             if findings_to_create:
                                 Finding.objects.bulk_create(findings_to_create)
-
+ 
                         if document.status != Document.Status.COMPLETED:
                             document.status = Document.Status.COMPLETED
                             document.save(update_fields=['status'])
-
+ 
                         _record_audit_log(profile, 'ANALYSE', 'analysis_result', analysis.result_id, True, request)
                         collected_result_ids.append(str(analysis.result_id))
-
+ 
                         yield f"data: {json.dumps({'status': 'analysed', 'file_name': file_name, 'result_id': str(analysis.result_id)})}\n\n".encode('utf-8')
                     else:
-                        # Document record not found — emit analysed without a result_id
                         yield f"data: {json.dumps({'status': 'analysed', 'file_name': file_name})}\n\n".encode('utf-8')
-
+ 
                 except Exception as db_err:
-                    # DB save failed — still emit analysed so the card updates,
-                    # but include the error for debugging
                     logger.error("Batch DB save failed for %s: %s", file_name, str(db_err))
                     yield f"data: {json.dumps({'status': 'analysed', 'file_name': file_name})}\n\n".encode('utf-8')
-
+ 
             except requests.exceptions.ConnectionError:
                 yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': 'AI Server is not running.'})}\n\n".encode('utf-8')
             except Exception as e:
                 yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': str(e)})}\n\n".encode('utf-8')
             finally:
                 cache.delete(f'file_bytes_{file_name}')
-
-        # All files processed — emit the final event with all collected result IDs
+ 
         yield f"data: {json.dumps({'status': 'batch_complete', 'result_ids': collected_result_ids})}\n\n".encode('utf-8')
-
+ 
     return StreamingHttpResponse(
         event_stream(),
         content_type='text/event-stream',
