@@ -263,18 +263,19 @@ class Finding(models.Model):
 # =========================
 class Recommendation(models.Model):
     class Status(models.TextChoices):
-        PENDING = "PENDING", "Pending"
-        IN_PROGRESS = "IN_PROGRESS", "In Progress"
-        DONE = "DONE", "Done"
+        CRITICAL = "CRITICAL", "Critical"
+        HIGH     = "HIGH",     "High"
+        MEDIUM   = "MEDIUM",   "Medium"
+        LOW      = "LOW",      "Low"
 
-    rec_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    result = models.ForeignKey(AnalysisResult, on_delete=models.CASCADE, related_name="recommendations")
+    rec_id              = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    result              = models.ForeignKey(AnalysisResult, on_delete=models.CASCADE, related_name="recommendations")
     recommendation_text = models.TextField()
-    status = models.CharField(max_length=20, choices=Status.choices)
-    act_name = models.CharField(max_length=255)
-    page_no = models.IntegerField()
-    line_no = models.IntegerField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    status              = models.CharField(max_length=10, choices=Status.choices, default=Status.MEDIUM)
+    act_name            = models.CharField(max_length=255)
+    steps_to_achieve    = models.JSONField(default=list)   # stores list of step strings
+    section             = models.CharField(max_length=255, blank=True, default='')  # e.g. "Section 4 — Compliance with the Data Protection Obligations"
+    created_at          = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "recommendations"

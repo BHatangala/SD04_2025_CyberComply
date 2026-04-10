@@ -2168,20 +2168,27 @@ def save_recommendations(request):
     for item in recommendations:
         recommendation_text = (item.get("recommendation_text") or "").strip()
         act_name            = (item.get("act_name") or "").strip()
-        page_no             = item.get("page_no")
-        line_no             = item.get("line_no")
-        status              = (item.get("status") or Recommendation.Status.PENDING).strip()
+        steps_to_achieve    = item.get("steps_to_achieve") or []
+        section             = (item.get("section") or "").strip()
+        status              = (item.get("status") or Recommendation.Status.MEDIUM).strip()
 
-        if not recommendation_text or not act_name or page_no is None or line_no is None:
+        if not recommendation_text or not act_name:
             continue
 
         valid_statuses = [s.value for s in Recommendation.Status]
         if status not in valid_statuses:
-            status = Recommendation.Status.PENDING
+            status = Recommendation.Status.MEDIUM
+
+        if not isinstance(steps_to_achieve, list):
+            steps_to_achieve = []
 
         rec = Recommendation.objects.create(
-            result=analysis_result, recommendation_text=recommendation_text,
-            status=status, act_name=act_name, page_no=int(page_no), line_no=int(line_no),
+            result=analysis_result,
+            recommendation_text=recommendation_text,
+            status=status,
+            act_name=act_name,
+            steps_to_achieve=steps_to_achieve,
+            section=section,
         )
         created.append(str(rec.rec_id))
 
@@ -2221,7 +2228,7 @@ def get_recommendations(request):
         return JsonResponse({"detail": "You do not have access to these recommendations"}, status=403)
 
     recommendations = Recommendation.objects.filter(result=analysis_result).order_by("created_at").values(
-        "rec_id", "recommendation_text", "status", "act_name", "page_no", "line_no", "created_at",
+        "rec_id", "recommendation_text", "status", "act_name", "steps_to_achieve", "section", "created_at",
     )
 
     return JsonResponse(

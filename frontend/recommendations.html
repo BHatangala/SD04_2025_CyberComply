@@ -590,19 +590,61 @@
 
                 this.recommendations = flagged.map(d => {
                     const req = this.pdpaIndex[d.requirement_id];
+                    const steps = req
+                        ? deriveSteps(req)
+                        : [`Address the requirements under ${d.requirement_id}.`];
+                    const reference = req ? buildReference(req) : d.requirement_id;
                     return {
-                        requirementId: d.requirement_id,
-                        clauseTitle:   d.clause || (req?.clause_title ?? d.requirement_id),
-                        reasoning:     d.reasoning,
-                        riskLevel:     d.risk_level || 'unknown',
-                        steps:         req
-                            ? deriveSteps(req)
-                            : [`Address the requirements under ${d.requirement_id}.`],
-                        reference:     req ? buildReference(req) : d.requirement_id
+                        requirementId:   d.requirement_id,
+                        clauseTitle:     d.clause || (req?.clause_title ?? d.requirement_id),
+                        reasoning:       d.reasoning,
+                        riskLevel:       d.risk_level || 'unknown',
+                        steps:           steps,
+                        reference:       reference,
+                        // backend-ready fields (used in saveRecommendations below)
+                        recommendation_text: d.reasoning,
+                        act_name:            d.clause || (req?.clause_title ?? d.requirement_id),
+                        status:              (d.risk_level || 'unknown').toUpperCase(),
+                        steps_to_achieve:    steps,
+                        section:             reference
                     };
                 });
 
                 console.log('[INFO] Recommendations built —', this.recommendations.length, 'cards');
+                
+
+                // ── Step 4: Save recommendations to the backend DB ────────
+                const alreadySaved = sessionStorage.getItem(`recsSaved_${resultId}`);
+                if (this.recommendations.length > 0 && resultId && !alreadySaved) {
+                    try {
+                        const payload = {
+                            result_id: resultId,
+                            recommendations: this.recommendations.map(rec => ({
+                                recommendation_text: rec.recommendation_text,
+                                act_name:            rec.act_name,
+                                status:              rec.status,
+                                steps_to_achieve:    rec.steps_to_achieve,
+                                section:             rec.section
+                            }))
+                        };
+                        const saveRes = await fetch(`${BASE}/api/recommendations/save/`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(payload)
+                        });
+                        if (saveRes.ok) {
+                            console.log('[INFO] Recommendations saved to DB successfully.');
+                            sessionStorage.setItem(`recsSaved_${resultId}`, '1');
+                        } else {
+                            console.warn('[WARN] Failed to save recommendations:', await saveRes.text());
+                        }
+                    } catch (saveErr) {
+                        console.warn('[WARN] Could not save recommendations to DB:', saveErr.message);
+                    }
+                }
 
             } catch (e) {
                 console.error('Failed to load recommendations:', e);
