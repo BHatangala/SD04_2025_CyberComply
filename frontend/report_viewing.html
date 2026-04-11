@@ -319,7 +319,7 @@
 </head>
 
 <body>
-<div id="app">
+<div id="app" :data-ready="ready ? 'true' : 'false'" >
 
   <!-- Top Header -->
   <div class="top-header">
@@ -449,7 +449,8 @@ const app = createApp({
       isAdmin: false,
       isGenerating: false,
       currentReportName: '',
-      currentSnapshot: null
+      currentSnapshot: null,
+      ready: false
     }
   },
 
@@ -474,6 +475,7 @@ const app = createApp({
       // ── Load an existing report chosen from the sidebar ──
       await this.loadReport(reportId, token);
     }
+    this.ready = true;
   },
 
   computed: {
@@ -552,7 +554,6 @@ const app = createApp({
 
         if (!resGenerate.ok) {
           console.error('Failed to generate report:', await resGenerate.text());
-          this.isGenerating = false;
           return;
         }
 
@@ -576,7 +577,7 @@ const app = createApp({
       } catch (e) {
         console.error('generateReport error:', e);
       } finally {
-        this.isGenerating = false;
+        this.isGenerating = false; // always runs regardless of success or failure
       }
     },
 
@@ -594,6 +595,7 @@ const app = createApp({
         const company = (meta.company || '').trim();
         const file    = (meta.file_analyzed || '').trim();
         this.currentReportName = company ? `${company} — ${file}` : file || 'Report';
+        await this.$nextTick();
       } catch (e) {
         console.error('loadReport error:', e);
       }
