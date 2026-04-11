@@ -353,34 +353,144 @@
                 Please select a report from the sidebar to view its content.
             </div>
             <div v-else>
-                <div style="margin-bottom:16px;"><strong>File:</strong> {{ currentSnapshot.metadata?.file_analyzed || '—' }}</div>
-                <div style="margin-bottom:16px;"><strong>Company:</strong> {{ currentSnapshot.metadata?.company || '—' }}</div>
-                <div style="margin-bottom:16px;"><strong>Compliance Score:</strong> {{ currentSnapshot.compliance?.compliance_score ?? '—' }}%</div>
-                <div style="margin-bottom:16px;">
-                    <strong>Risk Level:</strong> 
-                    {{ currentSnapshot.risks?.status ? currentSnapshot.risks.status.charAt(0).toUpperCase() + currentSnapshot.risks.status.slice(1) : '—' }} </div>
-                <div v-if="currentSnapshot.risks?.factors?.length" style="margin-bottom:16px;">
+
+                <!-- ── DOCUMENT ANALYSIS SUMMARY (all users) ──────────────── -->
+                <div style="font-size:13px; font-weight:700; color:#4a8fe7; letter-spacing:1px; text-transform:uppercase; margin-bottom:14px;">Document Analysis</div>
+                <div style="margin-bottom:10px;"><strong>File:</strong> {{ currentSnapshot.metadata?.file_analyzed || '—' }}</div>
+                <div style="margin-bottom:10px;"><strong>Company:</strong> {{ currentSnapshot.metadata?.company || '—' }}</div>
+                <div style="margin-bottom:10px;"><strong>Compliance Score:</strong> {{ currentSnapshot.compliance?.compliance_score ?? '—' }}%</div>
+                <div style="margin-bottom:10px;">
+                    <strong>Risk Level:</strong>
+                    {{ currentSnapshot.risks?.status ? currentSnapshot.risks.status.charAt(0).toUpperCase() + currentSnapshot.risks.status.slice(1) : '—' }}
+                </div>
+                <div v-if="currentSnapshot.risks?.factors?.length" style="margin-bottom:10px;">
                     <strong>Risk Factors:</strong>
-                    <ul style="margin-top:8px; padding-left:20px;">
+                    <ul style="margin-top:6px; padding-left:20px;">
                         <li v-for="(f, i) in currentSnapshot.risks.factors" :key="i">{{ f }}</li>
                     </ul>
                 </div>
-                <div v-if="topRecommendation" style="margin-bottom:16px;">
+                <div v-if="topRecommendation" style="margin-bottom:10px;">
                     <strong>Top Recommendation:</strong> {{ topRecommendation }}
                 </div>
-                <div v-if="currentSnapshot.compliance?.details?.length" style="margin-top:20px;">
-                    <strong>Compliance Details:</strong>
-                    <div v-for="(d, i) in sortedDetails" :key="i"
-                         style="margin-top:12px; padding:12px; background:#1a2845; border-radius:8px;">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                            <strong style="color:#ffffff;">{{ d.clause }}</strong>
-                            <span style="flex-shrink:0; margin-left:12px;" :style="{ color: d.status === 'compliant' ? '#4caf50' : (d.status === 'partial' ? '#ff9800' : '#f44336') }">
-                                {{ d.status === 'compliant' ? 'Compliant' : d.status === 'non-compliant' || d.status === 'non_compliant' ? 'Non-Compliant' : d.status === 'partial' ? 'Partial' : d.status }}</span>
+
+                <!-- ── COMPLIANCE INTERFACE (all users) ───────────────────── -->
+                <div style="margin-top:28px; border-top:1px solid rgba(74,143,231,0.2); padding-top:20px;">
+                    <div style="font-size:13px; font-weight:700; color:#4a8fe7; letter-spacing:1px; text-transform:uppercase; margin-bottom:16px;">Compliance Score</div>
+
+                    <!-- Gap Identification -->
+                    <div style="margin-bottom:22px;">
+                        <div style="font-size:13px; font-weight:700; color:#c5d0e6; margin-bottom:4px;">Gap Identification</div>
+                        <div style="font-size:12px; color:#6b7a99; margin-bottom:10px;">
+                            Requirements completely absent from the policy — {{ gaps.length }} gap{{ gaps.length !== 1 ? 's' : '' }} identified, sorted by severity
                         </div>
-                        <div style="margin-top:4px; font-size:13px; color:#c5d0e6;">{{ d.reasoning }}</div>
-                        <div style="margin-top:4px; font-size:12px; color:#8b9dc3;">Risk: {{ d.risk_level ? d.risk_level.charAt(0).toUpperCase() + d.risk_level.slice(1) : '—' }} | Confidence: {{ d.confidence }}%</div>
+                        <div v-if="gaps.length === 0" style="font-size:13px; color:#6b7a99; font-style:italic;">
+                            No compliance gaps detected. All requirements are at least partially addressed.
+                        </div>
+                        <div v-for="(item, idx) in gaps" :key="'gap-'+item.requirement_id"
+                            style="display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid rgba(74,143,231,0.1);">
+                            <span style="font-size:11px; font-weight:700; color:#4a8fe7; min-width:18px; padding-top:2px; flex-shrink:0;">{{ idx+1 }}</span>
+                            <div style="flex:1;">
+                                <div style="font-size:13px; font-weight:600; color:#fff; margin-bottom:3px;">{{ item.clause }}</div>
+                                <div style="font-size:12px; color:#8b9dc3; line-height:1.5;">{{ item.reasoning }}</div>
+                            </div>
+                            <span :style="riskBadgeStyle(item.risk_level)"
+                                style="font-size:10px; font-weight:700; padding:3px 9px; border-radius:99px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; letter-spacing:0.8px;">
+                                {{ item.risk_level || 'unknown' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Risk Assessment -->
+                    <div>
+                        <div style="font-size:13px; font-weight:700; color:#c5d0e6; margin-bottom:4px;">Risk Assessment</div>
+                        <div style="font-size:12px; color:#6b7a99; margin-bottom:10px;">
+                            All non-compliant and partially compliant requirements, sorted by severity — {{ riskItems.length }} item{{ riskItems.length !== 1 ? 's' : '' }} flagged
+                        </div>
+                        <div v-if="riskItems.length === 0" style="font-size:13px; color:#6b7a99; font-style:italic;">
+                            No risks identified. The document appears fully compliant.
+                        </div>
+                        <div v-for="(item, idx) in riskItems" :key="'risk-'+item.requirement_id"
+                            style="display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid rgba(74,143,231,0.1);">
+                            <span style="font-size:11px; font-weight:700; color:#4a8fe7; min-width:18px; padding-top:2px; flex-shrink:0;">{{ idx+1 }}</span>
+                            <div style="flex:1;">
+                                <div style="font-size:13px; font-weight:600; color:#fff; margin-bottom:3px; display:flex; align-items:center; flex-wrap:wrap; gap:7px;">
+                                    {{ item.clause }}
+                                    <span v-if="item.status === 'partial'"
+                                        style="font-size:11px; font-weight:600; color:#e7964a; background:rgba(231,150,74,0.12); border:1px solid rgba(231,150,74,0.3); padding:1px 7px; border-radius:99px;">
+                                        Partially Implemented
+                                    </span>
+                                </div>
+                                <div style="font-size:12px; color:#8b9dc3; line-height:1.5;">{{ item.reasoning }}</div>
+                            </div>
+                            <span :style="riskBadgeStyle(item.risk_level)"
+                                style="font-size:10px; font-weight:700; padding:3px 9px; border-radius:99px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; letter-spacing:0.8px;">
+                                {{ item.risk_level || 'unknown' }}
+                            </span>
+                        </div>
                     </div>
                 </div>
+
+                <!-- ── RECOMMENDATIONS (admin only) ───────────────────────── -->
+                <div v-if="isAdmin" style="margin-top:28px; border-top:1px solid rgba(74,143,231,0.2); padding-top:20px;">
+                    <div style="font-size:13px; font-weight:700; color:#4a8fe7; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px;">Recommendations</div>
+                    <div style="font-size:12px; color:#6b7a99; margin-bottom:16px;">
+                        {{ riskItems.length }} recommendation{{ riskItems.length !== 1 ? 's' : '' }} generated from non-compliant and partially compliant requirements
+                    </div>
+                    <div v-if="riskItems.length === 0" style="font-size:13px; color:#6b7a99; font-style:italic;">
+                        No recommendations — the document is fully compliant.
+                    </div>
+                    <div v-for="(item, idx) in riskItems" :key="'rec-'+item.requirement_id"
+                        style="margin-bottom:14px; padding:14px 16px; background:#1a2845; border-radius:8px; border-left:4px solid #4a8fe7;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;">
+                            <div style="font-size:14px; font-weight:700; color:#fff;">{{ idx+1 }}. {{ item.clause }}</div>
+                            <span :style="riskBadgeStyle(item.risk_level)"
+                                style="font-size:10px; font-weight:700; padding:3px 9px; border-radius:99px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; letter-spacing:0.8px;">
+                                {{ item.risk_level || 'unknown' }}
+                            </span>
+                        </div>
+                        <div style="font-size:13px; color:#8b9dc3; line-height:1.55; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid rgba(74,143,231,0.12);">
+                            {{ item.reasoning }}
+                        </div>
+                        <div style="font-size:12px; color:#6b7a99;">
+                            Personal Data Protection Act No. 9 of 2022 (Sri Lanka) — {{ buildReferenceFromId(item.requirement_id) }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── COMPARISON (admin only) ────────────────────────────── -->
+                <div v-if="isAdmin" style="margin-top:28px; border-top:1px solid rgba(74,143,231,0.2); padding-top:20px;">
+                    <div style="font-size:13px; font-weight:700; color:#4a8fe7; letter-spacing:1px; text-transform:uppercase; margin-bottom:16px;">Comparison</div>
+                    <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px;">
+                        <div style="background:#1a2845; padding:12px 18px; border-radius:8px; min-width:160px;">
+                            <div style="font-size:11px; color:#6b7a99; letter-spacing:0.5px; margin-bottom:4px; text-transform:uppercase;">Company</div>
+                            <div style="font-size:14px; font-weight:600; color:#fff;">{{ currentSnapshot.metadata?.company || '—' }}</div>
+                        </div>
+                        <div v-if="departmentName" style="background:#1a2845; padding:12px 18px; border-radius:8px; min-width:160px;">
+                            <div style="font-size:11px; color:#6b7a99; letter-spacing:0.5px; margin-bottom:4px; text-transform:uppercase;">Department</div>
+                            <div style="font-size:14px; font-weight:600; color:#fff;">{{ departmentName }}</div>
+                        </div>
+                        <div style="background:#1a2845; padding:12px 18px; border-radius:8px; min-width:160px;">
+                            <div style="font-size:11px; color:#6b7a99; letter-spacing:0.5px; margin-bottom:4px; text-transform:uppercase;">Score / Risk</div>
+                            <div style="font-size:14px; font-weight:600; color:#fff;">
+                                {{ currentSnapshot.compliance?.compliance_score ?? '—' }}% — {{ overallRiskLevel }} Risk
+                            </div>
+                        </div>
+                    </div>
+                    <div style="font-size:13px; font-weight:700; color:#c5d0e6; margin-bottom:12px;">
+                        {{ departmentName || currentSnapshot.metadata?.company || 'Departmental' }} Recommendations
+                    </div>
+                    <div v-if="departmentRecs.length === 0" style="font-size:13px; color:#6b7a99; font-style:italic;">
+                        No recommendations — this department is fully compliant.
+                    </div>
+                    <ul style="padding-left:0; list-style:none;">
+                        <li v-for="rec in departmentRecs" :key="rec.requirementId"
+                            style="padding:8px 0; border-bottom:1px solid rgba(74,143,231,0.1);">
+                            <div style="font-size:13px; font-weight:600; color:#fff; margin-bottom:3px;">{{ rec.clauseTitle }}</div>
+                            <div style="font-size:12px; color:#6b7a99;">{{ rec.reference }}</div>
+                        </li>
+                    </ul>
+                </div>
+
             </div>
         </div>
         <p class="report-notice">Note: Reports are automatically deleted after 30 days.</p>
@@ -443,6 +553,8 @@ const app = createApp({
       isGenerating: false,
       currentReportName: '',
       currentSnapshot: null,
+      resultId: null,
+      departmentName: '',
     }
   },
 
@@ -495,6 +607,39 @@ const app = createApp({
             if (statusDiff !== 0) return statusDiff;
             return (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4);
         });
+    },
+
+    // Non-compliant only, sorted by risk — used in Gap Identification
+    gaps() {
+        const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+        return (this.currentSnapshot?.compliance?.details || [])
+            .filter(d => d.status === 'non_compliant' || d.status === 'non-compliant')
+            .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
+    },
+
+    // Non-compliant + partial, sorted by risk — used in Risk Assessment, Recommendations, Comparison
+    riskItems() {
+        const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+        return (this.currentSnapshot?.compliance?.details || [])
+            .filter(d => d.status === 'non_compliant' || d.status === 'non-compliant' || d.status === 'partial')
+            .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
+    },
+
+    // Overall risk label derived from compliance score — used in Comparison
+    overallRiskLevel() {
+        const score = this.currentSnapshot?.compliance?.compliance_score ?? 0;
+        if (score >= 75) return 'Low';
+        if (score >= 40) return 'Medium';
+        return 'High';
+    },
+
+    // Departmental recommendation list — used in Comparison
+    departmentRecs() {
+        return this.riskItems.map(d => ({
+            requirementId: d.requirement_id,
+            clauseTitle:   d.clause || d.requirement_id,
+            reference:     this.buildReferenceFromId(d.requirement_id)
+        }));
     }
   },
 
@@ -673,11 +818,25 @@ const app = createApp({
           return;
         }
         this.currentSnapshot  = data.report_snapshot;
+        this.resultId = data.result_id || null;
         // Build display name from snapshot metadata
         const meta    = (data.report_snapshot || {}).metadata || {};
         const company = (meta.company || '').trim();
         const file    = (meta.file_analyzed || '').trim();
         this.currentReportName = company ? `${company} — ${file}` : file || 'Report';
+
+        // Fetch department name for the Comparison section (admin only, best-effort)
+        if (this.resultId) {
+          try {
+            const aRes = await fetch(`${BASE}/api/analysis/${this.resultId}/`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (aRes.ok) {
+              const aData = await aRes.json();
+              this.departmentName = aData.department || '';
+            }
+          } catch (_) { /* department info is optional */ }
+        }
       } catch (e) {
         console.error('loadReport error:', e);
         alert('Something went wrong while loading the report.');
@@ -908,6 +1067,26 @@ const app = createApp({
           alert("Something went wrong.");
       }
   },
+
+    // Converts a requirement ID like "SL-PDPA-S17-1" → "Section 17(1) of the Personal Data Protection Act..."
+    buildReferenceFromId(id) {
+      const stripped = (id || '').replace(/^SL-PDPA-S/, '');
+      const parts = stripped.split('-');
+      let ref = `Section ${parts[0]}`;
+      if (parts[1]) ref += `(${parts[1]})`;
+      return `${ref} of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)`;
+    },
+
+    // Returns an inline CSS string for risk-level badge colouring
+    riskBadgeStyle(level) {
+      const map = {
+        critical: 'background:rgba(231,74,74,0.15);color:#e74a4a;border:1px solid rgba(231,74,74,0.4)',
+        high:     'background:rgba(231,150,74,0.15);color:#e7964a;border:1px solid rgba(231,150,74,0.4)',
+        medium:   'background:rgba(231,210,74,0.15);color:#d4bf2e;border:1px solid rgba(231,210,74,0.4)',
+        low:      'background:rgba(144,238,144,0.15);color:#66cc66;border:1px solid rgba(144,238,144,0.4)',
+      };
+      return map[level] || 'background:rgba(139,157,195,0.15);color:#8b9dc3;border:1px solid rgba(139,157,195,0.3)';
+    },
 
     toggleSidebar() {
       this.sidebarOpen = !this.sidebarOpen;
