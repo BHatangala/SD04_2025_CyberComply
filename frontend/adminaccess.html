@@ -79,6 +79,7 @@
         /* === MAIN CONTENT AREA === */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
+            will-change: margin-left;
             padding: 60px 80px;
             position: relative;
             z-index: 1;
@@ -474,6 +475,7 @@
 
                         this.currentRequestId = data.request_id;
                         this.step = 'otp';
+                        await this.$nextTick();
                         this.message = {
                             text: `Verification code sent to ${this.orgEmail}`,
                             type: 'success'
