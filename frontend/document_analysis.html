@@ -438,6 +438,7 @@
             gap: 10px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.45);
             white-space: nowrap;
+            will-change: opacity, transform;
         }
 
         .access-toast.visible {
@@ -581,7 +582,7 @@
     </style>
 </head>
 <body>
-    <div id="app">
+    <div id="app" :data-ready="ready" ? 'true' : 'false'">
         <!-- Top Header -->
         <div class="top-header">
             <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
@@ -740,6 +741,7 @@
                     isAdmin: isAdminUser,
                     toastVisible: false,
                     toastTimer: null,
+                    ready: false,
 
                     // ── AI Result Fields ──
                     complianceScore: 0,
@@ -828,13 +830,15 @@
                     }
 
                     // Animate progress bar
-                    setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 300);
+                    await Vue.nextTick();
+                    setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 100);
 
                 } catch (e) {
                     console.error('Failed to load analysis result:', e);
                     this.loadError = 'Could not reach the server. Please check your connection.';
                 } finally {
                     this.isLoading = false;
+                    this.ready = true;
                 }
 
                 // ── Populate sidebar history ──────────────────────────────
