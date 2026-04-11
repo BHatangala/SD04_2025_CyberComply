@@ -965,23 +965,26 @@
                 },
 
                 async confirmSave() {
-                    const nameChanged = this.editedFullName.trim() !== this.originalFullName;
-                    const emailChanged = this.editedEmail.trim().toLowerCase() !== this.originalEmail;
+                    const cleanedName = this.editedFullName.trim().replace(/\s+/g, ' ');
+                    const trimmedEditedEmail = this.editedEmail.trim().toLowerCase();
+                    
+                    const nameChanged = cleanedName !== this.originalFullName;
+                    const emailChanged = trimmedEditedEmail !== this.originalEmail;
 
                     // If no changes at all → shouldn't happen due to v-if="hasChanges"
                     if (!nameChanged && !emailChanged) return;
 
                     // Validate name if changed
-                    if (nameChanged && this.editedFullName.trim().length < 3) {
+                    if (nameChanged && cleanedName.length < 3) {
                         return Swal.fire({
                             icon: 'error',
                             title: 'Invalid Name',
-                            text: 'Name must be at least 3 characters'
+                            text: 'Please enter your full name'
                         });
                     }
 
                     // Validate email if changed
-                    if (emailChanged && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.editedEmail)) {
+                    if (emailChanged && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEditedEmail)) {
                         return Swal.fire({
                             icon: 'error',
                             title: 'Invalid Email',
@@ -1012,7 +1015,7 @@
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ 
                                     email: this.email,  // Add this line - your backend needs the email
-                                    full_name: this.editedFullName.trim() 
+                                    full_name: cleanedName 
                                 })
                             });
                             if (!res.ok) {
@@ -1029,7 +1032,7 @@
 
                         // Step 2: If email changed → redirect to OTP page
                         if (emailChanged) {
-                            sessionStorage.setItem('pendingNewEmail', this.editedEmail.trim().toLowerCase());
+                            sessionStorage.setItem('pendingNewEmail', trimmedEditedEmail);
                             // Reset temp values before redirect
                             this.tempEmail = '';
                             // Show a brief loading message before redirect
@@ -1073,7 +1076,10 @@
                         const res = await fetch('http://127.0.0.1:8000/api/profile/update/', {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ full_name: this.editedFullName.trim() })
+                            body: JSON.stringify({ 
+                                email: this.email,
+                                full_name: cleanedName 
+                            })
                         });
                         if (!res.ok) throw new Error('Update failed');
                         const data = await res.json();
@@ -1157,12 +1163,16 @@
                 async logout() {
                     //Delete all uploaded files from S3 before logging out
                     const fileNames = JSON.parse(sessionStorage.getItem('uploadedFileNames') || '[]');
+                    const token = sessionStorage.getItem('authToken');
     
-                    if (fileNames.length > 0) {
+                    if (fileNames.length > 0 && token) {
                         try {
                             await fetch('http://127.0.0.1:8000/api/delete-file/', {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: { 
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                },
                                 body: JSON.stringify({ file_names: fileNames })
                             });
                         } catch (error) {
@@ -1242,9 +1252,9 @@
                     }
                 },
                 
-                // Navigates back to previous page
+                // Navigates back to home page
                 goToHome() {
-                    window.history.back();
+                    window.location.href = "home.html";
                 }
             }
         });

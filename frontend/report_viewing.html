@@ -158,17 +158,18 @@
 
     /* Main Content */
     .report-viewer {
-        margin-left: auto; 
-        margin-right: auto;
-        padding: 30px 30px;
+        padding: 30px;
         min-height: calc(100vh - 60px);
-        max-width: 1100px;
+        width: min(1100px, calc(100vw - 60px));
+        margin: 0 auto; 
         transition: margin 0.3s ease;
     }
 
     .report-viewer.shifted {
-        margin-left: calc(280px + (100% - 280px - 1100px)/2);
-        margin-right: auto;
+        width: min(1000px, calc(100vw - 280px - 80px));
+        margin-left: 50%;
+        margin-right: 0;
+        transform: translateX(calc(-50% + 140px));
     }
 
     /* 30-day notice banner */
@@ -204,20 +205,12 @@
         position: fixed;
         bottom: 70px;
         /* Center within remaining right-side space */
-        left: calc(50% + 550px + 70px);
+        right: 30px;
         display: flex;
         flex-direction: column;
         gap: 40px;
         z-index: 200;
         transition: left 0.3s ease;
-    }
-
-    .report-actions.shifted{
-        left: calc(
-        280px +                 /* sidebar width */
-        (100% - 280px) / 2 +    /* center of remaining page */
-        550px              /* half report width */
-        );
     }
 
     /* Button wrapper for locked state */
@@ -449,13 +442,14 @@ const app = createApp({
       isAdmin: false,
       isGenerating: false,
       currentReportName: '',
-      currentSnapshot: null
+      currentSnapshot: null,
     }
   },
 
   async mounted() {
     const token = sessionStorage.getItem('authToken');
     if (!token) {
+      alert('Your session has expired. Please log in again.');
       window.location.href = 'login.html';
       return;
     }
@@ -464,17 +458,23 @@ const app = createApp({
     this.isAdmin = sessionStorage.getItem('userRole') === 'ADMINISTRATIVE_USER';
 
     const params   = new URLSearchParams(window.location.search);
-    const reportId = params.get('report_id');
+    const reportId = (params.get('report_id') || '').trim();
     const generate = params.get('generate');  // 'true' when coming from document_analysis
 
     if (generate === 'true') {
       // ── Generate a new report from the latest saved analysis result ──
       await this.generateReport(token);
-    } else if (reportId) {
-      // ── Load an existing report chosen from the sidebar ──
+      return;
+    }
+    
+    if (reportId) {
+      if (!this.isValidUuid(reportId)) {
+        alert('Invalid report ID.');
+        return;
+      }
       await this.loadReport(reportId, token);
     }
-  },
+  },  
 
   computed: {
     topRecommendation() {
@@ -499,6 +499,10 @@ const app = createApp({
   },
 
   methods: {
+    isValidUuid(value) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test((value || '').trim());
+    },
+
     showProfile() { window.location.href = 'profile.html'; },
     goBack()      { window.history.back(); },
     goHome()      { window.location.href = 'home.html'; },
@@ -507,8 +511,15 @@ const app = createApp({
     async generateReport(token) {
       this.isGenerating = true;
 
-      const resultId = sessionStorage.getItem('latestResultId');
+      const resultId = (sessionStorage.getItem('latestResultId') || '').trim();
       if (!resultId) {
+        alert('No analysis result found. Please analyse a document first.');
+        this.isGenerating = false;
+        return;
+      }
+
+      if (!this.isValidUuid(resultId)) {
+        alert('Invalid analysis result ID.');
         this.isGenerating = false;
         return;
       }
@@ -522,6 +533,18 @@ const app = createApp({
           return;
         }
         const analysis = await resAnalysis.json();
+
+        if (!analysis || !analysis.result_id) {
+          alert('Invalid analysis data received from the server.');
+          this.isGenerating = false;
+          return;
+        }
+
+        if (!analysis.original_filename) {
+          alert('Report cannot be generated because the file name is missing.');
+          this.isGenerating = false;
+          return;
+        }
 
         // Build snapshot — use DB-sourced company name 
         // For general users, company_name will be empty and display falls back to just the filename.
@@ -582,12 +605,30 @@ const app = createApp({
 
     // ── Load and display an existing report by ID ──
     async loadReport(reportId, token) {
+      if (!reportId || !this.isValidUuid(reportId)) {
+        alert('Invalid report ID.');
+        return;
+      }
+
+      if (!token) {
+        alert('Your session has expired. Please log in again.');
+        window.location.href = 'login.html';
+        return;
+      }
+  
       try {
         const res = await fetch(`${BASE}/api/reports/${reportId}/`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!res.ok) return;
+        if (!res.ok){
+          alert('Failed to load report.');
+          return;
+        } 
         const data = await res.json();
+        if (!data || !data.report_snapshot) {
+          alert('Report data is missing or invalid.');
+          return;
+        }
         this.currentSnapshot  = data.report_snapshot;
         // Build display name from snapshot metadata
         const meta    = (data.report_snapshot || {}).metadata || {};
@@ -596,23 +637,44 @@ const app = createApp({
         this.currentReportName = company ? `${company} — ${file}` : file || 'Report';
       } catch (e) {
         console.error('loadReport error:', e);
+        alert('Something went wrong while loading the report.');
       }
     },
 
     async downloadReport() {
+      if (!this.isAdmin) {
+        alert('Only administrative users can download reports.');
+        return;
+      }
+  
       if (!this.currentSnapshot) {
           alert('Please select a report first.');
           return;
       }
 
+      const token = sessionStorage.getItem('authToken');
+      if (!token) {
+        alert('Your session has expired. Please log in again.');
+        window.location.href = 'login.html';
+        return;
+      }
+
       try {
           const params = new URLSearchParams(window.location.search);
           const report_id = params.get('report_id');
-          if (!report_id) { alert("Report ID missing."); return; }
+          if (!report_id) { 
+            alert("Report ID missing."); 
+            return; 
+          }
 
-          const res = await fetch("http://127.0.0.1:8000/api/download-report/", {
+          if (!this.isValidUuid(report_id)) {
+            alert('Invalid report ID.');
+            return;
+          }
+
+          const res = await fetch(`${BASE}/api/download-report/`, {
               method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${sessionStorage.getItem('authToken')}` },
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
               body: JSON.stringify({ report_id })
           });
           const data = await res.json();
@@ -826,30 +888,77 @@ const app = createApp({
       }
     },
     async openReport(report) {
-      this.currentReport = report.display_name;
+      const token = sessionStorage.getItem('authToken');
+      if (!token) {
+        alert('Your session has expired. Please log in again.');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      if (!report || !report.report_id) {
+        alert('Invalid report selected.');
+        return;
+      }
+
+      if (!this.isValidUuid(report.report_id)) {
+        alert('Invalid report ID.');
+        return;
+      }
+
       this.currentSnapshot = null;
+      this.currentReportName = report.display_name || 'Report';
+      
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/reports/${report.report_id}/`, {
-          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('authToken')}` }
+        const res = await fetch(`${BASE}/api/reports/${report.report_id}/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          alert('Failed to load report.');
+          return;
+        }
         const data = await res.json();
+
+        if (!data || !data.report_snapshot) {
+          alert('Report data is missing or invalid.');
+          return;
+        }
+    
         this.currentSnapshot = data.report_snapshot;
+
+        const meta = (data.report_snapshot || {}).metadata || {};
+        const company = (meta.company || '').trim();
+        const file = (meta.file_analyzed || '').trim();
+        this.currentReportName = company ? `${company} — ${file}` : file || report.display_name || 'Report';
+
+        window.history.replaceState({}, '', `report_viewing.html?report_id=${report.report_id}`);
       } catch (e) {
         console.error('Failed to load report:', e);
+        alert('Something went wrong while loading the report.');
       }
     },
  
     //share
     async shareReport() {
+      if (!this.isAdmin) {
+        alert('Only administrative users can share reports.');
+        return;
+      }
+  
       if (!this.currentSnapshot) {
         alert('Please select a report first.');
         return;
       }
 
+      const token = sessionStorage.getItem('authToken');
+      if (!token) {
+        alert('Your session has expired. Please log in again.');
+        window.location.href = 'login.html';
+        return;
+      }
+
       try {
 
-        // 🔹 Get report_id from URL
+        // Get report_id from URL
         const params = new URLSearchParams(window.location.search);
         const reportId = params.get('report_id');
 
@@ -858,12 +967,16 @@ const app = createApp({
           return;
         }
 
-        // 🔥 CALL BACKEND
-        const res = await fetch("http://127.0.0.1:8000/api/share-report/", {
+        if (!this.isValidUuid(reportId)) {
+          alert('Invalid report ID.');
+          return;
+        }
+
+        const res = await fetch(`${BASE}/api/share-report/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${sessionStorage.getItem('authToken')}`
+            "Authorization": `Bearer ${token}`
           },
           body: JSON.stringify({
             report_id: reportId
@@ -872,17 +985,17 @@ const app = createApp({
 
         const data = await res.json();
 
-        if (!res.ok) {
+        if (!res.ok || !data.token) {
           alert(data.error || "Failed to share report");
           return;
         }
 
         console.log("Share recorded:", data);
 
-        // 🔹 Build secure share URL using token
+        // Build secure share URL using token
         const shareUrl = `${window.location.origin}/report_viewing.html?token=${data.token}`;
 
-        // 🔹 Share
+        // Share
         if (navigator.share) {
           navigator.share({
             title: this.currentReportName,

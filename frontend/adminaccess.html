@@ -426,6 +426,7 @@
                 return {
                     sidebarOpen: true,
                     orgEmail: '',
+                    otpCode: '',
                     currentRequestId: null,           // store request_id from backend
                     step: 'form',              // 'form' | 'otp' | 'success'
                     message: { text: '', type: '' },
@@ -446,11 +447,36 @@
                 },
                 //Send Admin Access Request
                 async sendVerification() {
+                    if (this.loading) return;
+                    const token = sessionStorage.getItem('authToken');
+
+                    if (!token) {
+                        this.message = { text: 'Your session has expired. Please log in again.', type: 'error' };
+                        setTimeout(() => {
+                            window.location.href = 'login.html';
+                        }, 1200);
+                        return;
+                    }
+
                     this.message = { text: '', type: '' };
 
+                    const email = this.orgEmail.trim().toLowerCase();
+                    this.orgEmail = email;
+                    
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                    if (!this.orgEmail || !emailRegex.test(this.orgEmail)) {
+
+                    if (!email) {
+                        this.message = { text: 'Email cannot be empty.', type: 'error' };
+                        return;
+                    }
+
+                    if (!emailRegex.test(email)) {
                         this.message = { text: 'Please enter a valid email address.', type: 'error' };
+                        return;
+                    }
+
+                    if (email.length > 254) {
+                        this.message = { text: 'Email address is too long.', type: 'error' };
                         return;
                     }
 
@@ -461,9 +487,9 @@
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`
+                                'Authorization': `Bearer ${token}`
                             },
-                            body: JSON.stringify({ org_email: this.orgEmail })
+                            body: JSON.stringify({ org_email: email })
                         });
 
                         const data = await response.json();
@@ -472,10 +498,11 @@
                             throw new Error(data.detail || 'Request failed');
                         }
 
+                        this.orgEmail = email;
                         this.currentRequestId = data.request_id;
                         this.step = 'otp';
                         this.message = {
-                            text: `Verification code sent to ${this.orgEmail}`,
+                            text: `Verification code sent to ${email}`,
                             type: 'success'
                         };
 
@@ -490,14 +517,27 @@
                 },
                 // Handle successful OTP verification
                 async handleOtpVerified() {
+                    if (this.loading) return;
+
+                    const token = sessionStorage.getItem('authToken');
+                    if (!token) {
+                        this.message = { text: 'Your session has expired. Please log in again.', type: 'error' };
+                        setTimeout(() => {
+                            window.location.href = 'login.html';
+                        }, 1200);
+                        return;
+                    }
+
                     if (!this.currentRequestId) {
                         this.message = { text: 'No active request found. Please start over.', type: 'error' };
                         this.step = 'form';
                         return;
                     }
 
-                    if (!/^\d{6}$/.test(this.otpCode)) {
-                        this.message = { text: 'Please enter a valid 6-digit code.', type: 'error' };
+                    const otp = (this.otpCode || '').trim();
+
+                    if (!otp || !/^\d{6}$/.test(otp)) {
+                        this.message = { text: 'Invalid verification code.', type: 'error' };
                         return;
                     }
 
@@ -508,10 +548,10 @@
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`
+                                'Authorization': `Bearer ${token}`
                             },
                             body: JSON.stringify({
-                                otp: this.otpCode,
+                                otp: otp,
                                 request_id: this.currentRequestId
                             })
                         });
@@ -543,10 +583,16 @@
                 },
                 // Check current admin access request status on page load
                 async checkAdminRequestStatus() {
+                    const token = sessionStorage.getItem('authToken');
+                    if (!token) {
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
                     try {
                         const res = await fetch('http://127.0.0.1:8000/api/admin-access/status/', {
                             headers: {
-                                'Authorization': `Bearer ${sessionStorage.getItem('authToken') || ''}`
+                                'Authorization': `Bearer ${token}`
                             }
                         });
                         if (res.ok) {

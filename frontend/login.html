@@ -331,6 +331,7 @@
 
                 const step = ref(1); // 1: credentials | 2: otp
                 const message = reactive({ text: '', type: '' });
+
                 const showSuccessPopup = ref(false);
 
                 // Password visibility toggle
@@ -382,7 +383,7 @@
 
                     loading.value = true;
 
-                    const trimmedEmail = form.email.trim();
+                    const trimmedEmail = form.email.trim().toLowerCase();
 
                     if (!trimmedEmail && !form.password) {
                         setMessage('error', 'Please enter your email and password.');
@@ -401,13 +402,25 @@
                         setMessage('error', 'Please enter a valid email address.');
                         loading.value = false;
                         return;
+                    }   
+                    
+                    if (trimmedEmail.length > 254) {
+                        setMessage('error', 'Email address is too long.');
+                        loading.value = false;
+                        return;
                     }    
 
-                    if (!form.password) {
+                    if (!form.password || !form.password.trim()) {
                         setMessage('error', 'Please enter your password.');
                         loading.value = false;
                         return;
                     }
+
+                    if (form.password.length > 128) {
+                        setMessage('error', 'Password is too long.');
+                        loading.value = false;
+                        return;
+                    }    
 
                     try {
                         const response = await fetch("http://127.0.0.1:8000/api/login/", {

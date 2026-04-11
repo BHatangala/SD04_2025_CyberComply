@@ -864,6 +864,8 @@
                 type="text"
                 v-model="companyName"
                 placeholder="Enter organisation name…"
+                maxlength="200"
+                required
                 @blur="orgNameTouched = true"
             >
         </div>
@@ -1230,6 +1232,14 @@
             }
         },
 
+        watch: {
+            companyName() {
+                this.errorMessages = this.errorMessages.filter(
+                    msg => !msg.includes('Organisation')
+                );    
+            }
+        },    
+
         async mounted() {
             // Restore org name if we're returning from a OneDrive OAuth redirect
             const pendingOrg = sessionStorage.getItem('pendingOrgName');
@@ -1365,8 +1375,16 @@
                     this.errorMessages.push(`Maximum 10 files allowed. You currently have ${this.uploadedFiles.length} file(s) uploaded.`);
                     return;
                 }
-
+        
                 for (const file of files) {
+
+                    if (this.uploadedFiles.some(f => 
+                        f.name === file.name && f.size === file.size
+                    )) {
+                        this.errorMessages.push(`"${file.name}" is already uploaded.`);
+                        continue;
+                    }
+
                     if (file.size > 50 * 1024 * 1024) {
                         this.errorMessages.push(`"${file.name}" exceeds the 50 MB limit.`);
                         continue;
@@ -1502,6 +1520,9 @@
                 try {
                     const response = await fetch(this.analyzeEndpoint, {
                         method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${this.sessionToken}`
+                        },
                         body: formData
                     });
 
@@ -1697,6 +1718,10 @@
             async removeFile(index) {
                 const file = this.uploadedFiles[index];
 
+                this.errorMessages = this.errorMessages.filter(
+                    msg => msg !== `"${file.name}" is already uploaded.`
+                );
+
                 this.uploadedFiles.splice(index, 1);
 
                 if (file.status !== 'uploading' && file.status !== 'pending') {
@@ -1745,6 +1770,17 @@
                     fileObj.status = 'uploading';
 
                     if (fileObj.source === 'google' && fileObj._driveFileId) {
+
+                        if (this.uploadedFiles.some((f, i) =>
+                            i !== index &&
+                            f.name === fileObj.name &&
+                            f.size === fileObj.size
+                        )) {
+                            this.errorMessages.push(`"${fileObj.name}" is already uploaded.`);
+                            this.uploadedFiles.splice(index, 1);
+                            return;
+                        }
+
                         const driveFileId = fileObj._driveFileId;
                         const driveToken  = fileObj._driveToken;
                         fileObj._driveFileId = null;
@@ -1752,6 +1788,17 @@
                         this.uploadFromDrive(fileObj, driveFileId, driveToken);
 
                     } else if (fileObj.source === 'onedrive' && fileObj._oneDriveFileId) {
+
+                        if (this.uploadedFiles.some((f, i) =>
+                            i !== index &&
+                            f.name === fileObj.name &&
+                            f.size === fileObj.size
+                        )) {
+                            this.errorMessages.push(`"${fileObj.name}" is already uploaded.`);
+                            this.uploadedFiles.splice(index, 1);
+                            return;
+                        }
+
                         const oneDriveFileId    = fileObj._oneDriveFileId;
                         const oneDriveToken     = fileObj._oneDriveToken;
                         fileObj._oneDriveFileId = null;
@@ -1888,6 +1935,14 @@
                     this.errorMessages.push('Maximum 10 files allowed.');
                     return;
                 }
+
+                if (this.uploadedFiles.some(f => 
+                    f.name === fileName && f.size === fileSize
+                )) {
+                    this.errorMessages.push(`"${fileName}" is already uploaded.`);
+                    return;
+                }    
+
                 if (this.isAdmin && !this.validateOrgName()) return;
                 this.showStorageNotice = true;
 
@@ -2306,6 +2361,13 @@
             async uploadFromOneDrive(file) {
                 if (this.isAdmin && !this.validateOrgName()) return;
                 this.showStorageNotice = true;
+
+                if (this.uploadedFiles.some(f => 
+                    f.name === file.name && f.size === file.size
+                )) {
+                    this.errorMessages.push(`"${file.name}" is already uploaded.`);
+                    return;
+                }    
 
                 const fileObj = {
                     name:            file.name,
