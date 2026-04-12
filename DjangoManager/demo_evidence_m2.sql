@@ -376,3 +376,46 @@ FROM audit_logs al
 LEFT JOIN user_profile up ON al.user_id = up.user_id
 ORDER BY al.created_at DESC
 LIMIT 10;
+
+
+\echo ''
+\echo ''
+\echo '=============================='
+\echo 'SLOW QUERY MONITORING'
+\echo '=============================='
+\echo 'Displays filtered application queries with average execution time above 10 ms.'
+\echo ''
+
+SELECT
+    LEFT(query, 120)                    AS query_preview,
+    calls,
+    ROUND(total_exec_time::numeric, 2)  AS total_exec_time_ms,
+    ROUND(mean_exec_time::numeric, 2)   AS avg_exec_time_ms
+FROM
+    pg_stat_statements
+WHERE
+    query ~* '(organization|department|auth_user|user_profile|document|analysis_result|finding|recommendations|reports|report_downloads|report_shares|admin_access_request|deletion_request|audit_logs)'
+    AND mean_exec_time > 10
+ORDER BY
+    total_exec_time DESC;
+
+
+\echo ''
+\echo ''
+\echo '=============================='
+\echo 'MOST FREQUENT QUERIES'
+\echo '=============================='
+\echo 'Displays the most frequently executed queries.'
+\echo ''
+
+SELECT
+    LEFT(query, 120)                   AS query_preview,
+    calls,
+    ROUND(mean_exec_time::numeric, 2)  AS avg_exec_time_ms
+FROM
+    pg_stat_statements
+WHERE
+    query ~* '(organization|department|auth_user|user_profile|document|analysis_result|finding|recommendations|reports|report_downloads|report_shares|admin_access_request|deletion_request|audit_logs)'
+ORDER BY
+    calls DESC
+LIMIT 10;
