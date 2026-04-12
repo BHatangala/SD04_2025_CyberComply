@@ -50,6 +50,32 @@ MAX_OTP_ATTEMPTS   = 5
 
 AI_API_URL = "http://127.0.0.1:5000/api"
 
+# ──────────────────────────────────────────────
+# CloudWatch AI Monitoring Helper
+# ──────────────────────────────────────────────
+
+def push_ai_metric(metric_name, value, unit='Count'):
+    """
+    Push a custom metric to CloudWatch for AI usage monitoring.
+    Silently fails so it never breaks the actual AI call.
+    """
+    try:
+        cloudwatch = boto3.client(
+            'cloudwatch',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+        )
+        cloudwatch.put_metric_data(
+            Namespace='CyberComply/AI',
+            MetricData=[{
+                'MetricName': metric_name,
+                'Value': value,
+                'Unit': unit,
+            }]
+        )
+    except Exception as e:
+        logger.warning("CloudWatch metric push failed (non-critical): %s", str(e))
 
 # ──────────────────────────────────────────────
 # Home view
@@ -379,6 +405,7 @@ def analyze_compliance(request):
             yield f"data: {json.dumps({'status': 'analysing'})}\n\n".encode('utf-8')
  
             # ── Submit to Celery queue ─────────────────────────────────────────
+            ai_start_time = _time.time()
             submit_response = requests.post(
                 f"{AI_API_URL}/analyze-queued",
                 files={'file': (file_name, file_bytes, _mime_type_for(file_name))},
@@ -415,11 +442,16 @@ def analyze_compliance(request):
  
                 if job_state == 'success':
                     result = status_data.get('result', {})
+                    duration_ms = (_time.time() - ai_start_time) * 1000
+                    push_ai_metric('SuccessfulAnalysis', 1)
+                    push_ai_metric('AnalysisLatencyMs', duration_ms, unit='Milliseconds')
                     break
                 if job_state == 'failure':
+                    push_ai_metric('FailedAnalysis', 1)
                     yield f"data: {json.dumps({'status': 'error', 'message': status_data.get('error', 'Analysis failed.')})}\n\n".encode('utf-8')
                     return
                 if job_state == 'timeout':
+                    push_ai_metric('FailedAnalysis', 1)
                     yield f"data: {json.dumps({'status': 'error', 'message': 'Analysis timed out. Please try again or use a smaller document.'})}\n\n".encode('utf-8')
                     return
                 # pending / started / unknown — keep waiting
@@ -546,6 +578,7 @@ def analyze_batch(request):
  
             try:
                 # ── Submit to Celery queue ─────────────────────────────────────
+                ai_start_time = _time.time()
                 submit_response = requests.post(
                     f"{AI_API_URL}/analyze-queued",
                     files={'file': (file_name, file_bytes, _mime_type_for(file_name))},
@@ -582,12 +615,17 @@ def analyze_batch(request):
  
                     if job_state == 'success':
                         result = status_data.get('result', {})
+                        duration_ms = (_time.time() - ai_start_time) * 1000
+                        push_ai_metric('SuccessfulAnalysis', 1)
+                        push_ai_metric('AnalysisLatencyMs', duration_ms, unit='Milliseconds')
                         break
                     if job_state == 'failure':
+                        push_ai_metric('FailedAnalysis', 1)
                         yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': status_data.get('error', 'Analysis failed.')})}\n\n".encode('utf-8')
                         result = None
                         break
                     if job_state == 'timeout':
+                        push_ai_metric('FailedAnalysis', 1)
                         yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': 'Analysis timed out.'})}\n\n".encode('utf-8')
                         result = None
                         break
