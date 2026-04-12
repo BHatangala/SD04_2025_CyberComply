@@ -1180,65 +1180,185 @@ const app = createApp({
         return;
       }
 
-      try {
-
-        // Get report_id from URL
-        const params = new URLSearchParams(window.location.search);
-        const reportId = params.get('report_id');
-
-        if (!reportId) {
+      const params = new URLSearchParams(window.location.search);
+      const reportId = params.get('report_id');
+      if (!reportId) {
           alert("Report ID not found.");
           return;
-        }
+      }
 
-        if (!this.isValidUuid(reportId)) {
+      if (!this.isValidUuid(reportId)) {
           alert('Invalid report ID.');
           return;
+      }
+
+      try {
+        // Step 1: Generate PDF blob using existing jsPDF logic
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+        const snap     = this.currentSnapshot;
+        const meta     = snap.metadata || {};
+        const pageW    = doc.internal.pageSize.getWidth();
+        const pageH    = doc.internal.pageSize.getHeight();
+        const margin   = 15;
+        const contentW = pageW - margin * 2;
+
+        const DARK_BG   = [16, 23, 38];
+        const HEADER_BG = [26, 40, 69];
+        const CARD_BG   = [20, 32, 56];
+        const ACCENT    = [74, 143, 231];
+        const WHITE     = [255, 255, 255];
+        const LIGHT     = [197, 208, 230];
+        const GREEN     = [76, 175, 80];
+        const RED       = [244, 67, 54];
+        const ORANGE    = [255, 152, 0];
+
+        const initPage = () => {
+            doc.setFillColor(...DARK_BG);
+            doc.rect(0, 0, pageW, pageH, 'F');
+            doc.setFillColor(...HEADER_BG);
+            doc.rect(0, 0, pageW, 18, 'F');
+            doc.setFontSize(8);
+            doc.setTextColor(...LIGHT);
+            doc.setFont('helvetica', 'normal');
+            doc.text('CYBERCOMPLY — COMPLIANCE ANALYSIS REPORT', margin, 11);
+        };
+
+        const checkPage = (y, needed) => {
+            if (y + needed > pageH - 12) {
+                doc.addPage();
+                initPage();
+                return 26;
+            }
+            return y;
+        };
+
+        initPage();
+        let y = 26;
+
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...ACCENT);
+        doc.text(this.currentReportName || 'Report', margin, y);
+        y += 8;
+
+        doc.setDrawColor(...ACCENT);
+        doc.line(margin, y, pageW - margin, y);
+        y += 8;
+
+        doc.setFontSize(9);
+        if (meta.company) {
+            doc.setTextColor(...LIGHT); doc.text('Company:', margin, y);
+            doc.setTextColor(...WHITE); doc.text(meta.company, margin + 26, y); y += 6;
+        }
+        if (meta.file_analyzed) {
+            doc.setTextColor(...LIGHT); doc.text('File:', margin, y);
+            doc.setTextColor(...WHITE); doc.text(meta.file_analyzed, margin + 26, y); y += 6;
         }
 
+        const score      = snap.compliance?.compliance_score ?? '—';
+        const riskStatus = snap.risks?.status
+            ? snap.risks.status.charAt(0).toUpperCase() + snap.risks.status.slice(1) : '—';
+
+        doc.setTextColor(...LIGHT); doc.text('Score:', margin, y);
+        doc.setTextColor(...ACCENT); doc.text(`${score}%`, margin + 26, y);
+        doc.setTextColor(...LIGHT); doc.text('Risk:', margin + 65, y);
+        doc.setTextColor(...WHITE); doc.text(riskStatus, margin + 80, y);
+        y += 10;
+
+        const STATUS_ORDER = { 'non_compliant': 0, 'non-compliant': 0, 'partial': 1, 'compliant': 2 };
+        const RISK_ORDER   = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+        const details = [...(snap.compliance?.details || [])].sort((a, b) => {
+            const s = (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3);
+            return s !== 0 ? s : (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4);
+        });
+
+        if (details.length) {
+            y = checkPage(y, 14);
+            doc.setFont('helvetica', 'bold'); doc.setTextColor(...ACCENT);
+            doc.text('Compliance Details', margin, y); y += 8;
+
+            details.forEach(d => {
+                const clauseLines = doc.splitTextToSize(d.clause || '', contentW - 60);
+                const textLines   = doc.splitTextToSize(d.reasoning || '', contentW - 6);
+                const clauseH  = clauseLines.length * 5;
+                const metaH    = 5;
+                const reasonH  = textLines.length * 4.5;
+                const cardPad  = 12;
+                const cardHeight = clauseH + metaH + reasonH + cardPad;
+
+                y = checkPage(y, cardHeight + 6);
+                
+                doc.setFillColor(...CARD_BG);
+                doc.roundedRect(margin, y, contentW, cardHeight, 3, 3, 'F');
+
+                let innerY = y + 5;
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...WHITE);
+                doc.text(clauseLines, margin + 3, innerY);
+
+                let statusColor = RED;
+                let statusLabel = 'Non-Compliant';
+                if (d.status === 'compliant')    { statusColor = GREEN;  statusLabel = 'Compliant'; }
+                else if (d.status === 'partial') { statusColor = ORANGE; statusLabel = 'Partial'; }
+                doc.setTextColor(...statusColor);
+                doc.text(statusLabel, pageW - margin - 3, innerY, { align: 'right' });
+
+                innerY += clauseH + 1;
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...LIGHT);
+                doc.text(
+                    `Risk: ${d.risk_level ? d.risk_level.charAt(0).toUpperCase() + d.risk_level.slice(1) : '—'}   Confidence: ${d.confidence ?? '—'}%`,
+                    margin + 3, innerY
+                );
+                innerY += metaH;
+                textLines.forEach(line => { doc.text(line, margin + 3, innerY); innerY += 4.5; });
+                y = y + cardHeight + 4;
+            });
+        }
+
+        // Step 2: Convert PDF to blob
+        const pdfBlob = doc.output('blob');
+
+        // Step 3: Send blob + report_id to backend
+        const formData = new FormData();
+        formData.append('report_id', reportId);
+        formData.append('pdf', pdfBlob, `${this.currentReportName || 'report'}.pdf`);
+
         const res = await fetch(`${BASE}/api/share-report/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            report_id: reportId
-          })
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
         });
 
         if (!res.ok) {
-          const msg = await this.getErrorMessage(res, 'Failed to share report.');
-          alert(msg);
-
-          if (res.status === 401) {
-            sessionStorage.clear();
-            window.location.href = 'login.html';
-          }
-          return;
+            const msg = await this.getErrorMessage(res, 'Failed to share report.');
+            alert(msg);
+            if (res.status === 401) {
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+            }
+            return;
         }
 
         const data = await res.json();
-
-        if (!data.token) {
-          alert('Share link was not returned by the server.');
-          return;
+        if (!data.share_url) {
+            alert('Share link was not returned by the server.');
+            return;
         }
-
-        console.log("Share recorded:", data);
-
-        // Build secure share URL using token
-        const shareUrl = `${window.location.origin}/report_viewing.html?token=${data.token}`;
 
         // Share
         if (navigator.share) {
           navigator.share({
             title: this.currentReportName,
             text: 'Check out this compliance report!',
-            url: shareUrl
+            url: data.share_url
           }).catch(err => console.error('Share failed', err));
         } else {
-          navigator.clipboard.writeText(shareUrl)
+          navigator.clipboard.writeText(data.share_url)
             .then(() => alert('Secure share link copied to clipboard!'))
             .catch(() => alert('Unable to copy link'));
         }

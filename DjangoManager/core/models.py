@@ -487,7 +487,7 @@ class ReportShare(models.Model):
 
     shared_with_email = models.EmailField()
 
-    access_token = models.CharField(max_length=255, unique=True)
+    access_token = models.TextField(unique=True)
 
     expires_at = models.DateTimeField()
 

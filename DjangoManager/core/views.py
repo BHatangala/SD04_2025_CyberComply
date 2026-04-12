@@ -2460,15 +2460,14 @@ def share_report(request):
 
     if profile.role != UserProfile.Role.ADMIN:
         return JsonResponse({"error": "Only administrative users can share reports"}, status=403)
+    
+    report_id = request.POST.get("report_id", "").strip()
+    pdf_file  = request.FILES.get("pdf")
 
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-    report_id = (data.get("report_id") or "").strip()
     if not report_id:
         return JsonResponse({"error": "report_id is required"}, status=400)
+    if not pdf_file:
+        return JsonResponse({"error": "pdf file is required"}, status=400)
 
     try:
         report = Report.objects.select_related("result__document__user__org").get(report_id=report_id)
@@ -2480,16 +2479,69 @@ def share_report(request):
     is_org_admin = profile.org_id is not None and str(doc.org_id) == str(profile.org_id)
     if not is_owner and not is_org_admin:
         return JsonResponse({"error": "You do not have access to this report"}, status=403)
+    
+    # Reuse existing active share if one exists
+    existing_share = ReportShare.objects.filter(
+        report=report, shared_by=profile, is_active=True, expires_at__gt=timezone.now()
+    ).first()
 
-    token = str(uuid.uuid4())
+    if existing_share:
+        return JsonResponse({
+            "message": "Report shared successfully",
+            "share_url": existing_share.access_token
+        })
+    
+    # Write PDF to temp file and upload to S3
+    try:
+        s3_key = f"shared-reports/{report_id}.pdf"
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            for chunk in pdf_file.chunks():
+                tmp.write(chunk)
+            temp_path = tmp.name
+
+        try:
+            s3 = boto3.client(
+                's3',
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                region_name=settings.AWS_S3_REGION_NAME,
+            )
+
+            s3.upload_file(
+                temp_path,
+                settings.AWS_SHARED_REPORTS_BUCKET_NAME,
+                s3_key,
+                ExtraArgs={'ContentType': 'application/pdf'}
+            )
+
+            # Generate pre-signed URL (7 days)
+            presigned_url = s3.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': settings.AWS_SHARED_REPORTS_BUCKET_NAME,
+                    'Key': s3_key,
+                },
+                ExpiresIn=604800  # 7 days in seconds
+            )
+
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+
+    except (BotoCoreError, ClientError) as e:
+        logger.error("S3 upload failed for shared report %s: %s", report_id, str(e))
+        return JsonResponse({"error": "Failed to upload report. Please try again."}, status=500)
+
+    # Store pre-signed URL as access_token in ReportShare
     ReportShare.objects.create(
         report=report, shared_by=profile,
         shared_with_email=profile.auth_user.email,
-        access_token=token, expires_at=timezone.now() + timedelta(days=7),
+        access_token=presigned_url, expires_at=timezone.now() + timedelta(days=7),
     )
 
     _record_audit_log(profile, "SHARE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.MEDIUM)
-    return JsonResponse({"message": "Report shared successfully", "token": token})
+    return JsonResponse({"message": "Report shared successfully", "share_url": presigned_url})
 
 
 # ──────────────────────────────────────────────
