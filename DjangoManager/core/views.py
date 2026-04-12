@@ -37,7 +37,7 @@ from .models import (
     ReportDownload, DeletionRequest, ReportShare,
 )
 from .utils import validate_org_email
-
+from django.db import models
 
 # ──────────────────────────────────────────────
 # Security Configuration
@@ -279,6 +279,9 @@ def upload_file(request):
             return JsonResponse({'error': 'Department is required. Please select a department before uploading.'}, status=400)
         org, _  = Organization.objects.get_or_create(org_name=company_name)
         dept, _ = Department.objects.get_or_create(org=org, dept_name=department)
+        if not profile.org_id:
+            profile.org = org
+            profile.save(update_fields=["org"])
 
     ext = uploaded_file.name.lower().rsplit('.', 1)[-1]
     file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
@@ -407,6 +410,7 @@ def analyze_compliance(request):
                     snapshot_str = _json.dumps(snapshot)
                     Report.objects.create(
                         result=analysis_result,
+                        dept=document.dept,
                         report_snapshot=snapshot,
                         report_s3_key=file_name,
                         file_size=len(snapshot_str),
@@ -2263,17 +2267,34 @@ def list_reports(request):
     now       = timezone.now()
     cutoff_7  = now - timedelta(days=7)
     cutoff_30 = now - timedelta(days=30)
+    dept_ids_raw = (request.GET.get("dept_ids") or "").strip()
+    dept_ids = [d.strip() for d in dept_ids_raw.split(",") if d.strip()] if dept_ids_raw else []
 
-    if profile.role == UserProfile.Role.ADMIN and profile.org_id:
-        qs = Report.objects.select_related("result__document__org").filter(
-            result__document__user__org=profile.org, generated_at__gte=cutoff_30,
+    if profile.role == UserProfile.Role.ADMIN:
+        base_filter = (
+            {"result__document__user__org": profile.org}
+            if profile.org_id
+            else {"result__document__user": profile}
         )
+        qs = Report.objects.select_related(
+            "result__document__org", "result__document__dept", "dept"
+        ).filter(generated_at__gte=cutoff_30, **base_filter)
     else:
-        qs = Report.objects.select_related("result__document__org").filter(
+        qs = Report.objects.select_related(
+            "result__document__org", "result__document__dept", "dept"
+        ).filter(
             result__document__user=profile, generated_at__gte=cutoff_30,
         )
 
     qs = qs.order_by("-generated_at")
+
+    def _get_effective_dept_id(r):
+        """Report.dept_id if set, else fall back to the source document's dept_id."""
+        if r.dept_id:
+            return str(r.dept_id)
+        if r.result and r.result.document and r.result.document.dept_id:
+            return str(r.result.document.dept_id)
+        return None
 
     def _serialize(r):
         snapshot     = r.report_snapshot or {}
@@ -2284,14 +2305,86 @@ def list_reports(request):
         return {
             "report_id":    str(r.report_id),
             "display_name": display_name,
+            "dept_id":      _get_effective_dept_id(r),
             "generated_at": r.generated_at.isoformat(),
             "expires_at":   r.expires_at.isoformat(),
         }
 
-    last_7_days  = [_serialize(r) for r in qs if r.generated_at >= cutoff_7]
-    last_30_days = [_serialize(r) for r in qs if r.generated_at < cutoff_7]
+    def _matches_dept(r):
+        """Return True if this report belongs to any of the selected dept_ids."""
+        if not dept_ids:
+            return True
+        return _get_effective_dept_id(r) in dept_ids
+
+    all_reports  = [r for r in qs if _matches_dept(r)]
+    last_7_days  = [_serialize(r) for r in all_reports if r.generated_at >= cutoff_7]
+    last_30_days = [_serialize(r) for r in all_reports if r.generated_at < cutoff_7]
 
     return JsonResponse({"last_7_days": last_7_days, "last_30_days": last_30_days}, status=200)
+
+@csrf_exempt
+def debug_reports_dept(request):
+    """GET /api/debug-reports-dept/ — Temporary: shows dept data for all admin reports."""
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    if profile.role != UserProfile.Role.ADMIN:
+        return JsonResponse({"detail": "Admin only"}, status=403)
+
+    base_filter = (
+        {"result__document__user__org": profile.org}
+        if profile.org_id
+        else {"result__document__user": profile}
+    )
+    reports = Report.objects.select_related(
+        "result__document__dept", "dept"
+    ).filter(**base_filter)
+
+    rows = []
+    for r in reports:
+        rows.append({
+            "report_id":        str(r.report_id),
+            "report_dept_id":   str(r.dept_id) if r.dept_id else None,
+            "doc_dept_id":      str(r.result.document.dept_id) if r.result and r.result.document and r.result.document.dept_id else None,
+            "doc_dept_name":    r.result.document.dept.dept_name if r.result and r.result.document and r.result.document.dept_id else None,
+            "display_name":     r.report_s3_key,
+        })
+    return JsonResponse({"reports": rows}, status=200)
+
+@csrf_exempt
+def list_departments(request):
+    """GET /api/departments/ — Returns departments for the admin's org. Admin only."""
+    if request.method != "GET":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    if profile.role != UserProfile.Role.ADMIN:
+        return JsonResponse({"detail": "Admin access required"}, status=403)
+
+    base_filter = (
+        {"documents__user__org": profile.org}
+        if profile.org_id
+        else {"documents__user": profile}
+    )
+    depts = Department.objects.filter(
+        **base_filter
+    ).distinct().order_by("dept_name").values("dept_id", "dept_name")
+
+    # Group by dept_name — collect all dept_ids that share the same name.
+    # The frontend uses dept_name as the filter key so all synonymous dept rows match.
+    from collections import defaultdict
+    name_to_ids = defaultdict(list)
+    for d in depts:
+        name_to_ids[d["dept_name"]].append(str(d["dept_id"]))
+
+    departments = [
+        {"dept_name": name, "dept_ids": ids}
+        for name, ids in sorted(name_to_ids.items())
+    ]
+    return JsonResponse({"departments": departments}, status=200)
 
 
 @csrf_exempt
@@ -2315,6 +2408,7 @@ def generate_report(request):
     report_s3_key   = (payload.get("report_s3_key") or "").strip()
     file_size       = payload.get("file_size")
     expires_in_days = payload.get("expires_in_days", 30)
+    dept_id = (payload.get("dept_id") or "").strip() or None
 
     if not result_id or not report_snapshot or not report_s3_key or file_size is None:
         return JsonResponse({"detail": "result_id, report_snapshot, report_s3_key and file_size are required"}, status=400)
@@ -2323,12 +2417,20 @@ def generate_report(request):
         analysis_result = AnalysisResult.objects.get(result_id=result_id)
     except (AnalysisResult.DoesNotExist, Exception):
         return JsonResponse({"detail": "analysis_result not found"}, status=404)
+    
+    dept = None
+    if dept_id:
+        try:
+            dept = Department.objects.get(dept_id=dept_id)
+        except Department.DoesNotExist:
+            return JsonResponse({"detail": "Department not found"}, status=404)
 
     try:
         report = Report.objects.create(
             result=analysis_result, report_snapshot=report_snapshot,
             report_s3_key=report_s3_key, file_size=int(file_size),
             expires_at=timezone.now() + timedelta(days=int(expires_in_days)),
+            dept=dept,
         )
     except Exception as e:
         return JsonResponse({"detail": f"Failed to create report: {str(e)}"}, status=500)
@@ -2353,7 +2455,7 @@ def get_report(request, report_id):
     assert profile is not None
 
     try:
-        report = Report.objects.select_related("result__document").get(report_id=report_id)
+        report = Report.objects.select_related("result__document", "dept").get(report_id=report_id)
     except Report.DoesNotExist:
         return JsonResponse({"detail": "Report not found"}, status=404)
 
@@ -2372,6 +2474,7 @@ def get_report(request, report_id):
         {
             "report_id":       str(report.report_id),
             "result_id":       str(report.result.result_id),
+            "dept_id":         str(report.dept_id) if report.dept_id else None,
             "report_snapshot": report.report_snapshot,
             "report_s3_key":   report.report_s3_key,
             "file_size":       report.file_size,

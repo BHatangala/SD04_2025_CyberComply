@@ -290,6 +290,7 @@ class Recommendation(models.Model):
 class Report(models.Model):
     report_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     result = models.ForeignKey(AnalysisResult, on_delete=models.CASCADE, related_name="reports", db_column="result_id")
+    dept = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="reports")
     report_snapshot = models.JSONField()
     report_s3_key = models.CharField(max_length=255)
     file_size = models.BigIntegerField()
