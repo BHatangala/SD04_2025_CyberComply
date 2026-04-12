@@ -284,7 +284,7 @@ def upload_file(request):
     file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
     file_type = file_type_map.get(ext)
     if not file_type:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'}, status=400)
 
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -294,21 +294,21 @@ def upload_file(request):
 
     try:
         if is_password_protected(temp_path, uploaded_file.name):
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
             return JsonResponse({'error': 'File rejected — password protected files are not allowed'}, status=400)
 
         scan_result = scan_file(temp_path)
         if scan_result is not None:
             if scan_result.startswith('SCAN_ERROR:'):
-                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
                 return JsonResponse({'error': 'File could not be scanned. The security scanner is temporarily unavailable. Please try again shortly.'}, status=503)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
         s3_key, s3_url = upload_to_s3(temp_path, uploaded_file.name)
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", uploaded_file.name, profile.user_id)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'Failed to upload file to S3. Please try again in a few minutes.'}, status=500)
 
         with open(temp_path, 'rb') as f:
@@ -326,7 +326,7 @@ def upload_file(request):
             status=Document.Status.UPLOADED,
         )
 
-        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request)
+        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request, AuditLog.Severity.LOW)
         return JsonResponse({
             'status':      'uploaded',
             's3_url':      s3_url,
@@ -608,7 +608,7 @@ def upload_from_drive(request):
 
     valid_exts = ('.pdf', '.docx', '.txt')
     if not file_name.lower().endswith(valid_exts):
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': f'"{file_name}" is not supported. Only PDF, DOCX and TXT files are allowed.'}, status=400)
 
     # Resolve Organisation & Department
@@ -631,7 +631,7 @@ def upload_from_drive(request):
     file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
     file_type = file_type_map.get(ext)
     if not file_type:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'}, status=400)
 
     # Download from Google Drive
@@ -645,18 +645,18 @@ def upload_from_drive(request):
         )
     except requests.exceptions.RequestException as e:
         logger.error("Google Drive download failed for file %s, user %s: %s", file_name, profile.user_id, str(e))
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
         return JsonResponse({'error': 'Could not reach Google Drive. Please check your connection and try again.'}, status=502)
 
     if drive_response.status_code == 401:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Google access token is invalid or expired'}, status=401)
     if drive_response.status_code == 403:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Permission denied — cannot access this Google Drive file'}, status=403)
     if not drive_response.ok:
         logger.error("Google Drive returned HTTP %s for file %s, user %s", drive_response.status_code, file_name, profile.user_id)
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
         return JsonResponse({'error': 'Google Drive is temporarily unavailable. Please try again in a few minutes.'}, status=502)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp:
@@ -671,26 +671,26 @@ def upload_from_drive(request):
     try:
         file_size = os.path.getsize(temp_path)
         if file_size > 50 * 1024 * 1024:
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
             return JsonResponse({'error': f'"{file_name}" exceeds the 50 MB limit.'}, status=400)
 
         if is_password_protected(temp_path, file_name):
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
             return JsonResponse({'error': 'File rejected — password protected files are not allowed'}, status=400)
 
         scan_result = scan_file(temp_path)
         if scan_result is not None:
             if scan_result.startswith('SCAN_ERROR:'):
                 logger.error("ClamAV scanner unavailable for file %s, user %s: %s", file_name, profile.user_id, scan_result)
-                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
                 return JsonResponse({'error': 'File could not be scanned. The security scanner is temporarily unavailable. Please try again shortly.'}, status=503)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
         s3_key, s3_url = upload_to_s3(temp_path, file_name)
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", file_name, profile.user_id)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'Failed to upload file to S3. Please try again in a few minutes.'}, status=500)
 
         with open(temp_path, 'rb') as f:
@@ -708,7 +708,7 @@ def upload_from_drive(request):
             status=Document.Status.UPLOADED,
         )
 
-        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request)
+        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request, AuditLog.Severity.LOW)
 
         def event_stream():
             try:
@@ -774,7 +774,7 @@ def upload_from_onedrive(request):
 
     valid_exts = ('.pdf', '.docx', '.txt')
     if not file_name.lower().endswith(valid_exts):
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Unsupported file type'}, status=400)
 
     # ── Resolve Organisation & Department ─────────────────────────────────────
@@ -798,7 +798,7 @@ def upload_from_onedrive(request):
     file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
     file_type = file_type_map.get(ext)
     if not file_type:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'}, status=400)
 
     # ── Download from Microsoft Graph ─────────────────────────────────────────
@@ -812,14 +812,14 @@ def upload_from_onedrive(request):
             stream=True,
         )
     except requests.exceptions.RequestException as e:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
         return JsonResponse({'error': str(e)}, status=502)
 
     if response.status_code == 401:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Invalid or expired token'}, status=401)
     if not response.ok:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
         return JsonResponse({'error': f'Microsoft API error {response.status_code}'}, status=502)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp:
@@ -831,28 +831,28 @@ def upload_from_onedrive(request):
         # ── Size check ────────────────────────────────────────────────────────
         file_size = os.path.getsize(temp_path)
         if file_size > 50 * 1024 * 1024:
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
             return JsonResponse({'error': 'File too large. Maximum size is 50 MB.'}, status=400)
 
         # ── Password protection check ─────────────────────────────────────────
         if is_password_protected(temp_path, file_name):
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
             return JsonResponse({'error': 'File rejected — password protected files are not allowed'}, status=400)
 
         # ── Malware scan ──────────────────────────────────────────────────────
         scan_result = scan_file(temp_path)
         if scan_result is not None:
             if scan_result.startswith('SCAN_ERROR:'):
-                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
                 return JsonResponse({'error': 'File could not be scanned. The security scanner is temporarily unavailable. Please try again shortly.'}, status=503)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
         # ── Upload to S3 ──────────────────────────────────────────────────────
         s3_key, s3_url = upload_to_s3(temp_path, file_name)
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", file_name, profile.user_id)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'S3 upload failed. Please try again in a few minutes.'}, status=500)
 
         # ── Cache file bytes for analysis ─────────────────────────────────────
@@ -871,7 +871,7 @@ def upload_from_onedrive(request):
             status=Document.Status.UPLOADED,
         )
 
-        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request)
+        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request, AuditLog.Severity.LOW)
 
         return JsonResponse({
             'status':      'uploaded',
@@ -1399,14 +1399,11 @@ def _generate_and_store_otp(profile: UserProfile, purpose: str) -> str:
     return raw_otp
 
 
-def _record_audit_log(profile, action_type: str, target_type: str, target_id, success: bool, request=None) -> None:
+def _record_audit_log(profile, action_type: str, target_type: str, target_id, success: bool, request=None, severity: str = AuditLog.Severity.LOW) -> None:
     ip = request.META.get("REMOTE_ADDR") if request else None
-    # Skip the audit log entry rather than crashing on the NOT NULL constraint for rejection events.
-    if target_id is None:
-        return
     AuditLog.objects.create(
         user=profile, action_type=action_type, target_type=target_type,
-        target_id=target_id, success=success, ip_address=ip
+        target_id=target_id, success=success, severity=severity, ip_address=ip
     )
 
 
@@ -1854,7 +1851,7 @@ def delete_account(request):
         deletion_record.save(update_fields=["status"])
         return JsonResponse({"detail": "Account deletion failed. Please try again."}, status=500)
 
-    _record_audit_log(profile, "DELETE_ACCOUNT", "user_profile", profile.user_id, True, request)
+    _record_audit_log(profile, "DELETE_ACCOUNT", "user_profile", profile.user_id, True, request, AuditLog.Severity.HIGH )
     return JsonResponse({"detail": "Account deleted successfully"}, status=200)
 
 
@@ -1992,7 +1989,7 @@ def save_analysis_result(request):
         document.status = Document.Status.COMPLETED
         document.save(update_fields=["status"])
 
-    _record_audit_log(profile, "ANALYSE", "analysis_result", analysis.result_id, True, request)
+    _record_audit_log(profile, "ANALYSE", "analysis_result", analysis.result_id, True, request, AuditLog.Severity.LOW)
     return JsonResponse(
         {"result_id": str(analysis.result_id), "compliance_score": compliance_score,
          "risk_level": risk_level, "findings_saved": len(findings_to_create)},
@@ -2330,7 +2327,7 @@ def generate_report(request):
     except Exception as e:
         return JsonResponse({"detail": f"Failed to create report: {str(e)}"}, status=500)
 
-    _record_audit_log(profile, "GENERATE_REPORT", "report", report.report_id, True, request)
+    _record_audit_log(profile, "GENERATE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.LOW)
     return JsonResponse(
         {"detail": "Report generated successfully", "report_id": str(report.report_id),
          "generated_at": report.generated_at.isoformat(), "expires_at": report.expires_at.isoformat()},
@@ -2364,7 +2361,7 @@ def get_report(request, report_id):
     if not is_owner and not is_org_admin:
         return JsonResponse({"detail": "You do not have access to this report"}, status=403)
 
-    _record_audit_log(profile, "VIEW_REPORT", "report", report.report_id, True, request)
+    _record_audit_log(profile, "VIEW_REPORT", "report", report.report_id, True, request, AuditLog.Severity.LOW)
     return JsonResponse(
         {
             "report_id":       str(report.report_id),
@@ -2402,7 +2399,7 @@ def delete_report(request, report_id):
     if not is_owner and not is_org_admin:
         return JsonResponse({"detail": "You do not have permission to delete this report"}, status=403)
 
-    _record_audit_log(profile, "DELETE_REPORT", "report", report.report_id, True, request)
+    _record_audit_log(profile, "DELETE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.MEDIUM)
     report.delete()
     return JsonResponse({"detail": "Report deleted"}, status=200)
 
@@ -2441,7 +2438,7 @@ def download_report(request):
         return JsonResponse({"error": "You do not have access to this report"}, status=403)
 
     ReportDownload.objects.create(downloaded_by=profile, report_id=report_id)
-    _record_audit_log(profile, "DOWNLOAD_REPORT", "report", report.report_id, True, request)
+    _record_audit_log(profile, "DOWNLOAD_REPORT", "report", report.report_id, True, request, AuditLog.Severity.MEDIUM)
     return JsonResponse({"message": "Download recorded"})
 
 
@@ -2485,7 +2482,7 @@ def share_report(request):
         access_token=token, expires_at=timezone.now() + timedelta(days=7),
     )
 
-    _record_audit_log(profile, "SHARE_REPORT", "report", report.report_id, True, request)
+    _record_audit_log(profile, "SHARE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.MEDIUM)
     return JsonResponse({"message": "Report shared successfully", "token": token})
 
 
@@ -2545,7 +2542,7 @@ def request_admin_access(request):
         access_request.delete()
         return JsonResponse({"detail": "Failed to send verification code. Please try again."}, status=500)
 
-    _record_audit_log(profile, "ADMIN_ACCESS_REQUEST", "admin_access_request", access_request.request_id, True, request)
+    _record_audit_log(profile, "ADMIN_ACCESS_REQUEST", "admin_access_request", access_request.request_id, True, request, AuditLog.Severity.HIGH)
     return JsonResponse(
         {"detail": "A verification code has been sent to your organisation email.", "request_id": str(access_request.request_id)},
         status=201,
@@ -2619,7 +2616,7 @@ def verify_admin_access(request):
         profile.updated_at = now
         profile.save(update_fields=["role", "updated_at"])
 
-    _record_audit_log(profile, "ADMIN_ACCESS_APPROVED", "admin_access_request", access_request.request_id, True, request)
+    _record_audit_log(profile, "ADMIN_ACCESS_APPROVED", "admin_access_request", access_request.request_id, True, request, AuditLog.Severity.HIGH)
     return JsonResponse({"detail": "Administrative access granted successfully.", "role": profile.role}, status=200)
 
 

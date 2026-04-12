@@ -225,7 +225,7 @@ LIMIT 10;
 \echo ''
 
 SELECT audit_id, user_id, action_type, target_type, target_id,
-       success, ip_address, created_at
+       success, severity, ip_address, created_at
 FROM audit_logs
 ORDER BY created_at DESC
 LIMIT 10;
