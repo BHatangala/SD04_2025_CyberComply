@@ -84,6 +84,7 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'core.performance.PerformanceLoggingMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'core.csp.ContentSecurityPolicyMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
