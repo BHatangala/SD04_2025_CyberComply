@@ -606,7 +606,7 @@
                                     type: 'success'
                                 };
                             } else if (data.status === 'APPROVED') {
-                                sessionStorage.setItem('userRole', 'Administrative User');
+                                sessionStorage.setItem('userRole', data.role ||'ADMINISTRATIVE_USER');
                             }
                         }
                     } catch (e) {

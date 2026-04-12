@@ -777,7 +777,7 @@
                 // Fall back to /api/analysis/latest/ if none is stored.
                 const resultId = sessionStorage.getItem('latestResultId');
                 const url = resultId
-                    ? `${BASE}/api/analysis/${resultId}/`
+                    ? `${BASE}/api/analysis/${encodeURIComponent(resultId)}/`
                     : `${BASE}/api/analysis/latest/`;
 
                 try {

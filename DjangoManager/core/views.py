@@ -911,6 +911,12 @@ def signup(request):
 
     if len(full_name) < 3:
         return JsonResponse({"detail": "Please enter your full name (first and last name)"}, status=400)
+    
+    if len(full_name) > 150:
+        return JsonResponse({"detail": "Full name is too long."}, status=400)
+
+    if any(ord(char) < 32 for char in full_name):
+        return JsonResponse({"detail": "Invalid name format"}, status=400)
 
     if not re.match(r"^[A-Za-z'-]+(?:\s[A-Za-z'-]+)+$", full_name):
         return JsonResponse({"detail": "Please enter your full name (first and last name)"}, status=400)
