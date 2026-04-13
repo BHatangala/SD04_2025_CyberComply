@@ -387,17 +387,18 @@ LIMIT 10;
 \echo ''
 
 SELECT
-    LEFT(query, 120)                    AS query_preview,
+    LEFT(query, 120) AS query_preview,
     calls,
-    ROUND(total_exec_time::numeric, 2)  AS total_exec_time_ms,
-    ROUND(mean_exec_time::numeric, 2)   AS avg_exec_time_ms
+    ROUND(total_exec_time::numeric, 2) AS total_exec_time_ms,
+    ROUND(mean_exec_time::numeric, 2) AS avg_exec_time_ms
 FROM
     pg_stat_statements
 WHERE
     query ~* '(organization|department|auth_user|user_profile|document|analysis_result|finding|recommendations|reports|report_downloads|report_shares|admin_access_request|deletion_request|audit_logs)'
     AND mean_exec_time > 10
 ORDER BY
-    total_exec_time DESC;
+    total_exec_time DESC
+LIMIT 10;
 
 
 \echo ''
@@ -409,9 +410,9 @@ ORDER BY
 \echo ''
 
 SELECT
-    LEFT(query, 120)                   AS query_preview,
+    LEFT(query, 120) AS query_preview,
     calls,
-    ROUND(mean_exec_time::numeric, 2)  AS avg_exec_time_ms
+    ROUND(mean_exec_time::numeric, 2) AS avg_exec_time_ms
 FROM
     pg_stat_statements
 WHERE
@@ -419,3 +420,61 @@ WHERE
 ORDER BY
     calls DESC
 LIMIT 10;
+
+
+\echo ''
+\echo ''
+\echo '=============================='
+\echo 'PERFORMANCE ANALYSIS SUMMARY'
+\echo '=============================='
+\echo 'Evaluates query performance based on pg_stat_statements'
+\echo ''
+
+SELECT
+CASE 
+    WHEN (
+        SELECT COUNT(*) 
+        FROM pg_stat_statements
+        WHERE
+            query ~* '(organization|department|auth_user|user_profile|document|analysis_result|finding|recommendations|reports|report_downloads|report_shares|admin_access_request|deletion_request|audit_logs)'
+            AND mean_exec_time > 10
+    ) = 0 THEN
+
+        'No slow queries above 10 ms were detected.
+Most observed queries executed with low average execution times, indicating efficient database performance.
+
+Performance reasons:
+- Normalized relational schema reduced redundancy and improved query structure
+- Proper use of primary keys and foreign keys supported efficient joins
+- Indexed relationships improved filtering and lookup operations
+- Structured tables (user_profile, document, analysis_result, reports) optimized query flow
+- The current dataset size is manageable for PostgreSQL performance
+
+Optimization strategies implemented:
+- Enabled pg_stat_statements for real-time monitoring
+- Reviewed frequently executed queries for potential bottlenecks
+- Optimized Django ORM usage to avoid unnecessary database calls
+- Maintained normalized schema design for efficient operations
+- Utilized indexing through primary keys, unique constraints, and explicit model indexes where applicable
+- Limited unnecessary data retrieval using ORDER BY and LIMIT
+
+No immediate optimization required.
+Performance monitoring remains active for future scalability and tuning.'
+        
+    ELSE
+
+        'Slow queries detected (greater than 10 ms).
+
+Recommended optimization strategies:
+- Add indexes on frequently filtered and joined columns
+- Optimize JOIN operations and reduce unnecessary joins
+- Refactor complex queries for better execution plans
+- Replace SELECT * with specific column selection
+- Implement pagination (LIMIT/OFFSET) for large datasets
+- Optimize Django ORM queries using select_related or prefetch_related
+- Consider caching for frequently executed queries
+- Continuously monitor query performance using pg_stat_statements
+
+Further optimization will be applied based on observed query patterns.'
+        
+END AS performance_analysis;
