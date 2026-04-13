@@ -183,21 +183,26 @@
 
     .report-viewer h2.report-title {
         text-align: center;
-        font-size: 28px;
-        font-weight: bold;
-        margin-bottom: 20px;
+        font-size: 34px;
+        font-weight: 800;
+        margin-bottom: 22px;
         color: #ffffff;
+        letter-spacing: -0.4px;
+        text-shadow: 0 10px 26px rgba(0, 0, 0, 0.25);
     }
 
     .pdf-container {
         width: 100%;
         height: 75vh;
-        background-color: #bfc2c9;
-        border: 8px solid #2a4a7c;
-        border-radius: 12px;
-        color: #05070a;
+        background: linear-gradient(180deg, #f8fbff 0%, #eef3f9 100%);
+        border: 1px solid rgba(74, 143, 231, 0.18);
+        border-radius: 22px;
+        color: #162033;
         overflow: auto;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        box-shadow: 
+          0 24px 60px rgba(0, 0, 0, 0.28),
+          inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        padding: 28px;
     }
 
     /* Share & Download Buttons */
@@ -291,7 +296,7 @@
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
     }
 
-    /* Wavy Background-fix this */
+    /* Wavy Background */
     .wavy-background {
         position: fixed;
         bottom: 0;
@@ -307,7 +312,342 @@
         height: auto;
         display: block;
     }
+
+    .report-section {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 18px;
+        margin-bottom: 22px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+
+        /* animation */
+        opacity: 0;
+        transform: translateY(20px);
+        animation: fadeSlide 0.5s ease forwards;
+    }
+
+    @keyframes fadeSlide {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .section-title {
+        font-size: 20px;
+        font-weight: 800;
+        color: #14213a;
+        margin-bottom: 8px;
+    }
+
+    .section-subtitle {
+        font-size: 13px;
+        color: #6b7a99;
+        margin-bottom: 16px;
+        line-height: 1.2;
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 10px;
+        background: #e3e8f0;
+        border-radius: 20px;
+        overflow: hidden;
+        margin-top: 8px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4a8fe7, #6fb1ff);
+    }
+
+    .item-card {
+        display: flex;
+        gap: 12px;
+        padding: 14px;
+        border-radius: 14px;
+        background: #fffffffe;
+        border: 1px solid rgba(20, 33, 58, 0.08);
+        margin-bottom: 10px;
+        align-items: flex-start;
+        transition: all 0.2s ease;
+    }
+
+    item-card:hover{
+       background: #eff3f8;
+       transform: translateY(-1px); 
+    }
+
+    .item-index {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: #e8f1ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: #2e6ed3;
+    }
+
+    .comparison-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+    }
+
+    .comparison-card {
+        background: #1a2845;
+        color: white;
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(74, 143, 231, 0.18);
+    }   
     
+    .report-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+
+    /* Section header area */
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 16px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid rgba(42, 74, 124, 0.12);
+    }
+
+    /* Small uppercase section label */
+    .section-kicker {
+        font-size: 12px;
+        font-weight: 800;
+        color: #3f7fe0;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    /* Summary cards grid */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+    }
+
+    /* Summary card style */
+    .summary-card {
+        background: #1a2845;
+        border-radius: 14px;
+        padding: 14px;
+        border: 1px solid rgba(0,0,0,0.05);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.04);
+        min-height: 90px;
+    }
+
+    /* Summary label/value */
+    .summary-label {
+        font-size: 11px;
+        color: #9fb4da;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        font-weight: 700;
+        letter-spacing: 0.6px;
+    }
+
+    .summary-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: #ffffff;
+        line-height: 1.4;
+    }
+
+    /* Subsection block spacing */
+    .subsection-block {
+        margin-bottom: 24px;
+    }
+
+    .subsection-block:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Divider between subsections */
+    .subsection-divider {
+        height: 1px;
+        background: 1px solid rgba(255, 255, 255, 0.2);
+        margin: 4px 0 22px;
+    }
+
+    /* Content part of item card */
+    .item-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .item-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #162033;
+        line-height: 1.45;
+        margin-bottom: 4px;
+    }
+
+    .item-text {
+        font-size: 13px;
+        color: #5f6f8b;
+        margin-top: 4px;
+        line-height: 1.6;
+    }
+
+    /* meta/reference text */
+    .item-meta {
+        font-size: 12px;
+        color: #7d89a1;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(42, 74, 124, 0.08);
+        line-height: 1.5;
+    }
+
+    .empty-state {
+        font-size: 13px;
+        color: #6b7a99;
+        font-style: italic;
+        padding: 4px 0 2px;
+        line-height: 1.5;
+    }
+
+    /* List wrapper */
+    .list-block {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* Risk factor list */
+    .risk-factor-list {
+        margin-top: 10px;
+        padding-left: 18px;
+        color: #5f6f8b;
+    }
+
+    .risk-factor-list li {
+        margin-bottom: 6px;
+        line-height: 1.5;
+    }
+
+    /* Partial badge only */
+    .badge-partial {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 8px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.7px;
+        text-transform: uppercase;
+        background: rgba(231, 150, 74, 0.12);
+        color: #cf7b1e;
+        border: 1px solid rgba(231, 150, 74, 0.26);
+        vertical-align: middle;
+    }
+
+    .comparison-label {
+        font-size: 11px;
+        color: #91a5c9;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        font-weight: 700;
+    }
+
+    .comparison-value {
+        font-size: 15px;
+        font-weight: 700;
+        color: #ffffff;
+        line-height: 1.45;
+    }    
+
+    .section-dark{
+        background: #1a2845;
+    }
+
+    .section-dark .section-title{
+        color: #f0f3f8;
+    }
+
+    .section-dark .section-subtitle{
+        color: #dfe2e7;
+    }
+
+    .section-dark .summary-label{
+        color: #a9c4ff;
+    }
+
+    .section-dark .section-header{
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .section-dark .section-kicker{
+        color: #7fb3ff;
+    }
+
+    .overview-section{
+        background: #d5d8e2;
+    }
+
+    .overview-section .section-title {
+        color: #0f1a2b;
+    }
+
+    .overview-section .section-subtitle {
+        color: #4a5b75;
+    }
+
+    .overview-section .summary-label {
+        color: #6b7a99;
+    }
+
+    .overview-section .summary-value {
+        color: #ffffff;
+    }
+
+    .overview-section .summary-grid {
+        margin-bottom: 12px;
+    }
+
+    .overview-section .subsection-block {
+        margin-bottom: 16px;
+    }
+
+    .overview-section .summary-label,
+    .overview-section .section-kicker {
+        color: #5a6b85;
+    }
+
+    .overview-section .summary-value:not(.summary-card .summary-value) {
+        color: #0f1a2b;
+    }
+
+    .overview-section .subsection-block .summary-value {
+        color: #0f1a2b;
+        font-weight: 700;
+    }
+
+    .summary-card .summary-label {
+        color: #c4d2ef;
+    }
+
+    .summary-card .summary-value {
+        color: #f0eeee;
+    }
+
     </style>
 </head>
 
@@ -325,8 +665,7 @@
   </div>
 
   <!-- Back Arrow -->
-   <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←
-   </div>
+   <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←</div>
 
   <!-- Home Button -->
    <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goHome">
@@ -345,151 +684,229 @@
     <!-- Main Content -->
     <div class="report-viewer" :class="{ shifted: sidebarOpen }">
         <h2 class="report-title">{{ currentReportName || 'Select a report' }}</h2>
-        <div class="pdf-container" style="padding: 24px; overflow-y: auto;">
+        
+        <div class="pdf-container">
             <div v-if="isGenerating" style="color:#6b7a99; text-align:center; margin-top:40px;">
                 Generating report…
             </div>
+
             <div v-else-if="!currentSnapshot" style="color:#6b7a99; text-align:center; margin-top:40px;">
                 Please select a report from the sidebar to view its content.
             </div>
-            <div v-else>
+
+            <div v-else class="report-shell">
 
                 <!-- ── DOCUMENT ANALYSIS SUMMARY (all users) ──────────────── -->
-                <div style="font-size:13px; font-weight:700; color:#4a8fe7; letter-spacing:1px; text-transform:uppercase; margin-bottom:14px;">Document Analysis</div>
-                <div style="margin-bottom:10px;"><strong>File:</strong> {{ currentSnapshot.metadata?.file_analyzed || '—' }}</div>
-                <div style="margin-bottom:10px;"><strong>Company:</strong> {{ currentSnapshot.metadata?.company || '—' }}</div>
-                <div style="margin-bottom:10px;"><strong>Compliance Score:</strong> {{ currentSnapshot.compliance?.compliance_score ?? '—' }}%</div>
-                <div style="margin-bottom:10px;">
-                    <strong>Risk Level:</strong>
-                    {{ currentSnapshot.risks?.status ? currentSnapshot.risks.status.charAt(0).toUpperCase() + currentSnapshot.risks.status.slice(1) : '—' }}
-                </div>
-                <div v-if="currentSnapshot.risks?.factors?.length" style="margin-bottom:10px;">
-                    <strong>Risk Factors:</strong>
-                    <ul style="margin-top:6px; padding-left:20px;">
-                        <li v-for="(f, i) in currentSnapshot.risks.factors" :key="i">{{ f }}</li>
-                    </ul>
-                </div>
-                <div v-if="topRecommendation" style="margin-bottom:10px;">
-                    <strong>Top Recommendation:</strong> {{ topRecommendation }}
-                </div>
+              <section class="report-section overview-section">
+                  <div class="section-header">
+                      <div>
+                          <div class="section-kicker">Overview</div>
+                          <div class="section-title">Document Analysis</div>
+                          <div class="section-subtitle">
+                              Key document details and overall compliance summary
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="summary-grid">
+                      <div class="summary-card">
+                          <div class="summary-label">File</div>
+                          <div class="summary-value">{{ currentSnapshot.metadata?.file_analyzed || '—' }}</div>
+                      </div>
+
+                      <div class="summary-card">
+                          <div class="summary-label">Company</div>
+                          <div class="summary-value">{{ currentSnapshot.metadata?.company || '—' }}</div>
+                      </div>
+
+                      <div class="summary-card">
+                          <div class="summary-label">Risk Level</div>
+                          <div class="summary-value">
+                              {{ currentSnapshot.risks?.status ? currentSnapshot.risks.status.charAt(0).toUpperCase() + currentSnapshot.risks.status.slice(1) : '—' }}
+                          </div>
+                      </div>
+
+                      <div class="summary-card">
+                          <div class="summary-label">Top Recommendation</div>
+                          <div class="summary-value">{{ topRecommendation || '—' }}</div>
+                      </div>
+                  </div>
 
                 <!-- ── COMPLIANCE INTERFACE (all users) ───────────────────── -->
-                <div style="margin-top:28px; border-top:1px solid rgba(74,143,231,0.2); padding-top:20px;">
-                    <div style="font-size:13px; font-weight:700; color:#4a8fe7; letter-spacing:1px; text-transform:uppercase; margin-bottom:16px;">Compliance Score</div>
+                  <!-- NEW: Compliance score progress bar -->
+                  <div class="subsection-block">
+                      <div class="summary-label">Compliance Score</div>
+                      <div class="summary-value">{{ currentSnapshot.compliance?.compliance_score ?? '—' }}%</div>
+                      <div class="progress-bar">
+                          <div
+                              class="progress-fill"
+                              :style="{ width: Math.max(0, Math.min(100, Number(currentSnapshot.compliance?.compliance_score ?? 0))) + '%' }">
+                          </div>
+                      </div>
+                  </div>
 
-                    <!-- Gap Identification -->
-                    <div style="margin-bottom:22px;">
-                        <div style="font-size:13px; font-weight:700; color:#c5d0e6; margin-bottom:4px;">Gap Identification</div>
-                        <div style="font-size:12px; color:#6b7a99; margin-bottom:10px;">
-                            Requirements completely absent from the policy — {{ gaps.length }} gap{{ gaps.length !== 1 ? 's' : '' }} identified, sorted by severity
-                        </div>
-                        <div v-if="gaps.length === 0" style="font-size:13px; color:#6b7a99; font-style:italic;">
-                            No compliance gaps detected. All requirements are at least partially addressed.
-                        </div>
-                        <div v-for="(item, idx) in gaps" :key="'gap-'+item.requirement_id"
-                            style="display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid rgba(74,143,231,0.1);">
-                            <span style="font-size:11px; font-weight:700; color:#4a8fe7; min-width:18px; padding-top:2px; flex-shrink:0;">{{ idx+1 }}</span>
-                            <div style="flex:1;">
-                                <div style="font-size:13px; font-weight:600; color:#fff; margin-bottom:3px;">{{ item.clause }}</div>
-                                <div style="font-size:12px; color:#8b9dc3; line-height:1.5;">{{ item.reasoning }}</div>
-                            </div>
-                            <span :style="riskBadgeStyle(item.risk_level)"
-                                style="font-size:10px; font-weight:700; padding:3px 9px; border-radius:99px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; letter-spacing:0.8px;">
-                                {{ item.risk_level || 'unknown' }}
-                            </span>
-                        </div>
-                    </div>
+                  <div v-if="currentSnapshot.risks?.factors?.length" class="subsection-block">
+                      <div class="summary-label">Risk Factors</div>
+                      <ul class="risk-factor-list">
+                          <li v-for="(f, i) in currentSnapshot.risks.factors" :key="i">{{ f }}</li>
+                      </ul>
+                  </div>
+              </section>
 
-                    <!-- Risk Assessment -->
-                    <div>
-                        <div style="font-size:13px; font-weight:700; color:#c5d0e6; margin-bottom:4px;">Risk Assessment</div>
-                        <div style="font-size:12px; color:#6b7a99; margin-bottom:10px;">
-                            All non-compliant and partially compliant requirements, sorted by severity — {{ riskItems.length }} item{{ riskItems.length !== 1 ? 's' : '' }} flagged
-                        </div>
-                        <div v-if="riskItems.length === 0" style="font-size:13px; color:#6b7a99; font-style:italic;">
-                            No risks identified. The document appears fully compliant.
-                        </div>
-                        <div v-for="(item, idx) in riskItems" :key="'risk-'+item.requirement_id"
-                            style="display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid rgba(74,143,231,0.1);">
-                            <span style="font-size:11px; font-weight:700; color:#4a8fe7; min-width:18px; padding-top:2px; flex-shrink:0;">{{ idx+1 }}</span>
-                            <div style="flex:1;">
-                                <div style="font-size:13px; font-weight:600; color:#fff; margin-bottom:3px; display:flex; align-items:center; flex-wrap:wrap; gap:7px;">
-                                    {{ item.clause }}
-                                    <span v-if="item.status === 'partial'"
-                                        style="font-size:11px; font-weight:600; color:#e7964a; background:rgba(231,150,74,0.12); border:1px solid rgba(231,150,74,0.3); padding:1px 7px; border-radius:99px;">
-                                        Partially Implemented
-                                    </span>
-                                </div>
-                                <div style="font-size:12px; color:#8b9dc3; line-height:1.5;">{{ item.reasoning }}</div>
-                            </div>
-                            <span :style="riskBadgeStyle(item.risk_level)"
-                                style="font-size:10px; font-weight:700; padding:3px 9px; border-radius:99px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; letter-spacing:0.8px;">
-                                {{ item.risk_level || 'unknown' }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
+              <!-- CHANGED: Compliance Findings section -->
+              <section class="report-section section-dark">
+                  <div class="section-header">
+                      <div>
+                          <div class="section-kicker">Assessment</div>
+                          <div class="section-title">Compliance Findings</div>
+                          <div class="section-subtitle">
+                              Gaps and risks identified from the uploaded policy
+                          </div>
+                      </div>
+                  </div>
+
+                  <!-- CHANGED: Gap Identification subsection -->
+                  <div class="subsection-block">
+                      <div class="summary-label">Gap Identification</div>
+                      <div class="section-subtitle">
+                          Requirements completely absent from the policy — {{ gaps.length }} gap{{ gaps.length !== 1 ? 's' : '' }} identified
+                      </div>
+
+                      <div v-if="gaps.length === 0" class="empty-state">
+                          No compliance gaps detected. All requirements are at least partially addressed.
+                      </div>
+
+                      <div v-else class="list-block">
+                          <div v-for="(item, idx) in gaps" :key="'gap-'+item.requirement_id" class="item-card">
+                              <div class="item-index">{{ idx + 1 }}</div>
+                              <div class="item-body">
+                                  <div class="item-title">{{ item.clause }}</div>
+                                  <div class="item-text">{{ item.reasoning }}</div>
+                              </div>
+                              <span :style="riskBadgeStyle(item.risk_level)"
+                                  style="font-size:10px; font-weight:700; padding:6px 12px; border-radius:999px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; align-self: flex-start; display:inline-flex; align-items: center; justify-content: center; line-height: 1; min-width: 88px; text-align: center; letter-spacing: 0.8px;">
+                                  {{ item.risk_level || 'unknown' }}
+                              </span>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="subsection-divider"></div>
+
+                  <!-- CHANGED: Risk Assessment subsection -->
+                  <div class="subsection-block">
+                      <div class="summary-label">Risk Assessment</div>
+                      <div class="section-subtitle">
+                          All non-compliant and partially compliant requirements — {{ riskItems.length }} item{{ riskItems.length !== 1 ? 's' : '' }} flagged
+                      </div>
+
+                      <div v-if="riskItems.length === 0" class="empty-state">
+                          No risks identified. The document appears fully compliant.
+                      </div>
+
+                      <div v-else class="list-block">
+                          <div v-for="(item, idx) in riskItems" :key="'risk-'+item.requirement_id" class="item-card">
+                              <div class="item-index">{{ idx + 1 }}</div>
+                              <div class="item-body">
+                                  <div class="item-title">
+                                      {{ item.clause }}
+                                      <span v-if="item.status === 'partial'" class="badge-partial">Partial</span>
+                                  </div>
+                                  <div class="item-text">{{ item.reasoning }}</div>
+                              </div>
+                              <span :style="riskBadgeStyle(item.risk_level)"
+                                  style="font-size:10px; font-weight:700; padding:6px 12px; border-radius:999px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; align-self: flex-start; display:inline-flex; align-items: center; justify-content: center; line-height: 1; min-width: 88px; text-align: center; letter-spacing: 0.8px;">
+                                  {{ item.risk_level || 'unknown' }}
+                              </span>
+                          </div>
+                      </div>
+                  </div>
+              </section>   
+              
+              <!-- ── COMPARISON (admin only) ────────────────────────────── -->
+              <section v-if="isAdmin" class="report-section section-dark">
+                  <div class="section-header">
+                      <div>
+                          <div class="section-kicker">Department View</div>
+                          <div class="section-title">Comparison</div>
+                          <div class="section-subtitle">
+                              Department-level summary and recommendation references
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="comparison-grid">
+                      <div class="comparison-card">
+                          <div class="comparison-label">Company</div>
+                          <div class="comparison-value">{{ currentSnapshot.metadata?.company || '—' }}</div>
+                      </div>
+
+                      <div v-if="departmentName" class="comparison-card">
+                          <div class="comparison-label">Department</div>
+                          <div class="comparison-value">{{ departmentName }}</div>
+                      </div>
+
+                      <div class="comparison-card">
+                          <div class="comparison-label">Score / Risk</div>
+                          <div class="comparison-value">
+                              {{ currentSnapshot.compliance?.compliance_score ?? '—' }}% — {{ overallRiskLevel }} Risk
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="subsection-block" style="margin-top: 20px;">
+                      <div class="summary-label">
+                          {{ departmentName || currentSnapshot.metadata?.company || 'Departmental' }} Recommendations
+                      </div>
+
+                      <div v-if="departmentRecs.length === 0" class="empty-state">
+                          No recommendations — this department is fully compliant.
+                      </div>
+
+                      <div v-else class="list-block">
+                          <div v-for="rec in departmentRecs" :key="rec.requirementId" class="item-card">
+                              <div class="item-body">
+                                  <div class="item-title">{{ rec.clauseTitle }}</div>
+                                  <div class="item-text">{{ rec.reference }}</div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </section>
 
                 <!-- ── RECOMMENDATIONS (admin only) ───────────────────────── -->
-                <div v-if="isAdmin" style="margin-top:28px; border-top:1px solid rgba(74,143,231,0.2); padding-top:20px;">
-                    <div style="font-size:13px; font-weight:700; color:#4a8fe7; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px;">Recommendations</div>
-                    <div style="font-size:12px; color:#6b7a99; margin-bottom:16px;">
-                        {{ riskItems.length }} recommendation{{ riskItems.length !== 1 ? 's' : '' }} generated from non-compliant and partially compliant requirements
-                    </div>
-                    <div v-if="riskItems.length === 0" style="font-size:13px; color:#6b7a99; font-style:italic;">
-                        No recommendations — the document is fully compliant.
-                    </div>
-                    <div v-for="(item, idx) in riskItems" :key="'rec-'+item.requirement_id"
-                        style="margin-bottom:14px; padding:14px 16px; background:#1a2845; border-radius:8px; border-left:4px solid #4a8fe7;">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;">
-                            <div style="font-size:14px; font-weight:700; color:#fff;">{{ idx+1 }}. {{ item.clause }}</div>
-                            <span :style="riskBadgeStyle(item.risk_level)"
-                                style="font-size:10px; font-weight:700; padding:3px 9px; border-radius:99px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; letter-spacing:0.8px;">
-                                {{ item.risk_level || 'unknown' }}
-                            </span>
-                        </div>
-                        <div style="font-size:13px; color:#8b9dc3; line-height:1.55; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid rgba(74,143,231,0.12);">
-                            {{ item.reasoning }}
-                        </div>
-                        <div style="font-size:12px; color:#6b7a99;">
-                            Personal Data Protection Act No. 9 of 2022 (Sri Lanka) — {{ buildReferenceFromId(item.requirement_id) }}
-                        </div>
-                    </div>
-                </div>
+              <section v-if="isAdmin" class="report-section section-dark">
+                  <div class="section-header">
+                      <div>
+                          <div class="section-kicker">Action Plan</div>
+                          <div class="section-title">Recommendations</div>
+                          <div class="section-subtitle">
+                              {{ riskItems.length }} recommendation{{ riskItems.length !== 1 ? 's' : '' }} generated from flagged requirements
+                          </div>
+                      </div>
+                  </div>
 
-                <!-- ── COMPARISON (admin only) ────────────────────────────── -->
-                <div v-if="isAdmin" style="margin-top:28px; border-top:1px solid rgba(74,143,231,0.2); padding-top:20px;">
-                    <div style="font-size:13px; font-weight:700; color:#4a8fe7; letter-spacing:1px; text-transform:uppercase; margin-bottom:16px;">Comparison</div>
-                    <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px;">
-                        <div style="background:#1a2845; padding:12px 18px; border-radius:8px; min-width:160px;">
-                            <div style="font-size:11px; color:#6b7a99; letter-spacing:0.5px; margin-bottom:4px; text-transform:uppercase;">Company</div>
-                            <div style="font-size:14px; font-weight:600; color:#fff;">{{ currentSnapshot.metadata?.company || '—' }}</div>
-                        </div>
-                        <div v-if="departmentName" style="background:#1a2845; padding:12px 18px; border-radius:8px; min-width:160px;">
-                            <div style="font-size:11px; color:#6b7a99; letter-spacing:0.5px; margin-bottom:4px; text-transform:uppercase;">Department</div>
-                            <div style="font-size:14px; font-weight:600; color:#fff;">{{ departmentName }}</div>
-                        </div>
-                        <div style="background:#1a2845; padding:12px 18px; border-radius:8px; min-width:160px;">
-                            <div style="font-size:11px; color:#6b7a99; letter-spacing:0.5px; margin-bottom:4px; text-transform:uppercase;">Score / Risk</div>
-                            <div style="font-size:14px; font-weight:600; color:#fff;">
-                                {{ currentSnapshot.compliance?.compliance_score ?? '—' }}% — {{ overallRiskLevel }} Risk
-                            </div>
-                        </div>
-                    </div>
-                    <div style="font-size:13px; font-weight:700; color:#c5d0e6; margin-bottom:12px;">
-                        {{ departmentName || currentSnapshot.metadata?.company || 'Departmental' }} Recommendations
-                    </div>
-                    <div v-if="departmentRecs.length === 0" style="font-size:13px; color:#6b7a99; font-style:italic;">
-                        No recommendations — this department is fully compliant.
-                    </div>
-                    <ul style="padding-left:0; list-style:none;">
-                        <li v-for="rec in departmentRecs" :key="rec.requirementId"
-                            style="padding:8px 0; border-bottom:1px solid rgba(74,143,231,0.1);">
-                            <div style="font-size:13px; font-weight:600; color:#fff; margin-bottom:3px;">{{ rec.clauseTitle }}</div>
-                            <div style="font-size:12px; color:#6b7a99;">{{ rec.reference }}</div>
-                        </li>
-                    </ul>
-                </div>
+                  <div v-if="riskItems.length === 0" class="empty-state">
+                      No recommendations — the document is fully compliant.
+                  </div>
+
+                  <div v-else class="list-block">
+                      <div v-for="(item, idx) in riskItems" :key="'rec-'+item.requirement_id" class="item-card">
+                          <div class="item-index">{{ idx + 1 }}</div>
+                          <div class="item-body">
+                              <div class="item-title">{{ item.clause }}</div>
+                              <div class="item-text">{{ item.reasoning }}</div>
+                              <div class="item-meta">
+                                  Personal Data Protection Act No. 9 of 2022 (Sri Lanka) — {{ buildReferenceFromId(item.requirement_id) }}
+                              </div>
+                          </div>
+                          <span :style="riskBadgeStyle(item.risk_level)"
+                              style="font-size:10px; font-weight:700; padding:6px 12px; border-radius:999px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; align-self: flex-start; display:inline-flex; align-items: center; justify-content: center; line-height: 1; min-width: 88px; text-align: center; letter-spacing: 0.8px;">
+                              {{ item.risk_level || 'unknown' }}
+                          </span>
+                      </div>
+                  </div>
+              </section>
 
             </div>
         </div>
@@ -1122,6 +1539,7 @@ const app = createApp({
 
       this.currentSnapshot = null;
       this.currentReportName = report.display_name || 'Report';
+      this.departmentName = '';
       
       try {
         const res = await fetch(`${BASE}/api/reports/${report.report_id}/`, {
@@ -1148,6 +1566,21 @@ const app = createApp({
         }
     
         this.currentSnapshot = data.report_snapshot;
+        this.resultId = data.result_id || null;
+
+        if (this.resultId) {
+            try {
+                const aRes = await fetch(`${BASE}/api/analysis/${this.resultId}/`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (aRes.ok) {
+                    const aData = await aRes.json();
+                    this.departmentName = aData.department || '';
+                }
+            } catch (_) {
+                this.departmentName = '';
+            }
+        }        
 
         const meta = (data.report_snapshot || {}).metadata || {};
         const company = (meta.company || '').trim();
