@@ -227,6 +227,7 @@ LOGGING = {
         },
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'json',
         },
     },
     'loggers': {

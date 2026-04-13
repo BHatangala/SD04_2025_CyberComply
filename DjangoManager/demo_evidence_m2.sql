@@ -478,3 +478,12 @@ Recommended optimization strategies:
 Further optimization will be applied based on observed query patterns.'
         
 END AS performance_analysis;
+
+
+\echo ''
+\echo '========================================='
+\echo 'APPLICATION-LEVEL PERFORMANCE MONITORING'
+\echo '========================================='
+\echo 'In addition to database-level analysis, application-level performance is monitored using Django middleware.'
+\echo 'Each API request logs response time, database query count, and cumulative database latency per request.'
+\echo 'This enables identification of whether delays originate from database queries or application processing logic.'

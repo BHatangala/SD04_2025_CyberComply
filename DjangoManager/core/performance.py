@@ -2,8 +2,7 @@
 import time
 import json
 import logging
-import boto3
-from django.conf import settings
+from django.db import connection
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +31,21 @@ class PerformanceLoggingMiddleware:
     def __call__(self, request):
         start_time = time.time()
 
+        # Reset per-request DB query tracking
+        if hasattr(connection, "queries_log"):
+            connection.queries_log.clear()        
+
         response = self.get_response(request)
 
         duration_ms = round((time.time() - start_time) * 1000, 2)
+
+        # Capture DB metrics
+        db_queries = connection.queries
+        db_query_count = len(db_queries)
+        db_latency_ms = round(
+            sum(float(q.get("time", 0)) for q in db_queries) * 1000,
+            2
+        )
 
         # Assign severity based on SRS thresholds
         if duration_ms < THRESHOLD_WARNING_MS:
@@ -46,12 +57,23 @@ class PerformanceLoggingMiddleware:
         else:
             severity = 'critical'
 
+        # Escalate severity if DB latency is high
+        if db_latency_ms > 2000:
+            severity = 'critical'
+        elif db_latency_ms > 1000 and severity != 'critical':
+            severity = 'error'
+        elif db_latency_ms > 500 and severity == 'info':
+            severity = 'warning'
+
         log_entry = {
-            'path':        request.path,
-            'method':      request.method,
-            'status':      response.status_code,
-            'duration_ms': duration_ms,
-            'severity':    severity,
+            'path':             request.path,
+            'view':             request.resolver_match.view_name if request.resolver_match else 'unknown',
+            'method':           request.method,
+            'status':           response.status_code,
+            'duration_ms':      duration_ms,
+            'db_query_count':   db_query_count,
+            'db_latency_ms':    db_latency_ms,            
+            'severity':         severity,
         }
 
         # Log at the appropriate level so CloudWatch filters work correctly
