@@ -373,8 +373,8 @@
         transition: all 0.2s ease;
     }
 
-    item-card:hover{
-       background: #eff3f8;
+    .item-card:hover{
+       background: #eff1f2;
        transform: translateY(-1px); 
     }
 
@@ -983,6 +983,25 @@ const app = createApp({
       return;
     }
 
+    window.addEventListener('error', (event) => {
+        this.logClientError(
+            'window.error',
+            event.error || new Error(event.message),
+            {
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno
+            }
+        );
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+        this.logClientError(
+            'unhandledrejection',
+            event.reason || new Error('Unhandled promise rejection')
+        );
+    });
+
     // Resolve admin flag
     this.isAdmin = sessionStorage.getItem('userRole') === 'ADMINISTRATIVE_USER';
 
@@ -1061,6 +1080,37 @@ const app = createApp({
   },
 
   methods: {
+    async logClientError(source, error, extra = {}) {
+        const token = sessionStorage.getItem('authToken');
+
+        const payload = {
+            source,
+            message: error?.message || String(error) || 'Unknown client error',
+            stack: error?.stack || null,
+            page: window.location.pathname,
+            url: window.location.href,
+            report_id: this.resultId || new URLSearchParams(window.location.search).get('report_id') || null,
+            user_role: sessionStorage.getItem('userRole') || null,
+            timestamp: new Date().toISOString(),
+            extra
+        };
+
+        console.error(`[CLIENT ERROR] ${source}`, payload);
+
+        try {
+            await fetch(`${BASE}/api/client-error-log/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify(payload)
+            });
+        } catch (loggingError) {
+            console.error('Failed to send client error log:', loggingError);
+        }
+    },
+
     async getErrorMessage(response, fallback = 'Something went wrong.') {
       try {
         const contentType = response.headers.get('content-type') || '';
@@ -1192,7 +1242,9 @@ const app = createApp({
         }
 
       } catch (e) {
-        console.error('generateReport error:', e);
+        await this.logClientError('generateReport', e, {
+            latestResultId: sessionStorage.getItem('latestResultId')
+        });
         alert('Unable to connect to the backend. Please check whether the server is running.');
       } finally {
         this.isGenerating = false;
@@ -1255,7 +1307,7 @@ const app = createApp({
           } catch (_) { /* department info is optional */ }
         }
       } catch (e) {
-        console.error('loadReport error:', e);
+        console.error('loadReport error:', e, { reportId });
         alert('Something went wrong while loading the report.');
       }
     },
@@ -1480,7 +1532,9 @@ const app = createApp({
           doc.save(`${this.currentReportName || 'report'}.pdf`);
 
       } catch (err) {
-          console.error(err);
+          await this.logClientError('downloadReport', err, {
+            currentReportName: this.currentReportName
+          });
           alert("Something went wrong.");
       }
   },
@@ -1589,7 +1643,9 @@ const app = createApp({
 
         window.history.replaceState({}, '', `report_viewing.html?report_id=${report.report_id}`);
       } catch (e) {
-        console.error('Failed to load report:', e);
+        await this.logClientError('openReport', e, {
+            selectedReportId: report?.report_id || null
+        });
         alert('Something went wrong while loading the report.');
       }
     },
@@ -1797,7 +1853,9 @@ const app = createApp({
         }
 
       } catch (error) {
-        console.error("Share error:", error);
+        await this.logClientError('shareReport', error, {
+            currentReportName: this.currentReportName
+        });
         alert("Something went wrong.");
       }
     }

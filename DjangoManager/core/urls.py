@@ -66,6 +66,7 @@ urlpatterns = [
     path("api/reports/<uuid:report_id>/delete/", views.delete_report, name="delete_report"),
     path("api/download-report/", views.download_report, name="download_report"),
     path("api/share-report/", views.share_report, name="share_report"),
+    path("api/client-error-log/", views.log_client_error, name="log_client_error"),
 
     # ── Admin Access ──────────────────────────────────────────────────────
     path("api/admin-access/request/", views.request_admin_access, name="request_admin_access"),

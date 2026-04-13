@@ -2433,7 +2433,13 @@ def generate_report(request):
             dept=dept,
         )
     except Exception as e:
-        return JsonResponse({"detail": f"Failed to create report: {str(e)}"}, status=500)
+        logger.exception(
+            "Failed to create report | user_id=%s | result_id=%s | report_s3_key=%s",
+            profile.user_id,
+            result_id,
+            report_s3_key,
+        )
+        return JsonResponse({"detail": "Failed to create report: {str(e)}"}, status=500)
 
     _record_audit_log(profile, "GENERATE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.LOW)
     return JsonResponse(
@@ -2458,6 +2464,13 @@ def get_report(request, report_id):
         report = Report.objects.select_related("result__document", "dept").get(report_id=report_id)
     except Report.DoesNotExist:
         return JsonResponse({"detail": "Report not found"}, status=404)
+    except Exception:
+        logger.exception(
+            "Unexpected error while retrieving report | user_id=%s | report_id=%s",
+            profile.user_id,
+            report_id,
+        )
+        return JsonResponse({"detail": "Failed to load report."}, status=500)
 
     doc = report.result.document
     is_owner    = str(doc.user_id) == str(profile.user_id)
@@ -2539,6 +2552,13 @@ def download_report(request):
         report = Report.objects.select_related("result__document__user__org").get(report_id=report_id)
     except Report.DoesNotExist:
         return JsonResponse({"error": "Report not found"}, status=404)
+    except Exception:
+        logger.exception(
+            "Unexpected error while fetching report for download | user_id=%s | report_id=%s",
+            profile.user_id,
+            report_id,
+        )
+        return JsonResponse({"error": "Failed to process download request."}, status=500)
 
     doc = report.result.document
     is_owner    = str(doc.user_id) == str(profile.user_id)
@@ -2546,9 +2566,17 @@ def download_report(request):
     if not is_owner and not is_org_admin:
         return JsonResponse({"error": "You do not have access to this report"}, status=403)
 
-    ReportDownload.objects.create(downloaded_by=profile, report_id=report_id)
-    _record_audit_log(profile, "DOWNLOAD_REPORT", "report", report.report_id, True, request, AuditLog.Severity.MEDIUM)
-    return JsonResponse({"message": "Download recorded"})
+    try:
+        ReportDownload.objects.create(downloaded_by=profile, report_id=report_id)
+        _record_audit_log(profile, "DOWNLOAD_REPORT", "report", report.report_id, True, request, AuditLog.Severity.MEDIUM)
+        return JsonResponse({"message": "Download recorded"})
+    except Exception:
+        logger.exception(
+            "Failed to record report download | user_id=%s | report_id=%s",
+            profile.user_id,
+            report_id,
+        )
+        return JsonResponse({"error": "Failed to record download."}, status=500)
 
 
 @csrf_exempt
@@ -2576,6 +2604,13 @@ def share_report(request):
         report = Report.objects.select_related("result__document__user__org").get(report_id=report_id)
     except Report.DoesNotExist:
         return JsonResponse({"error": "Report not found"}, status=404)
+    except Exception:
+        logger.exception(
+            "Unexpected error while fetching report for sharing | user_id=%s | report_id=%s",
+            profile.user_id,
+            report_id,
+        )
+        return JsonResponse({"error": "Failed to load report for sharing."}, status=500)
 
     doc = report.result.document
     is_owner    = str(doc.user_id) == str(profile.user_id)
@@ -2637,14 +2672,79 @@ def share_report(request):
         return JsonResponse({"error": "Failed to upload report. Please try again."}, status=500)
 
     # Store pre-signed URL as access_token in ReportShare
-    ReportShare.objects.create(
-        report=report, shared_by=profile,
-        shared_with_email=profile.auth_user.email,
-        access_token=presigned_url, expires_at=timezone.now() + timedelta(days=7),
-    )
+    try:
+        ReportShare.objects.create(
+            report=report, 
+            shared_by=profile,
+            shared_with_email=profile.auth_user.email,
+            access_token=presigned_url, 
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+    except Exception:
+        logger.exception(
+            "Failed to create ReportShare record | user_id=%s | report_id=%s",
+            profile.user_id,
+            report_id,
+        )
+        return JsonResponse({"error": "Report uploaded, but share record creation failed."}, status=500)
 
     _record_audit_log(profile, "SHARE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.MEDIUM)
     return JsonResponse({"message": "Report shared successfully", "share_url": presigned_url})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def log_client_error(request):
+    """
+    POST /api/client-error-log/
+    Receives frontend/browser errors from report_viewing.html for debugging.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    source = (data.get("source") or "unknown").strip()
+    message = (data.get("message") or "No message provided").strip()
+    stack = data.get("stack") or ""
+    page = (data.get("page") or "").strip()
+    url = (data.get("url") or "").strip()
+    report_id = data.get("report_id")
+    user_role = data.get("user_role") or profile.role
+    timestamp = data.get("timestamp")
+    extra = data.get("extra", {})
+
+    logger.error(
+        "CLIENT_ERROR | user_id=%s | email=%s | role=%s | source=%s | page=%s | url=%s | report_id=%s | timestamp=%s | message=%s | extra=%s | stack=%s",
+        profile.user_id,
+        profile.auth_user.email,
+        user_role,
+        source,
+        page,
+        url,
+        str(report_id) if report_id else None,
+        timestamp,
+        message,
+        extra,
+        stack,
+    )
+
+    _record_audit_log(
+        profile,
+        "CLIENT_ERROR",
+        "frontend",
+        str(report_id) if report_id else None,
+        False,
+        request,
+        AuditLog.Severity.MEDIUM,
+    )
+
+    return JsonResponse({"detail": "Client error logged successfully"}, status=201)
 
 
 # ──────────────────────────────────────────────
