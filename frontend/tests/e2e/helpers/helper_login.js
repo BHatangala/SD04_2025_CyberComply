@@ -9,6 +9,7 @@ const { seedOtp, KNOWN_OTP } = require('./otpSeeder');
 const BASE = 'http://127.0.0.1:5500/frontend';
 
 // ── Credentials ───────────────────────────────────────────────────────────────
+// Change your email and passwords to the actual accounts (General & Admin) setup in your DB before running
 const GENERAL_EMAIL = '21804005@student.curtin.edu.au';
 const GENERAL_PASS  = 'Curtin1781*';
 const ADMIN_EMAIL   = 'edirisinghev82oth@gmail.com';
@@ -23,11 +24,17 @@ const OTP_BTN    = 'button.otp-btn';
  * Waits until home.html is fully loaded.
  */
 async function loginAsGeneral(page) {
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.goto('./login.html');
+    // Dismiss any success popup that may be covering the form
+    await page.evaluate(() => {
+        const modal = document.querySelector('.modal');
+        if (modal) modal.style.display = 'none';
+    }).catch(() => {});
     await page.fill('#email', GENERAL_EMAIL);
     await page.fill('#password', GENERAL_PASS);
     await page.click('button[type="submit"]');
-    await page.waitForURL('**/home.html', { timeout: 15000 });
+    await page.waitForURL('**/home.html', { timeout: 30000 });
 }
 
 /**
@@ -35,11 +42,16 @@ async function loginAsGeneral(page) {
  * Waits until home.html is fully loaded.
  */
 async function loginAsAdmin(page) {
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.goto('./login.html');
+    await page.evaluate(() => {
+        const modal = document.querySelector('.modal');
+        if (modal) modal.style.display = 'none';
+    }).catch(() => {});
     await page.fill('#email', ADMIN_EMAIL);
     await page.fill('#password', ADMIN_PASS);
     await page.click('button[type="submit"]');
-    await page.waitForURL('**/home.html', { timeout: 15000 });
+    await page.waitForURL('**/home.html', { timeout: 30000 });
 }
 
 /**
