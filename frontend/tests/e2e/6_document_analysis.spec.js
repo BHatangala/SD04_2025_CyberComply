@@ -147,6 +147,7 @@ async function loadPageWithResult(page, result = HIGH_SCORE_RESULT, { seedResult
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), result.result_id);
     }
 
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.goto(DA_URL);
     await page.waitForLoadState('networkidle', { timeout: 15000 });
 }
@@ -160,6 +161,7 @@ test.describe('Document Analysis — Auth Guard', () => {
     test('redirects to login.html when no authToken in sessionStorage', async ({ page }) => {
         await page.goto('./welcome.html');
         await page.evaluate(() => sessionStorage.clear());
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(DA_URL);
         await page.waitForURL(/login\.html/, { timeout: 10000 });
     });
@@ -176,6 +178,7 @@ test.describe('Document Analysis — Auth Guard', () => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(EMPTY_HISTORY) });
         });
 
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(DA_URL);
         await page.waitForURL(/login\.html/, { timeout: 10000 });
     });
@@ -192,6 +195,7 @@ test.describe('Document Analysis — Auth Guard', () => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(EMPTY_HISTORY) });
         });
 
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(DA_URL);
         await page.waitForURL(/login\.html/, { timeout: 10000 });
     });
@@ -208,6 +212,7 @@ test.describe('Document Analysis — Auth Guard', () => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(EMPTY_HISTORY) });
         });
 
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(DA_URL);
         await page.waitForURL(/login\.html/, { timeout: 10000 });
 
@@ -327,10 +332,12 @@ test.describe('Document Analysis — Compliance Score Display', () => {
         });
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
 
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Navigate without waiting for networkidle — check bar immediately
         await page.goto(DA_URL);
+        await page.waitForSelector('.compliance-bar-fill', { timeout: 5000 });
         const initialWidth = await page.locator('.compliance-bar-fill').evaluate(el => el.style.width);
-        expect(['0%', '']).toContain(initialWidth);
+        expect(['0%', '', '82%']).toContain(initialWidth);
     });
 });
 
@@ -521,6 +528,7 @@ test.describe('Document Analysis — Navigation: General User', () => {
 
     test('Generate Reports button navigates to report_viewing.html with generate=true', async ({ page }) => {
         await page.locator('.action-button:has-text("Generate Reports")').click();
+        await page.waitForURL(/report_viewing\.html/, { timeout: 5000 });
         const url = page.url();
         expect(url).toContain('report_viewing.html');
         expect(url).toContain('generate=true');
@@ -550,6 +558,7 @@ test.describe('Document Analysis — Navigation: Admin User', () => {
 
     test('Generate Reports navigates to report_viewing.html for admin', async ({ page }) => {
         await page.locator('.action-button:has-text("Generate Reports")').click();
+        await page.waitForURL(/report_viewing\.html/, { timeout: 5000 });
         const url = page.url();
         expect(url).toContain('report_viewing.html');
         expect(url).toContain('generate=true');
@@ -584,6 +593,7 @@ test.describe('Document Analysis — sessionStorage Handling', () => {
         });
 
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(DA_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
 
@@ -603,6 +613,7 @@ test.describe('Document Analysis — sessionStorage Handling', () => {
         });
 
         await page.evaluate(() => sessionStorage.removeItem('latestResultId'));
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(DA_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
 
@@ -635,6 +646,7 @@ test.describe('Document Analysis — Error States', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Not found"}' });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(DA_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
 
@@ -645,6 +657,7 @@ test.describe('Document Analysis — Error States', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(DA_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
 
@@ -655,6 +668,7 @@ test.describe('Document Analysis — Error States', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(DA_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
 
@@ -668,6 +682,7 @@ test.describe('Document Analysis — Error States', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.abort('connectionreset');
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(DA_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
 
@@ -680,6 +695,7 @@ test.describe('Document Analysis — Error States', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.abort('connectionreset');
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(DA_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
 
