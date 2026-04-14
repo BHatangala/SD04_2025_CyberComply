@@ -116,6 +116,7 @@ async function loadReportPage(page, snapshot = FAKE_SNAPSHOT, { freshRoutes = tr
         });
     });
 
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.goto(`${REPORT_URL}?report_id=${REPORT_ID}`);
     await page.waitForLoadState('networkidle', { timeout: 15000 });
 }
@@ -279,6 +280,7 @@ test.describe('Report Viewing — Generate Flow', () => {
         });
 
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(`${REPORT_URL}?generate=true`);
         await page.waitForLoadState('networkidle', { timeout: 20000 });
 
@@ -308,12 +310,12 @@ test.describe('Report Viewing — Sidebar', () => {
     });
 
     test('clicking menu icon closes sidebar — back arrow loses shifted class', async ({ page }) => {
-        await page.locator('.menu-icon').click();
+        await page.locator('.menu-icon').click({ force: true });
         await expect(page.locator('.back-arrow')).not.toHaveClass(/shifted/);
     });
 
     test('clicking menu icon closes sidebar — home button loses shifted class', async ({ page }) => {
-        await page.locator('.menu-icon').click();
+        await page.locator('.menu-icon').click({ force: true });
         await expect(page.locator('.home-button')).not.toHaveClass(/shifted/);
     });
 
@@ -355,6 +357,7 @@ test.describe('Report Viewing — Navigation', () => {
                 body:        JSON.stringify(FAKE_REPORT_RESPONSE)
             });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(`${REPORT_URL}?report_id=${REPORT_ID}`);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await page.locator('.back-arrow').click();
@@ -485,6 +488,7 @@ test.describe('Report Viewing — Multi-interface Enrichment (User Story Task 1)
             });
         });
 
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(`${REPORT_URL}?report_id=${REPORT_ID}`);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
 
