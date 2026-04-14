@@ -6,6 +6,7 @@
     <title>CyberComply - Recommendations</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
     <style>
         * {
             margin: 0;
@@ -525,6 +526,8 @@
                 window.location.href = 'login.html';
                 return;
             }
+
+            SessionManager.init({ timeoutMs: 1200000 });
 
             // ── Step 1: Load PDPA requirements JSON from local file ─────
             // Static file fetch — identical to ai-development approach.
