@@ -112,6 +112,7 @@
     <img src="img2.png" alt="Decorative Wave Right" class="right-wave">
 
     <script src="otp_component.js"></script>
+    <script src="session-manager.js"></script>
 
     <script>
         const { createApp, reactive, ref } = Vue;
@@ -145,6 +146,8 @@
 
                     return {};
                 }
+
+                SessionManager.init({ timeoutMs: 1200000 });
 
                 const handleDeleteVerified = async (deleteToken) => {
                     if (!deleteToken) {

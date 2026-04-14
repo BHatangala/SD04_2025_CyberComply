@@ -171,6 +171,7 @@
     <img src="img2.png" alt="Decorative Wave Right" class="right-wave">
 
     <script src="otp_component.js"></script>
+    <script src="session-manager.js"></script>
 
     <script>
         const { createApp, reactive, ref, computed, onMounted } = Vue;
@@ -439,6 +440,7 @@
                 // Automatically send OTP when component mounts
                 onMounted(() => {
                     sendInitialOtp();
+                    SessionManager.init({ timeoutMs: 1200000 });
                 });
 
                 return {
