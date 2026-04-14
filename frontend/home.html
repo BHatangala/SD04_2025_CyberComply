@@ -6,6 +6,7 @@
     <title>CyberComply - Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
 
     <!-- Google Identity Services (OAuth 2.0) + Google API client (Picker) -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -1283,6 +1284,9 @@
             this.sessionToken = token;
             this.userEmail    = email;
             this.userRole     = roleRaw;
+
+            // Session timeout — 30 min because analysis can take ~20 min
+            SessionManager.init({ timeoutMs: 1800000 });
 
             // Populate sidebar with real analysis history from the database
             await this.fetchHistory();
