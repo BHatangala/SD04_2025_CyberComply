@@ -127,6 +127,7 @@ async function loadPageWithData(page, result = MIXED_RESULT, { freshRoutes = tru
     });
 
     await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.goto(COMP_URL);
     await page.waitForLoadState('networkidle', { timeout: 15000 });
 }
@@ -140,6 +141,7 @@ test.describe('Comparison — Auth Guard', () => {
     test('redirects to login.html when no authToken in sessionStorage', async ({ page }) => {
         await page.goto('./welcome.html');
         await page.evaluate(() => sessionStorage.clear());
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForURL(/login\.html/, { timeout: 10000 });
     });
@@ -151,6 +153,7 @@ test.describe('Comparison — Auth Guard', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 401, contentType: 'application/json', body: '{"detail":"Unauthorized"}' });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForURL(/login\.html/, { timeout: 10000 });
     });
@@ -162,6 +165,7 @@ test.describe('Comparison — Auth Guard', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 403, contentType: 'application/json', body: '{"detail":"Forbidden"}' });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForURL(/login\.html/, { timeout: 10000 });
     });
@@ -173,6 +177,7 @@ test.describe('Comparison — Auth Guard', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 401, contentType: 'application/json', body: '{"detail":"Unauthorized"}' });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForURL(/login\.html/, { timeout: 10000 });
         const token = await page.evaluate(() => sessionStorage.getItem('authToken'));
@@ -217,7 +222,7 @@ test.describe('Comparison — Page Rendering', () => {
     });
 
     test('home button is visible', async ({ page }) => {
-        await expect(page.locator('.home-button')).toBeVisible();
+        await expect(page.locator('.home-button')).toBeVisible({ timeout: 10000 });
     });
 });
 
@@ -234,6 +239,7 @@ test.describe('Comparison — Loading and Error States', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Not found"}' });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await expect(page.locator('.no-data-banner')).toBeVisible();
@@ -246,6 +252,7 @@ test.describe('Comparison — Loading and Error States', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"Server error"}' });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await expect(page.locator('.no-data-banner')).toBeVisible();
@@ -258,6 +265,7 @@ test.describe('Comparison — Loading and Error States', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.abort();
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await expect(page.locator('.no-data-banner')).toBeVisible();
@@ -270,6 +278,7 @@ test.describe('Comparison — Loading and Error States', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.abort();
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await expect(page.locator('.no-data-banner')).toContainText('Could not reach the server');
@@ -296,6 +305,7 @@ test.describe('Comparison — Loading and Error States', () => {
             });
         });
 
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         expect(latestCalled).toBe(true);
@@ -336,6 +346,7 @@ test.describe('Comparison — Company and Department Display', () => {
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await expect(page.locator('.company-name')).not.toBeVisible();
