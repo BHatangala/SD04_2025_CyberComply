@@ -7,6 +7,7 @@
     <title>CyberComply - Comparison Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -587,6 +588,8 @@
                 // ── RBAC flag from session ───────────────────────────────────
                 const roleRaw = sessionStorage.getItem('userRole');
                 this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
+
+                SessionManager.init({ timeoutMs: 1200000 });
 
                 // ── Fetch analysis result from DB ────────────────────────────
                 // Reads the result_id written by home.html after saving the analysis.
