@@ -77,6 +77,7 @@ async function loadPage(page, {
         });
     });
 
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.goto(AA_URL);
     await page.waitForLoadState('networkidle', { timeout: 15000 });
 }
