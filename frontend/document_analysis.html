@@ -438,6 +438,7 @@
             gap: 10px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.45);
             white-space: nowrap;
+            will-change: opacity, transform;
         }
 
         .access-toast.visible {
@@ -581,7 +582,7 @@
     </style>
 </head>
 <body>
-    <div id="app">
+    <div id="app" :data-ready="ready ? 'true' : 'false'">
         <!-- Top Header -->
         <div class="top-header">
             <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
@@ -618,23 +619,23 @@
             <!-- Content Container -->
             <div class="content-container">
 
-                <div
-                    v-if="loadError"
-                    style="
-                        background: rgba(231,74,74,0.12);
-                        border: 1px solid rgba(231,74,74,0.4);
-                        border-left: 4px solid #e74a4a;
-                        color: #f0d0d0;
-                        padding: 16px 22px;
-                        border-radius: 8px;
-                        font-size: 14px;
-                        letter-spacing: 0.3px;
-                        margin-bottom: 24px;
-                    "
-                >
-                    {{ loadError }}
+                <!-- Error banner -->
+                <div v-if="loadError" style="
+                    max-width: 900px;
+                    margin: 0 auto 28px;
+                    background: rgba(231,74,74,0.08);
+                    border: 1px solid rgba(231,74,74,0.25);
+                    border-radius: 10px;
+                    padding: 18px 24px;
+                    font-size: 14px;
+                    color: #e74a4a;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                ">
+                    ⚠ {{ loadError }}
                 </div>
-                
+
                 <!-- Compliance Score Section -->
                 <div class="compliance-section">
                     <div class="section-tooltip-wrapper">
@@ -757,6 +758,7 @@
                     isAdmin: isAdminUser,
                     toastVisible: false,
                     toastTimer: null,
+                    ready: false,
 
                     // ── AI Result Fields ──
                     complianceScore: 0,
@@ -845,13 +847,15 @@
                     }
 
                     // Animate progress bar
-                    setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 300);
+                    await Vue.nextTick();
+                    setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 100);
 
                 } catch (e) {
                     console.error('Failed to load analysis result:', e);
                     this.loadError = 'Could not reach the server. Please check your connection.';
                 } finally {
                     this.isLoading = false;
+                    this.ready = true;
                 }
 
                 // ── Populate sidebar history ──────────────────────────────
