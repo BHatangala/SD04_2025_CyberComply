@@ -6,6 +6,7 @@
     <title>CyberComply - Comparison Dashboard Graphical</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
 
     <style>
       /* Global Reset and Base Theme */
@@ -874,6 +875,7 @@
         data() {
           return {
             sidebarOpen: true,
+            isAdmin: false,
 
             companyLabel: "ABC Company",
 
@@ -1102,6 +1104,17 @@
           onBack() {
             window.location.href = "comparison.html";
           },
+        },
+
+        async mounted() {
+          const token   = sessionStorage.getItem('authToken');
+          const roleRaw = sessionStorage.getItem('userRole');
+          if (!token) {
+            window.location.href = 'login.html';
+            return;
+          }
+          this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
+          SessionManager.init({ timeoutMs: 1200000 });
         },
       });
       registerSidebarComponent(app);
