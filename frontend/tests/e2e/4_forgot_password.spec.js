@@ -309,8 +309,9 @@ test.describe('Forgot Password — Step 3: New Password', () => {
                 body: JSON.stringify({ detail: 'Password reset successfully.' }),
             });
         });
-        await page.fill('input[placeholder*="Enter your new password"]', "Cyber@Comply1");
-        await page.fill('input[placeholder*="Confirm your new password"]', "Cyber@Comply1");
+        //Change the password here to you original initial email before change to revert back and work for other tests
+        await page.fill('input[placeholder*="Enter your new password"]', "Curtin1781*");
+        await page.fill('input[placeholder*="Confirm your new password"]', "Curtin1781*");
         await page.click('button:has-text("Reset Password")');
 
         await page.waitForURL(/login\.html/, { timeout: 15000 });
