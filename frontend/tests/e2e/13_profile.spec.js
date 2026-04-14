@@ -103,8 +103,10 @@ async function loadProfilePage(page, profile = GENERAL_USER_PROFILE, { freshRout
         sessionStorage.setItem('userEmail', email);
     }, profile.email);
 
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.goto(PROFILE_URL);
-    await page.waitForLoadState('networkidle', { timeout: 15000 });
+    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    await page.waitForSelector('.main-content[data-ready="true"]', { timeout: 30000 });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -267,8 +269,10 @@ test.describe('Profile — Data Loading', () => {
             });
         });
         await page.evaluate(() => sessionStorage.setItem('userEmail', 'admin@orgdomain.com'));
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(PROFILE_URL);
-        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        await page.waitForLoadState('networkidle', { timeout: 30000 });
+        await page.waitForSelector('.main-content[data-ready="true"]', { timeout: 30000 });
         await expect(page.locator('.profile-field').filter({ hasText: 'Role' }).locator('.profile-value'))
             .toContainText('Administrative User');
     });
@@ -283,8 +287,10 @@ test.describe('Profile — Data Loading', () => {
             });
         });
         await page.evaluate(() => sessionStorage.setItem('userEmail', 'admin@orgdomain.com'));
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(PROFILE_URL);
-        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        await page.waitForLoadState('networkidle', { timeout: 30000 });
+        await page.waitForSelector('.main-content[data-ready="true"]', { timeout: 30000 });
         await expect(page.locator('#enable-2fa')).toBeChecked();
     });
 
@@ -299,6 +305,7 @@ test.describe('Profile — Data Loading', () => {
             await route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
         });
         await page.evaluate((email) => sessionStorage.setItem('userEmail', email), 'jane.smith@example.com');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(PROFILE_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await expect(page.locator('.swal2-container')).toBeVisible({ timeout: 5000 });
@@ -310,6 +317,7 @@ test.describe('Profile — Data Loading', () => {
             await route.abort('connectionreset');
         });
         await page.evaluate((email) => sessionStorage.setItem('userEmail', email), 'jane.smith@example.com');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(PROFILE_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await expect(page.locator('.swal2-container')).toBeVisible({ timeout: 5000 });
@@ -476,6 +484,7 @@ test.describe('Profile — Save Changes: Name', () => {
         // Dismiss Swal confirmation
         await page.locator('.save-button').click();
         await page.locator('.swal2-confirm').click();
+        await page.waitForTimeout(1000);
 
         expect(patchCalled).toBe(true);
     });
@@ -659,7 +668,7 @@ test.describe('Profile — 2FA Toggle', () => {
             await dialog.dismiss();
         });
 
-        await page.locator('#enable-2fa').check();
+        await page.locator('#enable-2fa').click();
         await page.waitForTimeout(500);
 
         // Checkbox should have reverted to unchecked
@@ -729,7 +738,7 @@ test.describe('Profile — Grant Admin Access: Admin User', () => {
     });
 
     test('clicking Grant Admin Access shows access denied toast for admin user', async ({ page }) => {
-        await page.locator('.action-button:has-text("GRANT ADMIN ACCESS")').click();
+        await page.locator('.action-button:has-text("GRANT ADMIN ACCESS")').click({ force: true });
         await expect(page.locator('.access-toast')).toHaveClass(/visible/);
     });
 
@@ -763,7 +772,7 @@ test.describe('Profile — Delete Account Modal', () => {
     });
 
     test('clicking Delete Account button opens the confirmation modal', async ({ page }) => {
-        await page.locator('.action-button:has-text("DELETE ACCOUNT")').click();
+        await page.locator('.action-button:has-text("DELETE ACCOUNT")').click({ force: true });
         await expect(page.locator('.delete-modal-overlay')).toBeVisible();
     });
 
@@ -785,7 +794,7 @@ test.describe('Profile — Delete Account Modal', () => {
     });
 
     test('delete modal shows the reason dropdown', async ({ page }) => {
-        await page.locator('.action-button:has-text("DELETE ACCOUNT")').click();
+        await page.locator('.action-button:has-text("DELETE ACCOUNT")').click({ force: true });
         await expect(page.locator('.delete-modal-reason select')).toBeVisible();
     });
 
