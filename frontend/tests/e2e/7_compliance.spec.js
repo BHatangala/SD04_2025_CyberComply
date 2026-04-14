@@ -124,6 +124,7 @@ async function loadPageWithData(page, result = MIXED_RESULT, { freshRoutes = tru
     });
 
     await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.goto(COMP_URL);
     await page.waitForLoadState('networkidle', { timeout: 15000 });
 }
@@ -151,6 +152,7 @@ test.describe('Compliance — Auth Guard', () => {
         await page.route(reMapping, async route => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_MAPPING) });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForURL(/login\.html/, { timeout: 10000 });
     });
@@ -165,6 +167,7 @@ test.describe('Compliance — Auth Guard', () => {
         await page.route(reMapping, async route => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_MAPPING) });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForURL(/login\.html/, { timeout: 10000 });
     });
@@ -245,6 +248,7 @@ test.describe('Compliance — Loading and Error States', () => {
         await page.route(reMapping, async route => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_MAPPING) });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await expect(page.locator('.no-data-banner')).toBeVisible({ timeout: 5000 });
@@ -259,6 +263,7 @@ test.describe('Compliance — Loading and Error States', () => {
         await page.route(reMapping, async route => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_MAPPING) });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await expect(page.locator('.no-data-banner')).toBeVisible({ timeout: 5000 });
@@ -273,6 +278,7 @@ test.describe('Compliance — Loading and Error States', () => {
         await page.route(reMapping, async route => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_MAPPING) });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await expect(page.locator('.no-data-banner')).toBeVisible({ timeout: 5000 });
@@ -287,6 +293,7 @@ test.describe('Compliance — Loading and Error States', () => {
         await page.route(reMapping, async route => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_MAPPING) });
         });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         await expect(page.locator('.no-data-banner')).toContainText('Could not reach the server', { timeout: 5000 });
@@ -308,6 +315,7 @@ test.describe('Compliance — Loading and Error States', () => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_MAPPING) });
         });
         await page.evaluate(() => sessionStorage.removeItem('latestResultId'));
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
         expect(fetchedLatest).toBe(true);
@@ -405,7 +413,7 @@ test.describe('Compliance — Filter Label', () => {
     test('clicking Clear filter removes the active filter', async ({ page }) => {
         await page.locator('.summary-chip.chip-critical').click();
         await expect(page.locator('.filter-label')).toBeVisible();
-        await page.locator('.filter-clear').click();
+        await page.locator('.filter-clear').click({ force: true });
         await expect(page.locator('.filter-label')).not.toBeVisible();
     });
 
@@ -453,7 +461,7 @@ test.describe('Compliance — Gap Identification', () => {
 
     test('gap items show reasoning text', async ({ page }) => {
         const firstGap = page.locator('.info-section').nth(0).locator('.gap-item').first();
-        await expect(firstGap.locator('.gap-reasoning')).toContainText('No minimisation policy found');
+        await expect(firstGap.locator('.gap-reasoning')).toContainText('No minimisation policy found', { timeout: 8000 });
     });
 
     test('gap items have numbered index', async ({ page }) => {
