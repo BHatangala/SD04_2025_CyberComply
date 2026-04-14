@@ -7,6 +7,7 @@
     <title>CyberComply - Compliance Score</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -686,6 +687,8 @@
                     window.location.href = 'login.html';
                     return;
                 }
+
+                SessionManager.init({ timeoutMs: 1200000 });
 
                 // ── Load static risk mapping from local file (ai-development) ──
                 // Not a Django endpoint — fetched directly from the filesystem.
