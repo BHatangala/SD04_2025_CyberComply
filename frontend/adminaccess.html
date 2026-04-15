@@ -566,6 +566,7 @@
                         }
 
                         sessionStorage.setItem('userRole', data.role);
+                        sessionStorage.setItem('userEmail', data.email);
                         this.otpCode = '';
                         this.message = { text: 'Administrative access granted successfully!', type: 'success' };
                         this.step = 'success';
