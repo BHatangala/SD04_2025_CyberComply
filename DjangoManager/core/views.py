@@ -2841,7 +2841,10 @@ def request_admin_access(request):
     ).order_by("-created_at").first()
 
     access_request = AdminAccessRequest.objects.create(
-        user=profile, verification_otp=otp_row, org_email=org_email,
+        user=profile, 
+        verification_otp=otp_row, 
+        org_email=org_email,
+        original_email=profile.auth_user.email,
         status=AdminAccessRequest.Status.PENDING,
     )
 
@@ -2922,9 +2925,16 @@ def verify_admin_access(request):
         profile.role       = UserProfile.Role.ADMIN
         profile.updated_at = now
         profile.save(update_fields=["role", "updated_at"])
+        profile.auth_user.username = access_request.org_email
+        profile.auth_user.email    = access_request.org_email
+        profile.auth_user.save(update_fields=["username", "email"])
 
     _record_audit_log(profile, "ADMIN_ACCESS_APPROVED", "admin_access_request", access_request.request_id, True, request, AuditLog.Severity.HIGH)
-    return JsonResponse({"detail": "Administrative access granted successfully.", "role": profile.role}, status=200)
+    return JsonResponse({
+        "detail": "Administrative access granted successfully.", 
+        "role": profile.role,
+        "email": access_request.org_email,
+    }, status=200)
 
 
 @csrf_exempt
