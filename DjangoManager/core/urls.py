@@ -73,4 +73,8 @@ urlpatterns = [
     path("api/admin-access/verify/", views.verify_admin_access, name="verify_admin_access"),
     path("api/admin-access/status/", views.get_admin_access_status, name="get_admin_access_status"),
 
+    # ── Notifications ─────────────────────────────────────────────────────
+    path("api/notifications/unread/", views.get_unread_notifications, name="get_unread_notifications"),
+    path("api/notifications/mark-read/", views.mark_notifications_read, name="mark_notifications_read"),
+
 ]

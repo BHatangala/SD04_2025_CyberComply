@@ -288,6 +288,13 @@ class Recommendation(models.Model):
 # Table: reports
 # =========================
 class Report(models.Model):
+
+    class EmailStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SENT    = "sent",    "Sent"
+        FAILED  = "failed",  "Failed"
+        SKIPPED = "skipped", "Skipped"
+
     report_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     result = models.ForeignKey(AnalysisResult, on_delete=models.CASCADE, related_name="reports", db_column="result_id")
     dept = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="reports")
@@ -296,6 +303,12 @@ class Report(models.Model):
     file_size = models.BigIntegerField()
     generated_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
+    notification_sent = models.BooleanField(default=False)
+    email_status = models.CharField(
+        max_length=10,
+        choices=EmailStatus.choices,
+        default=EmailStatus.PENDING,
+    )
 
     class Meta:
         db_table = "reports"
@@ -498,3 +511,31 @@ class ReportShare(models.Model):
 
     class Meta:
         db_table = 'report_shares'
+
+
+# =========================
+# Table: notification
+# =========================
+class Notification(models.Model):
+    class NotificationType(models.TextChoices):
+        REPORT_READY = "REPORT_READY", "Report Ready"
+
+    notification_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="notifications")
+    notification_type = models.CharField(max_length=30, choices=NotificationType.choices)
+    message = models.TextField()
+    report = models.ForeignKey(
+        Report,
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="notifications",
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "notification"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} — {self.notification_type}"

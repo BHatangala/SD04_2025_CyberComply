@@ -14,7 +14,7 @@ from datetime import timedelta
 from django.core import signing
 from django.core.signing import BadSignature, SignatureExpired
 from django.conf import settings
-from .email_service import send_otp_email
+from .email_service import send_otp_email, send_report_ready_email
 from django.core.cache import cache
 import random
 import hashlib
@@ -35,6 +35,7 @@ from .models import (
     AnalysisResult, Finding, Recommendation,
     Report, AuditLog, AdminAccessRequest,
     ReportDownload, DeletionRequest, ReportShare,
+    Notification,
 )
 from .utils import validate_org_email
 from django.db import models
@@ -375,6 +376,9 @@ def analyze_compliance(request):
             status=400,
         )
 
+    # Best-effort profile lookup for notification; None means notification is skipped.
+    _notify_profile, _ = _get_profile_from_token(request)
+
     def event_stream():
         try:
             yield f"data: {json.dumps({'status': 'analysing'})}\n\n".encode('utf-8')
@@ -408,7 +412,7 @@ def analyze_compliance(request):
                     )
                     snapshot     = {**result, 'metadata': {**result.get('metadata', {}), 'file_analyzed': file_name, 'company': company_name}}
                     snapshot_str = _json.dumps(snapshot)
-                    Report.objects.create(
+                    report = Report.objects.create(
                         result=analysis_result,
                         dept=document.dept,
                         report_snapshot=snapshot,
@@ -416,6 +420,8 @@ def analyze_compliance(request):
                         file_size=len(snapshot_str),
                         expires_at=timezone.now() + timedelta(days=30),
                     )
+                    if _notify_profile is not None:
+                        _send_report_notification(_notify_profile, report, document.original_filename)
             except Exception:
                 pass
 
@@ -1415,6 +1421,38 @@ def _record_audit_log(profile, action_type: str, target_type: str, target_id, su
         user=profile, action_type=action_type, target_type=target_type,
         target_id=target_id, success=success, severity=severity, ip_address=ip
     )
+
+
+def _send_report_notification(profile, report, report_name: str) -> None:
+    """
+    Creates an in-app Notification row and sends a report-ready email via SES.
+    Updates report.notification_sent and report.email_status accordingly.
+    Errors are swallowed so they never break the caller's response.
+    """
+    try:
+        Notification.objects.create(
+            user=profile,
+            notification_type=Notification.NotificationType.REPORT_READY,
+            message=f"Your compliance report '{report_name}' is ready to view.",
+            report=report,
+        )
+        report.notification_sent = True
+        report.save(update_fields=["notification_sent"])
+    except Exception:
+        logger.exception("Failed to create in-app notification | report_id=%s", report.report_id)
+
+    try:
+        email = profile.auth_user.email
+        success = send_report_ready_email(email, report_name)
+        report.email_status = Report.EmailStatus.SENT if success else Report.EmailStatus.FAILED
+        report.save(update_fields=["email_status"])
+    except Exception:
+        logger.exception("Failed to send report-ready email | report_id=%s", report.report_id)
+        try:
+            report.email_status = Report.EmailStatus.FAILED
+            report.save(update_fields=["email_status"])
+        except Exception:
+            pass
 
 
 # ──────────────────────────────────────────────
@@ -2442,6 +2480,14 @@ def generate_report(request):
         return JsonResponse({"detail": "Failed to create report: {str(e)}"}, status=500)
 
     _record_audit_log(profile, "GENERATE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.LOW)
+
+    report_name = (
+        analysis_result.document.original_filename
+        if hasattr(analysis_result, "document")
+        else str(report.report_id)
+    )
+    _send_report_notification(profile, report, report_name)
+
     return JsonResponse(
         {"detail": "Report generated successfully", "report_id": str(report.report_id),
          "generated_at": report.generated_at.isoformat(), "expires_at": report.expires_at.isoformat()},
@@ -2905,3 +2951,68 @@ def get_admin_access_status(request):
         },
         status=200,
     )
+
+
+# ──────────────────────────────────────────────
+# Notifications
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_unread_notifications(request):
+    """
+    GET /api/notifications/unread/
+    Returns all unread notifications for the authenticated user.
+    The frontend polls this endpoint to drive the real-time notification badge.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
+    notifications = Notification.objects.filter(user=profile, is_read=False).order_by("-created_at")[:50]
+
+    return JsonResponse(
+        {
+            "unread_count": notifications.count(),
+            "notifications": [
+                {
+                    "notification_id": str(n.notification_id),
+                    "type":            n.notification_type,
+                    "message":         n.message,
+                    "report_id":       str(n.report_id) if n.report_id else None,
+                    "created_at":      n.created_at.isoformat(),
+                }
+                for n in notifications
+            ],
+        },
+        status=200,
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def mark_notifications_read(request):
+    """
+    POST /api/notifications/mark-read/
+    Body (optional): {"notification_ids": ["<uuid>", ...]}
+    Omitting notification_ids marks ALL unread notifications as read.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
+    try:
+        payload = json.loads(request.body.decode("utf-8")) if request.body else {}
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    notification_ids = payload.get("notification_ids")
+
+    qs = Notification.objects.filter(user=profile, is_read=False)
+    if notification_ids:
+        qs = qs.filter(notification_id__in=notification_ids)
+
+    updated = qs.update(is_read=True)
+    return JsonResponse({"detail": f"{updated} notification(s) marked as read."}, status=200)
