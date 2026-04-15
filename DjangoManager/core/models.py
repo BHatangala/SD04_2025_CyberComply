@@ -368,6 +368,7 @@ class AdminAccessRequest(models.Model):
                             db_column="verification_otp_id"
                           )
     org_email           = models.CharField(max_length=255, db_column="org_email")
+    original_email      = models.CharField(max_length=255, blank=True, default='')
     status              = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     requested_at        = models.DateTimeField(default=timezone.now, db_column="requested_at")
     verified_at         = models.DateTimeField(null=True, blank=True, db_column="verified_at")
