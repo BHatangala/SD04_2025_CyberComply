@@ -649,6 +649,28 @@
         color: #f0eeee;
     }
 
+    /* Inline error / success states */
+    .status-message {
+        margin: 0 0 18px 0;
+        padding: 14px 16px;
+        border-radius: 12px;
+        font-size: 14px;
+        line-height: 1.5;
+        border: 1px solid transparent;
+    }
+
+    .status-message.error {
+        background: rgba(231, 74, 74, 0.12);
+        border-color: rgba(231, 74, 74, 0.35);
+        color: #ffd2d2;
+    }
+
+    .status-message.info {
+        background: rgba(74, 143, 231, 0.12);
+        border-color: rgba(74, 143, 231, 0.35);
+        color: #d6e8ff;
+    }
+
     </style>
 </head>
 
@@ -686,6 +708,10 @@
     <div class="report-viewer" :class="{ shifted: sidebarOpen }">
         <h2 class="report-title">{{ currentReportName || 'Select a report' }}</h2>
         
+        <div v-if="uiMessage" class="status-message" :class="uiMessageType">
+            {{ uiMessage }}
+        </div>
+
         <div class="pdf-container">
             <div v-if="isGenerating" style="color:#6b7a99; text-align:center; margin-top:40px;">
                 Generating report…
@@ -973,13 +999,15 @@ const app = createApp({
       currentSnapshot: null,
       resultId: null,
       departmentName: '',
+      uiMessage: '',
+      uiMessageType: 'error',
     }
   },
 
   async mounted() {
     const token = sessionStorage.getItem('authToken');
     if (!token) {
-      alert('Your session has expired. Please log in again.');
+      this.showUiMessage('Your session has expired. Please log in again.');
       window.location.href = 'login.html';
       return;
     }
@@ -1020,7 +1048,7 @@ const app = createApp({
     
     if (reportId) {
       if (!this.isValidUuid(reportId)) {
-        alert('Invalid report ID.');
+        this.showUiMessage('Invalid report ID.');
         return;
       }
       await this.loadReport(reportId, token);
@@ -1083,6 +1111,16 @@ const app = createApp({
   },
 
   methods: {
+    showUiMessage(message, type = 'error', fallback = 'Something went wrong. Please try again.') {
+        this.uiMessage = message || fallback;
+        this.uiMessageType = type;
+    },
+
+    clearUiMessage() {
+        this.uiMessage = '';
+        this.uiMessageType = 'error';
+    },
+
     async logClientError(source, error, extra = {}) {
         const token = sessionStorage.getItem('authToken');
 
@@ -1136,17 +1174,18 @@ const app = createApp({
 
     // ── Called when arriving from "Generate Reports" on document_analysis.html ──
     async generateReport(token) {
+      this.clearUiMessage();
       this.isGenerating = true;
 
       const resultId = (sessionStorage.getItem('latestResultId') || '').trim();
       if (!resultId) {
-        alert('No analysis result found. Please analyse a document first.');
+        this.showUiMessage('No analysis result found. Please analyse a document first.');
         this.isGenerating = false;
         return;
       }
 
       if (!this.isValidUuid(resultId)) {
-        alert('Invalid analysis result ID.');
+        this.showUiMessage('Invalid analysis result ID.');
         this.isGenerating = false;
         return;
       }
@@ -1159,25 +1198,25 @@ const app = createApp({
           const msg = await this.getErrorMessage(resAnalysis, 'Failed to retrieve analysis result.');
 
           if (resAnalysis.status === 401) {
-            alert(msg);
+            this.showUiMessage(msg, 'error', 'Failed to retrieve analysis result.');
             sessionStorage.clear();
             window.location.href = 'login.html';
             return;
           }
 
-          alert(msg);
+          this.showUiMessage(msg, 'error', 'Failed to retrieve analysis result.');
           return;
         }
 
         const analysis = await resAnalysis.json();
 
         if (!analysis || !analysis.result_id) {
-          alert('Invalid analysis data received from the server.');
+          this.showUiMessage('Invalid analysis data received from the server.');
           return;
         }
 
         if (!analysis.original_filename) {
-          alert('Report cannot be generated because the file name is missing.');
+          this.showUiMessage('Report cannot be generated because the file name is missing.');
           return;
         }
 
@@ -1212,20 +1251,20 @@ const app = createApp({
           const msg = await this.getErrorMessage(resGenerate, 'Failed to generate report.');
 
           if (resGenerate.status === 401) {
-            alert(msg);
+            this.showUiMessage(msg, 'error', 'Failed to generate report.')
             sessionStorage.clear();
             window.location.href = 'login.html';
             return;
           }
 
-          alert(msg);
+          this.showUiMessage(msg, 'error', 'Failed to generate report.');
           return;
         }
 
         const generated = await resGenerate.json();
 
         if (!generated || !generated.report_id) {
-          alert('Report was created, but the server returned an invalid response.');
+          this.showUiMessage('Report was created, but the server returned an invalid response.');
           return;
         }
 
@@ -1248,7 +1287,11 @@ const app = createApp({
         await this.logClientError('generateReport', e, {
             latestResultId: sessionStorage.getItem('latestResultId')
         });
-        alert('Unable to connect to the backend. Please check whether the server is running.');
+        this.showUiMessage(
+            'Unable to connect to the backend. Please check whether the server is running.',
+            'error',
+            'Unable to connect to backend'
+        );
       } finally {
         this.isGenerating = false;
       }
@@ -1256,13 +1299,14 @@ const app = createApp({
 
     // ── Load and display an existing report by ID ──
     async loadReport(reportId, token) {
+      this.clearUiMessage();
       if (!reportId || !this.isValidUuid(reportId)) {
-        alert('Invalid report ID.');
+        this.showUiMessage('Invalid report ID.');
         return;
       }
 
       if (!token) {
-        alert('Your session has expired. Please log in again.');
+        this.showUiMessage('Your session has expired. Please log in again.');
         window.location.href = 'login.html';
         return;
       }
@@ -1275,21 +1319,22 @@ const app = createApp({
           const msg = await this.getErrorMessage(res, 'Failed to load report.');
 
           if (res.status === 401) {
-            alert(msg);
+            this.showUiMessage(msg, 'error', 'Failed to load report.')
             sessionStorage.clear();
             window.location.href = 'login.html';
             return;
           }
 
-          alert(msg);
+          this.showUiMessage(msg, 'error', 'Failed to load report.');
           return;
         } 
         const data = await res.json();
         if (!data || !data.report_snapshot) {
-          alert('Report data is missing or invalid.');
+          this.showUiMessage('Report data is missing or invalid.');
           return;
         }
         this.currentSnapshot  = data.report_snapshot;
+        this.clearUiMessage();
         this.resultId = data.result_id || null;
         // Build display name from snapshot metadata
         const meta    = (data.report_snapshot || {}).metadata || {};
@@ -1311,24 +1356,25 @@ const app = createApp({
         }
       } catch (e) {
         console.error('loadReport error:', e, { reportId });
-        alert('Something went wrong while loading the report.');
+        this.showUiMessage('Something went wrong while loading the report.');
       }
     },
 
     async downloadReport() {
+      this.clearUiMessage();  
       if (!this.isAdmin) {
-        alert('Only administrative users can download reports.');
+        this.showUiMessage('Only administrative users can download reports.');
         return;
       }
   
       if (!this.currentSnapshot) {
-          alert('Please select a report first.');
+          this.showUiMessage('Please select a report first.');
           return;
       }
 
       const token = sessionStorage.getItem('authToken');
       if (!token) {
-        alert('Your session has expired. Please log in again.');
+        this.showUiMessage('Your session has expired. Please log in again.');
         window.location.href = 'login.html';
         return;
       }
@@ -1337,12 +1383,12 @@ const app = createApp({
           const params = new URLSearchParams(window.location.search);
           const report_id = params.get('report_id');
           if (!report_id) { 
-            alert("Report ID missing."); 
+            this.showUiMessage("Report ID missing."); 
             return; 
           }
 
           if (!this.isValidUuid(report_id)) {
-            alert('Invalid report ID.');
+            this.showUiMessage('Invalid report ID.');
             return;
           }
 
@@ -1353,7 +1399,7 @@ const app = createApp({
           });
           if (!res.ok) {
             const msg = await this.getErrorMessage(res, 'Failed to record download.');
-            alert(msg);
+            this.showUiMessage(msg, 'error', 'Failed to record download')
 
             if (res.status === 401) {
               sessionStorage.clear();
@@ -1538,7 +1584,7 @@ const app = createApp({
           await this.logClientError('downloadReport', err, {
             currentReportName: this.currentReportName
           });
-          alert("Something went wrong.");
+          this.showUiMessage("Something went wrong while downloading the report.");
       }
   },
 
@@ -1577,20 +1623,21 @@ const app = createApp({
     },
     
     async openReport(report) {
+      this.clearUiMessage();  
       const token = sessionStorage.getItem('authToken');
       if (!token) {
-        alert('Your session has expired. Please log in again.');
+        this.showUiMessage('Your session has expired. Please log in again.');
         window.location.href = 'login.html';
         return;
       }
 
       if (!report || !report.report_id) {
-        alert('Invalid report selected.');
+        this.showUiMessage('Invalid report selected.');
         return;
       }
 
       if (!this.isValidUuid(report.report_id)) {
-        alert('Invalid report ID.');
+        this.showUiMessage('Invalid report ID.');
         return;
       }
 
@@ -1606,23 +1653,24 @@ const app = createApp({
           const msg = await this.getErrorMessage(res, 'Failed to load report.');
 
           if (res.status === 401) {
-            alert(msg);
+            this.showUiMessage(msg, 'error', 'Failed to load report.');
             sessionStorage.clear();
             window.location.href = 'login.html';
             return;
           }
 
-          alert(msg);
+          this.showUiMessage(msg, 'error', 'Failed to load report.');
           return;
         }
         const data = await res.json();
 
         if (!data || !data.report_snapshot) {
-          alert('Report data is missing or invalid.');
+          this.showUiMessage('Report data is missing or invalid.');
           return;
         }
     
         this.currentSnapshot = data.report_snapshot;
+        this.clearUiMessage();
         this.resultId = data.result_id || null;
 
         if (this.resultId) {
@@ -1649,25 +1697,26 @@ const app = createApp({
         await this.logClientError('openReport', e, {
             selectedReportId: report?.report_id || null
         });
-        alert('Something went wrong while loading the report.');
+        this.showUiMessage('Something went wrong while loading the report.');
       }
     },
  
     //share
     async shareReport() {
+      this.clearUiMessage();  
       if (!this.isAdmin) {
-        alert('Only administrative users can share reports.');
+        this.showUiMessage('Only administrative users can share reports.');
         return;
       }
   
       if (!this.currentSnapshot) {
-        alert('Please select a report first.');
+        this.showUiMessage('Please select a report first.');
         return;
       }
 
       const token = sessionStorage.getItem('authToken');
       if (!token) {
-        alert('Your session has expired. Please log in again.');
+        this.showUiMessage('Your session has expired. Please log in again.');
         window.location.href = 'login.html';
         return;
       }
@@ -1675,12 +1724,12 @@ const app = createApp({
       const params = new URLSearchParams(window.location.search);
       const reportId = params.get('report_id');
       if (!reportId) {
-          alert("Report ID not found.");
+          this.showUiMessage("Report ID not found.");
           return;
       }
 
       if (!this.isValidUuid(reportId)) {
-          alert('Invalid report ID.');
+          this.showUiMessage('Invalid report ID.');
           return;
       }
 
@@ -1828,7 +1877,7 @@ const app = createApp({
 
         if (!res.ok) {
             const msg = await this.getErrorMessage(res, 'Failed to share report.');
-            alert(msg);
+            this.showUiMessage(msg, 'error', 'Failed to share report');
             if (res.status === 401) {
                 sessionStorage.clear();
                 window.location.href = 'login.html';
@@ -1838,7 +1887,7 @@ const app = createApp({
 
         const data = await res.json();
         if (!data.share_url) {
-            alert('Share link was not returned by the server.');
+            this.showUiMessage('Share link was not returned by the server.');
             return;
         }
 
@@ -1851,15 +1900,15 @@ const app = createApp({
           }).catch(err => console.error('Share failed', err));
         } else {
           navigator.clipboard.writeText(data.share_url)
-            .then(() => alert('Secure share link copied to clipboard!'))
-            .catch(() => alert('Unable to copy link'));
+            .then(() => this.showUiMessage('Secure share link copied to clipboard!', 'info'))
+            .catch(() => this.showUiMessage('Unable to copy link', 'error', 'Unable to copy link.'));
         }
 
       } catch (error) {
         await this.logClientError('shareReport', error, {
             currentReportName: this.currentReportName
         });
-        alert("Something went wrong.");
+        this.showUiMessage("Something went wrong while sharing the report.");
       }
     }
   }
