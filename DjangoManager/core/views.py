@@ -14,7 +14,7 @@ from datetime import timedelta
 from django.core import signing
 from django.core.signing import BadSignature, SignatureExpired
 from django.conf import settings
-from .email_service import send_otp_email
+from .email_service import send_otp_email, send_report_ready_email
 from django.core.cache import cache
 import random
 import hashlib
@@ -36,9 +36,10 @@ from .models import (
     AnalysisResult, Finding, Recommendation,
     Report, AuditLog, AdminAccessRequest,
     ReportDownload, DeletionRequest, ReportShare,
+    Notification,
 )
 from .utils import validate_org_email
-
+from django.db import models
 
 # ──────────────────────────────────────────────
 # Security Configuration
@@ -202,6 +203,39 @@ def _mime_type_for(file_name):
     }.get(ext, 'application/octet-stream')
 
 
+def _delete_s3_keys(keys: list, bucket: str = None) -> dict:
+    """
+    Hard-deletes a list of S3 keys from S3.
+    Returns {'deleted': [...], 'failed': [...]}.
+    Errors are logged but never raised so callers are never broken by S3 issues.
+    """
+    bucket   = bucket or settings.AWS_STORAGE_BUCKET_NAME
+    deleted, failed = [], []
+    if not keys:
+        return {"deleted": deleted, "failed": failed}
+    try:
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+        )
+        for i in range(0, len(keys), 1000):   # S3 allows max 1000 keys per call
+            batch = [{"Key": k} for k in keys[i:i + 1000]]
+            resp  = s3.delete_objects(Bucket=bucket, Delete={"Objects": batch})
+            deleted.extend(o["Key"] for o in resp.get("Deleted", []))
+            for err in resp.get("Errors", []):
+                failed.append(err["Key"])
+                logger.error(
+                    "S3 delete failed | key=%s | code=%s | msg=%s",
+                    err["Key"], err.get("Code"), err.get("Message"),
+                )
+    except (BotoCoreError, ClientError) as e:
+        logger.error("S3 bulk delete error | bucket=%s | error=%s", bucket, e)
+        failed.extend(keys)
+    return {"deleted": deleted, "failed": failed}
+
+
 # ──────────────────────────────────────────────
 # OAuth Token helpers (SSM Parameter Store)
 # ──────────────────────────────────────────────
@@ -337,12 +371,15 @@ def upload_file(request):
             return JsonResponse({'error': 'Department is required. Please select a department before uploading.'}, status=400)
         org, _  = Organization.objects.get_or_create(org_name=company_name)
         dept, _ = Department.objects.get_or_create(org=org, dept_name=department)
+        if not profile.org_id:
+            profile.org = org
+            profile.save(update_fields=["org"])
 
     ext = uploaded_file.name.lower().rsplit('.', 1)[-1]
     file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
     file_type = file_type_map.get(ext)
     if not file_type:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'}, status=400)
 
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -352,15 +389,15 @@ def upload_file(request):
 
     try:
         if is_password_protected(temp_path, uploaded_file.name):
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
             return JsonResponse({'error': 'File rejected — password protected files are not allowed'}, status=400)
 
         scan_result = scan_file(temp_path)
         if scan_result is not None:
             if scan_result.startswith('SCAN_ERROR:'):
-                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
                 return JsonResponse({'error': 'File could not be scanned. The security scanner is temporarily unavailable. Please try again shortly.'}, status=503)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
         upload_start = time.time()
@@ -368,7 +405,7 @@ def upload_file(request):
         upload_duration = time.time() - upload_start
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", uploaded_file.name, profile.user_id)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             push_upload_metric('UploadFailureCount', 1, unit='Count')
             push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
             return JsonResponse({'error': 'Failed to upload file to S3. Please try again in a few minutes.'}, status=500)
@@ -390,7 +427,7 @@ def upload_file(request):
 
         push_upload_metric('UploadSuccessCount', 1, unit='Count')
         push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
-        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request)
+        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request, AuditLog.Severity.LOW)
         return JsonResponse({
             'status':      'uploaded',
             's3_url':      s3_url,
@@ -436,6 +473,9 @@ def analyze_compliance(request):
             {'error': f'File bytes for "{file_name}" not found in cache. Please re-upload.'},
             status=400,
         )
+
+    # Best-effort profile lookup for notification; None means notification is skipped.
+    _notify_profile, _ = _get_profile_from_token(request)
 
     def event_stream():
         try:
@@ -521,13 +561,16 @@ def analyze_compliance(request):
                     )
                     snapshot     = {**result, 'metadata': {**result.get('metadata', {}), 'file_analyzed': file_name, 'company': company_name}}
                     snapshot_str = _json.dumps(snapshot)
-                    Report.objects.create(
+                    report = Report.objects.create(
                         result=analysis_result,
+                        dept=document.dept,
                         report_snapshot=snapshot,
                         report_s3_key=file_name,
                         file_size=len(snapshot_str),
                         expires_at=timezone.now() + timedelta(days=30),
                     )
+                    if _notify_profile is not None:
+                        _send_report_notification(_notify_profile, report, document.original_filename)
             except Exception:
                 pass
 
@@ -726,7 +769,7 @@ def analyze_batch(request):
                             document.status = Document.Status.COMPLETED
                             document.save(update_fields=['status'])
 
-                        _record_audit_log(profile, 'ANALYSE', 'analysis_result', analysis.result_id, True, request)
+                        _record_audit_log(profile, 'ANALYSE', 'analysis_result', analysis.result_id, True, request, AuditLog.Severity.LOW)
                         collected_result_ids.append(str(analysis.result_id))
 
                         yield f"data: {json.dumps({'status': 'analysed', 'file_name': file_name, 'result_id': str(analysis.result_id)})}\n\n".encode('utf-8')
@@ -959,7 +1002,7 @@ def delete_file(request):
             Bucket=settings.AWS_STORAGE_BUCKET_NAME,
             Delete={'Objects': [{'Key': k} for k in keys_to_delete]},
         )
-        _record_audit_log(profile, "DELETE", "document", None, True, request)
+        _record_audit_log(profile, "DELETE", "document", None, True, request, AuditLog.Severity.LOW)
         return JsonResponse({'status': f'{len(keys_to_delete)} file(s) deleted'})
 
     except (BotoCoreError, ClientError) as e:
@@ -1000,7 +1043,7 @@ def upload_from_drive(request):
 
     valid_exts = ('.pdf', '.docx', '.txt')
     if not file_name.lower().endswith(valid_exts):
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': f'"{file_name}" is not supported. Only PDF, DOCX and TXT files are allowed.'}, status=400)
 
     # Resolve Organisation & Department
@@ -1023,7 +1066,7 @@ def upload_from_drive(request):
     file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
     file_type = file_type_map.get(ext)
     if not file_type:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'}, status=400)
 
     # Download from Google Drive
@@ -1037,18 +1080,18 @@ def upload_from_drive(request):
         )
     except requests.exceptions.RequestException as e:
         logger.error("Google Drive download failed for file %s, user %s: %s", file_name, profile.user_id, str(e))
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
         return JsonResponse({'error': 'Could not reach Google Drive. Please check your connection and try again.'}, status=502)
 
     if drive_response.status_code == 401:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Google access token is invalid or expired'}, status=401)
     if drive_response.status_code == 403:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Permission denied — cannot access this Google Drive file'}, status=403)
     if not drive_response.ok:
         logger.error("Google Drive returned HTTP %s for file %s, user %s", drive_response.status_code, file_name, profile.user_id)
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
         return JsonResponse({'error': 'Google Drive is temporarily unavailable. Please try again in a few minutes.'}, status=502)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp:
@@ -1063,26 +1106,26 @@ def upload_from_drive(request):
     try:
         file_size = os.path.getsize(temp_path)
         if file_size > 50 * 1024 * 1024:
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
             return JsonResponse({'error': f'"{file_name}" exceeds the 50 MB limit.'}, status=400)
 
         if is_password_protected(temp_path, file_name):
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
             return JsonResponse({'error': 'File rejected — password protected files are not allowed'}, status=400)
 
         scan_result = scan_file(temp_path)
         if scan_result is not None:
             if scan_result.startswith('SCAN_ERROR:'):
                 logger.error("ClamAV scanner unavailable for file %s, user %s: %s", file_name, profile.user_id, scan_result)
-                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
                 return JsonResponse({'error': 'File could not be scanned. The security scanner is temporarily unavailable. Please try again shortly.'}, status=503)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
         s3_key, s3_url = upload_to_s3(temp_path, file_name)
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", file_name, profile.user_id)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'Failed to upload file to S3. Please try again in a few minutes.'}, status=500)
 
         with open(temp_path, 'rb') as f:
@@ -1100,7 +1143,7 @@ def upload_from_drive(request):
             status=Document.Status.UPLOADED,
         )
 
-        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request)
+        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request, AuditLog.Severity.LOW)
 
         def event_stream():
             try:
@@ -1166,7 +1209,7 @@ def upload_from_onedrive(request):
 
     valid_exts = ('.pdf', '.docx', '.txt')
     if not file_name.lower().endswith(valid_exts):
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Unsupported file type'}, status=400)
 
     # ── Resolve Organisation & Department ─────────────────────────────────────
@@ -1190,7 +1233,7 @@ def upload_from_onedrive(request):
     file_type_map = {'pdf': 'PDF', 'docx': 'DOCX', 'txt': 'TXT'}
     file_type = file_type_map.get(ext)
     if not file_type:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Unsupported file type. Only PDF, DOCX, and TXT are allowed.'}, status=400)
 
     # ── Download from Microsoft Graph ─────────────────────────────────────────
@@ -1204,14 +1247,14 @@ def upload_from_onedrive(request):
             stream=True,
         )
     except requests.exceptions.RequestException as e:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
         return JsonResponse({'error': str(e)}, status=502)
 
     if response.status_code == 401:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
         return JsonResponse({'error': 'Invalid or expired token'}, status=401)
     if not response.ok:
-        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+        _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
         return JsonResponse({'error': f'Microsoft API error {response.status_code}'}, status=502)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp:
@@ -1223,28 +1266,28 @@ def upload_from_onedrive(request):
         # ── Size check ────────────────────────────────────────────────────────
         file_size = os.path.getsize(temp_path)
         if file_size > 50 * 1024 * 1024:
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
             return JsonResponse({'error': 'File too large. Maximum size is 50 MB.'}, status=400)
 
         # ── Password protection check ─────────────────────────────────────────
         if is_password_protected(temp_path, file_name):
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.LOW)
             return JsonResponse({'error': 'File rejected — password protected files are not allowed'}, status=400)
 
         # ── Malware scan ──────────────────────────────────────────────────────
         scan_result = scan_file(temp_path)
         if scan_result is not None:
             if scan_result.startswith('SCAN_ERROR:'):
-                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+                _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.MEDIUM)
                 return JsonResponse({'error': 'File could not be scanned. The security scanner is temporarily unavailable. Please try again shortly.'}, status=503)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
         # ── Upload to S3 ──────────────────────────────────────────────────────
         s3_key, s3_url = upload_to_s3(temp_path, file_name)
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", file_name, profile.user_id)
-            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'S3 upload failed. Please try again in a few minutes.'}, status=500)
 
         # ── Cache file bytes for analysis ─────────────────────────────────────
@@ -1263,7 +1306,7 @@ def upload_from_onedrive(request):
             status=Document.Status.UPLOADED,
         )
 
-        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request)
+        _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request, AuditLog.Severity.LOW)
 
         return JsonResponse({
             'status':      'uploaded',
@@ -1303,6 +1346,12 @@ def signup(request):
 
     if len(full_name) < 3:
         return JsonResponse({"detail": "Please enter your full name (first and last name)"}, status=400)
+
+    if len(full_name) > 150:
+        return JsonResponse({"detail": "Full name is too long."}, status=400)
+
+    if any(ord(char) < 32 for char in full_name):
+        return JsonResponse({"detail": "Invalid name format"}, status=400)
 
     if not re.match(r"^[A-Za-z'-]+(?:\s[A-Za-z'-]+)+$", full_name):
         return JsonResponse({"detail": "Please enter your full name (first and last name)"}, status=400)
@@ -1791,15 +1840,47 @@ def _generate_and_store_otp(profile: UserProfile, purpose: str) -> str:
     return raw_otp
 
 
-def _record_audit_log(profile, action_type: str, target_type: str, target_id, success: bool, request=None) -> None:
-    ip = request.META.get("REMOTE_ADDR") if request else None
+def _record_audit_log(profile, action_type: str, target_type: str, target_id, success: bool, request=None, severity: str = AuditLog.Severity.LOW) -> None:
     # Skip the audit log entry rather than crashing on the NOT NULL constraint for rejection events.
     if target_id is None:
         return
+    ip = request.META.get("REMOTE_ADDR") if request else None
     AuditLog.objects.create(
         user=profile, action_type=action_type, target_type=target_type,
-        target_id=target_id, success=success, ip_address=ip
+        target_id=target_id, success=success, severity=severity, ip_address=ip
     )
+
+
+def _send_report_notification(profile, report, report_name: str) -> None:
+    """
+    Creates an in-app Notification row and sends a report-ready email via SES.
+    Updates report.notification_sent and report.email_status accordingly.
+    Errors are swallowed so they never break the caller's response.
+    """
+    try:
+        Notification.objects.create(
+            user=profile,
+            notification_type=Notification.NotificationType.REPORT_READY,
+            message=f"Your compliance report '{report_name}' is ready to view.",
+            report=report,
+        )
+        report.notification_sent = True
+        report.save(update_fields=["notification_sent"])
+    except Exception:
+        logger.exception("Failed to create in-app notification | report_id=%s", report.report_id)
+
+    try:
+        email = profile.auth_user.email
+        success = send_report_ready_email(email, report_name)
+        report.email_status = Report.EmailStatus.SENT if success else Report.EmailStatus.FAILED
+        report.save(update_fields=["email_status"])
+    except Exception:
+        logger.exception("Failed to send report-ready email | report_id=%s", report.report_id)
+        try:
+            report.email_status = Report.EmailStatus.FAILED
+            report.save(update_fields=["email_status"])
+        except Exception:
+            pass
 
 
 # ──────────────────────────────────────────────
@@ -2246,7 +2327,16 @@ def delete_account(request):
         deletion_record.save(update_fields=["status"])
         return JsonResponse({"detail": "Account deletion failed. Please try again."}, status=500)
 
-    _record_audit_log(profile, "DELETE_ACCOUNT", "user_profile", profile.user_id, True, request)
+    # Hard-delete all document and report files from S3
+    all_keys = list(set(s3_keys + report_s3_keys))
+    s3_result = _delete_s3_keys(all_keys)
+    if s3_result["failed"]:
+        logger.error(
+            "Account deletion S3 cleanup incomplete | user_id=%s | failed_keys=%s",
+            profile.user_id, s3_result["failed"],
+        )
+
+    _record_audit_log(profile, "DELETE_ACCOUNT", "user_profile", profile.user_id, True, request, AuditLog.Severity.HIGH)
     return JsonResponse({"detail": "Account deleted successfully"}, status=200)
 
 
@@ -2296,8 +2386,8 @@ def _serialize_analysis(analysis: AnalysisResult) -> dict:
         "result_id":         str(analysis.result_id),
         "document_id":       str(analysis.document_id),
         "original_filename": analysis.document.original_filename,
-        "company_name":      analysis.document.org.org_name if analysis.document.org else "", 
-        "department":        analysis.document.dept.dept_name if analysis.document.dept else "", 
+        "company_name":      analysis.document.org.org_name if analysis.document.org else "",
+        "department":        analysis.document.dept.dept_name if analysis.document.dept else "",
         "compliance_score":  analysis.compliance_score,
         "risk_level":        analysis.risk_level,
         "summary":           analysis.summary,
@@ -2384,7 +2474,7 @@ def save_analysis_result(request):
         document.status = Document.Status.COMPLETED
         document.save(update_fields=["status"])
 
-    _record_audit_log(profile, "ANALYSE", "analysis_result", analysis.result_id, True, request)
+    _record_audit_log(profile, "ANALYSE", "analysis_result", analysis.result_id, True, request, AuditLog.Severity.LOW)
     return JsonResponse(
         {"result_id": str(analysis.result_id), "compliance_score": compliance_score,
          "risk_level": risk_level, "findings_saved": len(findings_to_create)},
@@ -2560,20 +2650,27 @@ def save_recommendations(request):
     for item in recommendations:
         recommendation_text = (item.get("recommendation_text") or "").strip()
         act_name            = (item.get("act_name") or "").strip()
-        page_no             = item.get("page_no")
-        line_no             = item.get("line_no")
-        status              = (item.get("status") or Recommendation.Status.PENDING).strip()
+        steps_to_achieve    = item.get("steps_to_achieve") or []
+        section             = (item.get("section") or "").strip()
+        status              = (item.get("status") or Recommendation.Status.MEDIUM).strip()
 
-        if not recommendation_text or not act_name or page_no is None or line_no is None:
+        if not recommendation_text or not act_name:
             continue
 
         valid_statuses = [s.value for s in Recommendation.Status]
         if status not in valid_statuses:
-            status = Recommendation.Status.PENDING
+            status = Recommendation.Status.MEDIUM
+
+        if not isinstance(steps_to_achieve, list):
+            steps_to_achieve = []
 
         rec = Recommendation.objects.create(
-            result=analysis_result, recommendation_text=recommendation_text,
-            status=status, act_name=act_name, page_no=int(page_no), line_no=int(line_no),
+            result=analysis_result,
+            recommendation_text=recommendation_text,
+            status=status,
+            act_name=act_name,
+            steps_to_achieve=steps_to_achieve,
+            section=section,
         )
         created.append(str(rec.rec_id))
 
@@ -2613,7 +2710,7 @@ def get_recommendations(request):
         return JsonResponse({"detail": "You do not have access to these recommendations"}, status=403)
 
     recommendations = Recommendation.objects.filter(result=analysis_result).order_by("created_at").values(
-        "rec_id", "recommendation_text", "status", "act_name", "page_no", "line_no", "created_at",
+        "rec_id", "recommendation_text", "status", "act_name", "steps_to_achieve", "section", "created_at",
     )
 
     return JsonResponse(
@@ -2645,17 +2742,34 @@ def list_reports(request):
     now       = timezone.now()
     cutoff_7  = now - timedelta(days=7)
     cutoff_30 = now - timedelta(days=30)
+    dept_ids_raw = (request.GET.get("dept_ids") or "").strip()
+    dept_ids = [d.strip() for d in dept_ids_raw.split(",") if d.strip()] if dept_ids_raw else []
 
-    if profile.role == UserProfile.Role.ADMIN and profile.org_id:
-        qs = Report.objects.select_related("result__document__org").filter(
-            result__document__user__org=profile.org, generated_at__gte=cutoff_30,
+    if profile.role == UserProfile.Role.ADMIN:
+        base_filter = (
+            {"result__document__user__org": profile.org}
+            if profile.org_id
+            else {"result__document__user": profile}
         )
+        qs = Report.objects.select_related(
+            "result__document__org", "result__document__dept", "dept"
+        ).filter(generated_at__gte=cutoff_30, **base_filter)
     else:
-        qs = Report.objects.select_related("result__document__org").filter(
+        qs = Report.objects.select_related(
+            "result__document__org", "result__document__dept", "dept"
+        ).filter(
             result__document__user=profile, generated_at__gte=cutoff_30,
         )
 
     qs = qs.order_by("-generated_at")
+
+    def _get_effective_dept_id(r):
+        """Report.dept_id if set, else fall back to the source document's dept_id."""
+        if r.dept_id:
+            return str(r.dept_id)
+        if r.result and r.result.document and r.result.document.dept_id:
+            return str(r.result.document.dept_id)
+        return None
 
     def _serialize(r):
         snapshot     = r.report_snapshot or {}
@@ -2666,14 +2780,88 @@ def list_reports(request):
         return {
             "report_id":    str(r.report_id),
             "display_name": display_name,
+            "dept_id":      _get_effective_dept_id(r),
             "generated_at": r.generated_at.isoformat(),
             "expires_at":   r.expires_at.isoformat(),
         }
 
-    last_7_days  = [_serialize(r) for r in qs if r.generated_at >= cutoff_7]
-    last_30_days = [_serialize(r) for r in qs if r.generated_at < cutoff_7]
+    def _matches_dept(r):
+        """Return True if this report belongs to any of the selected dept_ids."""
+        if not dept_ids:
+            return True
+        return _get_effective_dept_id(r) in dept_ids
+
+    all_reports  = [r for r in qs if _matches_dept(r)]
+    last_7_days  = [_serialize(r) for r in all_reports if r.generated_at >= cutoff_7]
+    last_30_days = [_serialize(r) for r in all_reports if r.generated_at < cutoff_7]
 
     return JsonResponse({"last_7_days": last_7_days, "last_30_days": last_30_days}, status=200)
+
+
+@csrf_exempt
+def debug_reports_dept(request):
+    """GET /api/debug-reports-dept/ — Temporary: shows dept data for all admin reports."""
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    if profile.role != UserProfile.Role.ADMIN:
+        return JsonResponse({"detail": "Admin only"}, status=403)
+
+    base_filter = (
+        {"result__document__user__org": profile.org}
+        if profile.org_id
+        else {"result__document__user": profile}
+    )
+    reports = Report.objects.select_related(
+        "result__document__dept", "dept"
+    ).filter(**base_filter)
+
+    rows = []
+    for r in reports:
+        rows.append({
+            "report_id":        str(r.report_id),
+            "report_dept_id":   str(r.dept_id) if r.dept_id else None,
+            "doc_dept_id":      str(r.result.document.dept_id) if r.result and r.result.document and r.result.document.dept_id else None,
+            "doc_dept_name":    r.result.document.dept.dept_name if r.result and r.result.document and r.result.document.dept_id else None,
+            "display_name":     r.report_s3_key,
+        })
+    return JsonResponse({"reports": rows}, status=200)
+
+
+@csrf_exempt
+def list_departments(request):
+    """GET /api/departments/ — Returns departments for the admin's org. Admin only."""
+    if request.method != "GET":
+        return JsonResponse({"detail": "Method not allowed"}, status=405)
+
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    if profile.role != UserProfile.Role.ADMIN:
+        return JsonResponse({"detail": "Admin access required"}, status=403)
+
+    base_filter = (
+        {"documents__user__org": profile.org}
+        if profile.org_id
+        else {"documents__user": profile}
+    )
+    depts = Department.objects.filter(
+        **base_filter
+    ).distinct().order_by("dept_name").values("dept_id", "dept_name")
+
+    # Group by dept_name — collect all dept_ids that share the same name.
+    # The frontend uses dept_name as the filter key so all synonymous dept rows match.
+    from collections import defaultdict
+    name_to_ids = defaultdict(list)
+    for d in depts:
+        name_to_ids[d["dept_name"]].append(str(d["dept_id"]))
+
+    departments = [
+        {"dept_name": name, "dept_ids": ids}
+        for name, ids in sorted(name_to_ids.items())
+    ]
+    return JsonResponse({"departments": departments}, status=200)
 
 
 @csrf_exempt
@@ -2697,6 +2885,7 @@ def generate_report(request):
     report_s3_key   = (payload.get("report_s3_key") or "").strip()
     file_size       = payload.get("file_size")
     expires_in_days = payload.get("expires_in_days", 30)
+    dept_id         = (payload.get("dept_id") or "").strip() or None
 
     if not result_id or not report_snapshot or not report_s3_key or file_size is None:
         return JsonResponse({"detail": "result_id, report_snapshot, report_s3_key and file_size are required"}, status=400)
@@ -2706,16 +2895,36 @@ def generate_report(request):
     except (AnalysisResult.DoesNotExist, Exception):
         return JsonResponse({"detail": "analysis_result not found"}, status=404)
 
+    dept = None
+    if dept_id:
+        try:
+            dept = Department.objects.get(dept_id=dept_id)
+        except Department.DoesNotExist:
+            return JsonResponse({"detail": "Department not found"}, status=404)
+
     try:
         report = Report.objects.create(
             result=analysis_result, report_snapshot=report_snapshot,
             report_s3_key=report_s3_key, file_size=int(file_size),
             expires_at=timezone.now() + timedelta(days=int(expires_in_days)),
+            dept=dept,
         )
     except Exception as e:
+        logger.exception(
+            "Failed to create report | user_id=%s | result_id=%s | report_s3_key=%s",
+            profile.user_id, result_id, report_s3_key,
+        )
         return JsonResponse({"detail": f"Failed to create report: {str(e)}"}, status=500)
 
-    _record_audit_log(profile, "GENERATE_REPORT", "report", report.report_id, True, request)
+    _record_audit_log(profile, "GENERATE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.LOW)
+
+    report_name = (
+        analysis_result.document.original_filename
+        if hasattr(analysis_result, "document")
+        else str(report.report_id)
+    )
+    _send_report_notification(profile, report, report_name)
+
     return JsonResponse(
         {"detail": "Report generated successfully", "report_id": str(report.report_id),
          "generated_at": report.generated_at.isoformat(), "expires_at": report.expires_at.isoformat()},
@@ -2735,9 +2944,15 @@ def get_report(request, report_id):
     assert profile is not None
 
     try:
-        report = Report.objects.select_related("result__document").get(report_id=report_id)
+        report = Report.objects.select_related("result__document", "dept").get(report_id=report_id)
     except Report.DoesNotExist:
         return JsonResponse({"detail": "Report not found"}, status=404)
+    except Exception:
+        logger.exception(
+            "Unexpected error while retrieving report | user_id=%s | report_id=%s",
+            profile.user_id, report_id,
+        )
+        return JsonResponse({"detail": "Failed to load report."}, status=500)
 
     doc = report.result.document
     is_owner    = str(doc.user_id) == str(profile.user_id)
@@ -2749,11 +2964,12 @@ def get_report(request, report_id):
     if not is_owner and not is_org_admin:
         return JsonResponse({"detail": "You do not have access to this report"}, status=403)
 
-    _record_audit_log(profile, "VIEW_REPORT", "report", report.report_id, True, request)
+    _record_audit_log(profile, "VIEW_REPORT", "report", report.report_id, True, request, AuditLog.Severity.LOW)
     return JsonResponse(
         {
             "report_id":       str(report.report_id),
             "result_id":       str(report.result.result_id),
+            "dept_id":         str(report.dept_id) if report.dept_id else None,
             "report_snapshot": report.report_snapshot,
             "report_s3_key":   report.report_s3_key,
             "file_size":       report.file_size,
@@ -2787,7 +3003,7 @@ def delete_report(request, report_id):
     if not is_owner and not is_org_admin:
         return JsonResponse({"detail": "You do not have permission to delete this report"}, status=403)
 
-    _record_audit_log(profile, "DELETE_REPORT", "report", report.report_id, True, request)
+    _record_audit_log(profile, "DELETE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.MEDIUM)
     report.delete()
     return JsonResponse({"detail": "Report deleted"}, status=200)
 
@@ -2818,6 +3034,12 @@ def download_report(request):
         report = Report.objects.select_related("result__document__user__org").get(report_id=report_id)
     except Report.DoesNotExist:
         return JsonResponse({"error": "Report not found"}, status=404)
+    except Exception:
+        logger.exception(
+            "Unexpected error while fetching report for download | user_id=%s | report_id=%s",
+            profile.user_id, report_id,
+        )
+        return JsonResponse({"error": "Failed to process download request."}, status=500)
 
     doc = report.result.document
     is_owner    = str(doc.user_id) == str(profile.user_id)
@@ -2825,14 +3047,21 @@ def download_report(request):
     if not is_owner and not is_org_admin:
         return JsonResponse({"error": "You do not have access to this report"}, status=403)
 
-    ReportDownload.objects.create(downloaded_by=profile, report_id=report_id)
-    _record_audit_log(profile, "DOWNLOAD_REPORT", "report", report.report_id, True, request)
-    return JsonResponse({"message": "Download recorded"})
+    try:
+        ReportDownload.objects.create(downloaded_by=profile, report_id=report_id)
+        _record_audit_log(profile, "DOWNLOAD_REPORT", "report", report.report_id, True, request, AuditLog.Severity.MEDIUM)
+        return JsonResponse({"message": "Download recorded"})
+    except Exception:
+        logger.exception(
+            "Failed to record report download | user_id=%s | report_id=%s",
+            profile.user_id, report_id,
+        )
+        return JsonResponse({"error": "Failed to record download."}, status=500)
 
 
 @csrf_exempt
 def share_report(request):
-    """POST /api/share-report/ — Creates a share token. Admin only."""
+    """POST /api/share-report/ — Uploads PDF to S3 and returns a pre-signed URL. Admin only."""
     if request.method != "POST":
         return JsonResponse({"error": "Invalid request"}, status=405)
 
@@ -2843,19 +3072,24 @@ def share_report(request):
     if profile.role != UserProfile.Role.ADMIN:
         return JsonResponse({"error": "Only administrative users can share reports"}, status=403)
 
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    report_id = request.POST.get("report_id", "").strip()
+    pdf_file  = request.FILES.get("pdf")
 
-    report_id = (data.get("report_id") or "").strip()
     if not report_id:
         return JsonResponse({"error": "report_id is required"}, status=400)
+    if not pdf_file:
+        return JsonResponse({"error": "pdf file is required"}, status=400)
 
     try:
         report = Report.objects.select_related("result__document__user__org").get(report_id=report_id)
     except Report.DoesNotExist:
         return JsonResponse({"error": "Report not found"}, status=404)
+    except Exception:
+        logger.exception(
+            "Unexpected error while fetching report for sharing | user_id=%s | report_id=%s",
+            profile.user_id, report_id,
+        )
+        return JsonResponse({"error": "Failed to load report for sharing."}, status=500)
 
     doc = report.result.document
     is_owner    = str(doc.user_id) == str(profile.user_id)
@@ -2863,15 +3097,132 @@ def share_report(request):
     if not is_owner and not is_org_admin:
         return JsonResponse({"error": "You do not have access to this report"}, status=403)
 
-    token = str(uuid.uuid4())
-    ReportShare.objects.create(
-        report=report, shared_by=profile,
-        shared_with_email=profile.auth_user.email,
-        access_token=token, expires_at=timezone.now() + timedelta(days=7),
+    # Reuse existing active share if one exists
+    existing_share = ReportShare.objects.filter(
+        report=report, shared_by=profile, is_active=True, expires_at__gt=timezone.now()
+    ).first()
+
+    if existing_share:
+        return JsonResponse({
+            "message": "Report shared successfully",
+            "share_url": existing_share.access_token
+        })
+
+    # Write PDF to temp file and upload to S3
+    try:
+        s3_key = f"shared-reports/{report_id}.pdf"
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            for chunk in pdf_file.chunks():
+                tmp.write(chunk)
+            temp_path = tmp.name
+
+        try:
+            s3 = boto3.client(
+                's3',
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                region_name=settings.AWS_S3_REGION_NAME,
+            )
+
+            s3.upload_file(
+                temp_path,
+                settings.AWS_SHARED_REPORTS_BUCKET_NAME,
+                s3_key,
+                ExtraArgs={'ContentType': 'application/pdf'}
+            )
+
+            # Generate pre-signed URL (7 days)
+            presigned_url = s3.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': settings.AWS_SHARED_REPORTS_BUCKET_NAME,
+                    'Key': s3_key,
+                },
+                ExpiresIn=604800  # 7 days in seconds
+            )
+
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+
+    except (BotoCoreError, ClientError) as e:
+        logger.error("S3 upload failed for shared report %s: %s", report_id, str(e))
+        return JsonResponse({"error": "Failed to upload report. Please try again."}, status=500)
+
+    # Store pre-signed URL as access_token in ReportShare
+    try:
+        ReportShare.objects.create(
+            report=report,
+            shared_by=profile,
+            shared_with_email=profile.auth_user.email,
+            access_token=presigned_url,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+    except Exception:
+        logger.exception(
+            "Failed to create ReportShare record | user_id=%s | report_id=%s",
+            profile.user_id, report_id,
+        )
+        return JsonResponse({"error": "Report uploaded, but share record creation failed."}, status=500)
+
+    _record_audit_log(profile, "SHARE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.MEDIUM)
+    return JsonResponse({"message": "Report shared successfully", "share_url": presigned_url})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def log_client_error(request):
+    """
+    POST /api/client-error-log/
+    Receives frontend/browser errors from report_viewing.html for debugging.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    source    = (data.get("source") or "unknown").strip()
+    message   = (data.get("message") or "No message provided").strip()
+    stack     = data.get("stack") or ""
+    page      = (data.get("page") or "").strip()
+    url       = (data.get("url") or "").strip()
+    report_id = data.get("report_id")
+    user_role = data.get("user_role") or profile.role
+    timestamp = data.get("timestamp")
+    extra     = data.get("extra", {})
+
+    logger.error(
+        "CLIENT_ERROR | user_id=%s | email=%s | role=%s | source=%s | page=%s | url=%s | report_id=%s | timestamp=%s | message=%s | extra=%s | stack=%s",
+        profile.user_id,
+        profile.auth_user.email,
+        user_role,
+        source,
+        page,
+        url,
+        str(report_id) if report_id else None,
+        timestamp,
+        message,
+        extra,
+        stack,
     )
 
-    _record_audit_log(profile, "SHARE_REPORT", "report", report.report_id, True, request)
-    return JsonResponse({"message": "Report shared successfully", "token": token})
+    _record_audit_log(
+        profile,
+        "CLIENT_ERROR",
+        "frontend",
+        str(report_id) if report_id else None,
+        False,
+        request,
+        AuditLog.Severity.MEDIUM,
+    )
+
+    return JsonResponse({"detail": "Client error logged successfully"}, status=201)
 
 
 # ──────────────────────────────────────────────
@@ -2922,7 +3273,10 @@ def request_admin_access(request):
     ).order_by("-created_at").first()
 
     access_request = AdminAccessRequest.objects.create(
-        user=profile, verification_otp=otp_row, org_email=org_email,
+        user=profile,
+        verification_otp=otp_row,
+        org_email=org_email,
+        original_email=profile.auth_user.email,
         status=AdminAccessRequest.Status.PENDING,
     )
 
@@ -2930,7 +3284,7 @@ def request_admin_access(request):
         access_request.delete()
         return JsonResponse({"detail": "Failed to send verification code. Please try again."}, status=500)
 
-    _record_audit_log(profile, "ADMIN_ACCESS_REQUEST", "admin_access_request", access_request.request_id, True, request)
+    _record_audit_log(profile, "ADMIN_ACCESS_REQUEST", "admin_access_request", access_request.request_id, True, request, AuditLog.Severity.HIGH)
     return JsonResponse(
         {"detail": "A verification code has been sent to your organisation email.", "request_id": str(access_request.request_id)},
         status=201,
@@ -3003,20 +3357,16 @@ def verify_admin_access(request):
         profile.role       = UserProfile.Role.ADMIN
         profile.updated_at = now
         profile.save(update_fields=["role", "updated_at"])
-        # Update the user's email to the verified org email
         profile.auth_user.username = access_request.org_email
-        profile.auth_user.email = access_request.org_email
-        profile.auth_user.save(update_fields=["email", "username"])
+        profile.auth_user.email    = access_request.org_email
+        profile.auth_user.save(update_fields=["username", "email"])
 
-    _record_audit_log(profile, "ADMIN_ACCESS_APPROVED", "admin_access_request", access_request.request_id, True, request)
-    return JsonResponse(
-        {
-            "detail": "Administrative access granted successfully.", 
-            "role": profile.role,
-            "org_email": access_request.org_email,
-        }, 
-        status=200,
-    )
+    _record_audit_log(profile, "ADMIN_ACCESS_APPROVED", "admin_access_request", access_request.request_id, True, request, AuditLog.Severity.HIGH)
+    return JsonResponse({
+        "detail": "Administrative access granted successfully.",
+        "role":   profile.role,
+        "email":  access_request.org_email,
+    }, status=200)
 
 
 @csrf_exempt
@@ -3043,3 +3393,187 @@ def get_admin_access_status(request):
         },
         status=200,
     )
+
+
+# ──────────────────────────────────────────────
+# Notifications
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_unread_notifications(request):
+    """
+    GET /api/notifications/unread/
+    Returns all unread notifications for the authenticated user.
+    The frontend polls this endpoint to drive the real-time notification badge.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
+    notifications = Notification.objects.filter(user=profile, is_read=False).order_by("-created_at")[:50]
+
+    return JsonResponse(
+        {
+            "unread_count": notifications.count(),
+            "notifications": [
+                {
+                    "notification_id": str(n.notification_id),
+                    "type":            n.notification_type,
+                    "message":         n.message,
+                    "report_id":       str(n.report_id) if n.report_id else None,
+                    "created_at":      n.created_at.isoformat(),
+                }
+                for n in notifications
+            ],
+        },
+        status=200,
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def mark_notifications_read(request):
+    """
+    POST /api/notifications/mark-read/
+    Body (optional): {"notification_ids": ["<uuid>", ...]}
+    Omitting notification_ids marks ALL unread notifications as read.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
+    try:
+        payload = json.loads(request.body.decode("utf-8")) if request.body else {}
+    except Exception:
+        return JsonResponse({"detail": "Invalid JSON"}, status=400)
+
+    notification_ids = payload.get("notification_ids")
+
+    qs = Notification.objects.filter(user=profile, is_read=False)
+    if notification_ids:
+        qs = qs.filter(notification_id__in=notification_ids)
+
+    updated = qs.update(is_read=True)
+    return JsonResponse({"detail": f"{updated} notification(s) marked as read."}, status=200)
+
+
+# ──────────────────────────────────────────────
+# Logout
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def logout(request):
+    """
+    POST /api/logout/
+    - Deletes any documents with status UPLOADED (uploaded but not yet analysed)
+      from S3 and soft-deletes their DB records so they don't leave orphan files.
+    - Clears those files from the Redis cache.
+    - Always returns 200 so the frontend can clear its local state regardless.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        # Still return 200 — token may already be expired on logout
+        return JsonResponse({"detail": "Logged out"}, status=200)
+
+    # Find documents uploaded but never analysed
+    unanalysed_docs = Document.objects.filter(
+        user=profile,
+        status=Document.Status.UPLOADED,
+        deleted_at__isnull=True,
+    )
+
+    s3_keys = list(unanalysed_docs.values_list("s3_key", flat=True))
+
+    # Clear Redis cache for those files
+    for key in s3_keys:
+        cache.delete(f"file_bytes_{key}")
+
+    # Hard-delete from S3
+    s3_result = _delete_s3_keys(s3_keys)
+    if s3_result["failed"]:
+        logger.error(
+            "Logout S3 cleanup incomplete | user_id=%s | failed_keys=%s",
+            profile.user_id, s3_result["failed"],
+        )
+
+    # Soft-delete the document records
+    now = timezone.now()
+    unanalysed_docs.update(status=Document.Status.DELETED, deleted_at=now)
+
+    _record_audit_log(profile, "LOGOUT", "user_profile", profile.user_id, True, request, AuditLog.Severity.LOW)
+    return JsonResponse({"detail": "Logged out"}, status=200)
+
+
+# ──────────────────────────────────────────────
+# Cloud Health
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def cloud_health(request):
+    """
+    GET /api/cloud-health/
+    Checks S3, ClamAV, and Flask AI service connectivity.
+    Returns overall status and per-service details.
+    Logs every result to CloudWatch for compliance monitoring.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    services = {}
+
+    # ── S3 ───────────────────────────────────────────────────────────────────
+    try:
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+        )
+        s3.head_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
+        services["s3"] = {"ok": True, "message": "S3 reachable"}
+    except (BotoCoreError, ClientError) as e:
+        logger.error("CLOUD_HEALTH | S3 unreachable | %s", e)
+        services["s3"] = {"ok": False, "message": "S3 unavailable — file uploads and downloads will fail"}
+
+    # ── ClamAV ───────────────────────────────────────────────────────────────
+    try:
+        cd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        cd.settimeout(3)
+        cd.connect((settings.CLAMAV_HOST, settings.CLAMAV_PORT))
+        cd.send(b"zPING\0")
+        resp = cd.recv(20).decode(errors="ignore")
+        cd.close()
+        if "PONG" in resp:
+            services["clamav"] = {"ok": True, "message": "ClamAV reachable"}
+        else:
+            logger.warning("CLOUD_HEALTH | ClamAV unexpected response: %s", resp)
+            services["clamav"] = {"ok": False, "message": "ClamAV not responding correctly — file uploads will be blocked"}
+    except Exception as e:
+        logger.error("CLOUD_HEALTH | ClamAV unreachable | %s", e)
+        services["clamav"] = {"ok": False, "message": "ClamAV unavailable — file uploads will be blocked"}
+
+    # ── Flask AI service ─────────────────────────────────────────────────────
+    try:
+        ai_resp = requests.get(f"http://127.0.0.1:5000/health", timeout=5)
+        if ai_resp.status_code == 200:
+            services["ai_service"] = {"ok": True, "message": "AI service reachable"}
+        else:
+            logger.warning("CLOUD_HEALTH | AI service returned %s", ai_resp.status_code)
+            services["ai_service"] = {"ok": False, "message": f"AI service returned {ai_resp.status_code} — analysis will fail"}
+    except Exception as e:
+        logger.error("CLOUD_HEALTH | AI service unreachable | %s", e)
+        services["ai_service"] = {"ok": False, "message": "AI service unavailable — analysis will fail"}
+
+    overall_ok = all(s["ok"] for s in services.values())
+    logger.info("CLOUD_HEALTH | overall=%s | services=%s", "ok" if overall_ok else "degraded", services)
+
+    return JsonResponse({
+        "overall": "ok" if overall_ok else "degraded",
+        "services": services,
+    }, status=200)

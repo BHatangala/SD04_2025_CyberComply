@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +7,7 @@
     <title>CyberComply - Document Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
     <style>
         * {
             margin: 0;
@@ -921,6 +923,11 @@
         // Resolved at runtime from sessionStorage (set by login flow).
         // The mounted() hook overwrites this with the server-confirmed
         // role so the hardcoded default below is only a safe fallback.
+        //
+        // Example (once backend exists):
+        //   const isAdminUser = await fetch('/api/auth/me')
+        //                         .then(r => r.json())
+        //                         .then(u => u.role === 'admin');
         const isAdminUser = true;  // fallback — overridden in mounted()
         // ─────────────────────────────────────────────────────────────
 
@@ -954,12 +961,6 @@
                     topRecommendation: '',
                     complianceDetails: [],   // single-file mode only
 
-                    // ── Sidebar History ──
-                    last7Days: [],
-                    last30Days: [],
-                    filteredLast7Days: [],
-                    filteredLast30Days: [],
-
                     // Loading / error state
                     isLoading: true,
                     loadError: '',
@@ -979,6 +980,9 @@
                 const roleRaw = sessionStorage.getItem('userRole');
                 this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
 
+                // Session timeout — 30 min because analysis can take ~20 min
+                SessionManager.init({ timeoutMs: 1800000 });
+
                 // ── Detect which mode to use ──────────────────────────────
                 // batchResultIds written by home.html on batch_complete takes priority.
                 // latestResultId is the single-file path (unchanged behaviour).
@@ -990,12 +994,8 @@
                     await this.loadBatchResults(token, batchIdsRaw);
                 } else {
                     // ── SINGLE FILE MODE ──────────────────────────────────
-                    // Identical to the original flow — no changes.
                     await this.loadSingleResult(token, singleId);
                 }
-
-                // ── Populate sidebar history ──────────────────────────────
-                await this.fetchHistory(token);
             },
 
             methods: {
@@ -1037,12 +1037,10 @@
 
                         const data = await res.json();
 
-                        this.isBatchMode    = true;
+                        this.isBatchMode     = true;
                         this.analysedCompany = data.org_name || 'Unknown Organisation';
 
                         // Each dept gets an `expanded: false` flag for the collapsible sub-box.
-                        // Upload order is preserved — get_org_comparison returns depts in the
-                        // order result_ids were passed, which matches the batch submission order.
                         this.batchDepartments = (data.departments || []).map(d => ({
                             ...d,
                             expanded: false
@@ -1076,7 +1074,7 @@
                     }
                 },
 
-                // ── Single file result loader (original logic, unchanged) ──
+                // ── Single file result loader ────────────────────────────
                 async loadSingleResult(token, resultId) {
                     const url = resultId
                         ? `${BASE}/api/analysis/${resultId}/`
@@ -1158,33 +1156,6 @@
                 },
                 goBack() {
                     window.location.href = 'home.html';
-                },
-
-                // ── Sidebar history navigation ──
-                openReport(report) {
-                    const resultId = report.resultId || null;
-                    if (resultId) {
-                        sessionStorage.setItem('latestResultId', resultId);
-                        window.location.href = 'document_analysis.html';
-                    } else {
-                        window.location.href = `report_viewing.html?report=${encodeURIComponent(report.label || report)}`;
-                    }
-                },
-
-                async fetchHistory(token) {
-                    try {
-                        const res = await fetch(`${BASE}/api/analysis/history/`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        if (!res.ok) return;
-                        const data = await res.json();
-                        this.last7Days  = (data.last_7_days  || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
-                        this.last30Days = (data.last_30_days || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
-                        this.filteredLast7Days  = [...this.last7Days];
-                        this.filteredLast30Days = [...this.last30Days];
-                    } catch (e) {
-                        console.warn('Could not load analysis history:', e);
-                    }
                 },
 
                 // ── Compliance Score: open to all ──

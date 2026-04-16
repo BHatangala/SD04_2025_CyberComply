@@ -7,6 +7,7 @@
     <title>CyberComply - Compliance Score</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -192,6 +193,8 @@
             padding: 25px 30px;
             border-radius: 12px;
             border-left: 5px solid #4a8fe7;
+            max-height: 500px;
+            overflow-y: auto;
         }
 
         /* section-header margin-bottom updated to 15px (sprint-2) */
@@ -686,6 +689,8 @@
                     return;
                 }
 
+                SessionManager.init({ timeoutMs: 1200000 });
+
                 // ── Load static risk mapping from local file (ai-development) ──
                 // Not a Django endpoint — fetched directly from the filesystem.
                 this.loadRiskMapping();
@@ -695,7 +700,7 @@
                 // Falls back to the /latest/ endpoint if no id is stored.
                 const resultId = sessionStorage.getItem('latestResultId');
                 const url = resultId
-                    ? `${BASE}/api/analysis/${resultId}/`
+                    ? `${BASE}/api/analysis/${encodeURIComponent(resultId)}/`
                     : `${BASE}/api/analysis/latest/`;
 
                 try {
