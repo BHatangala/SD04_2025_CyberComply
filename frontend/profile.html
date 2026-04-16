@@ -938,7 +938,7 @@
                     }
 
                     try {
-                        const res = await fetch(`/api/profile/?email=${encodeURIComponent(email)}`);
+                        const res = await fetch(`http://127.0.0.1:8000/api/profile/?email=${encodeURIComponent(email)}`);
                         if (!res.ok) throw new Error('Failed to load profile');
                         const data = await res.json();
 
@@ -1017,7 +1017,7 @@
                     try {
                         // Step 1: If name changed → save it immediately (PATCH)
                         if (nameChanged) {
-                            const res = await fetch('/api/profile/update/', {
+                            const res = await fetch('http://127.0.0.1:8000/api/profile/update/', {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ 
@@ -1080,7 +1080,7 @@
                 async saveNameOnly() {
                     this.isSaving = true;
                     try {
-                        const res = await fetch('/api/profile/update/', {
+                        const res = await fetch('http://127.0.0.1:8000/api/profile/update/', {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ full_name: this.editedFullName.trim() })
@@ -1136,7 +1136,7 @@
 
                 async updateTwoFactorSetting() {
                     try {
-                        const response = await fetch('/api/profile/twofa/', {
+                        const response = await fetch('http://127.0.0.1:8000/api/profile/twofa/', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -1170,7 +1170,7 @@
     
                     if (fileNames.length > 0) {
                         try {
-                            await fetch('/api/delete-file/', {
+                            await fetch('http://127.0.0.1:8000/api/delete-file/', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ file_names: fileNames })
@@ -1216,7 +1216,7 @@
                     this.deletingAccount = true;
                 
                     try {
-                        const response = await fetch('/api/request-delete-account/', {
+                        const response = await fetch('http://127.0.0.1:8000/api/request-delete-account/', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ email: this.email })
