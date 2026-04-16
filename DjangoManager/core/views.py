@@ -59,6 +59,34 @@ def home(request):
 
 
 # ──────────────────────────────────────────────
+# CloudWatch AI Monitoring Helper
+# ──────────────────────────────────────────────
+
+def push_ai_metric(metric_name, value, unit='Count'):
+    """
+    Push a custom metric to CloudWatch for AI usage monitoring.
+    Silently fails so it never breaks the actual AI call.
+    """
+    try:
+        cloudwatch = boto3.client(
+            'cloudwatch',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+        )
+        cloudwatch.put_metric_data(
+            Namespace='CyberComply/AI',
+            MetricData=[{
+                'MetricName': metric_name,
+                'Value': value,
+                'Unit': unit,
+            }]
+        )
+    except Exception as e:
+        logger.warning("CloudWatch metric push failed (non-critical): %s", str(e))
+
+
+# ──────────────────────────────────────────────
 # AWS / File helpers
 # ──────────────────────────────────────────────
 

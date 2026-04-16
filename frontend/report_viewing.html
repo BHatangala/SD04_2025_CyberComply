@@ -507,95 +507,116 @@ const app = createApp({
     async generateReport(token) {
       this.isGenerating = true;
 
-      const resultId = sessionStorage.getItem('latestResultId');
-      if (!resultId) {
-        this.isGenerating = false;
-        return;
+      // ── Detect batch vs single ──────────────────────────────────
+      const batchIdsRaw = sessionStorage.getItem('batchResultIds');
+      const singleId    = sessionStorage.getItem('latestResultId');
+
+      const resultIds = batchIdsRaw
+          ? (() => { try { return JSON.parse(batchIdsRaw); } catch { return []; } })()
+          : (singleId ? [singleId] : []);
+
+      if (resultIds.length === 0) {
+          this.isGenerating = false;
+          return;
       }
 
       try {
-        const resAnalysis = await fetch(`${BASE}/api/analysis/${resultId}/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!resAnalysis.ok) {
-          this.isGenerating = false;
-          return;
-        }
-        const analysis = await resAnalysis.json();
+          let lastGeneratedId = null;
 
-        // Build snapshot — use DB-sourced company name 
-        // For general users, company_name will be empty and display falls back to just the filename.
-        const snapshot = { ...(analysis.raw_output || {}) };
-        snapshot.metadata = {
-          ...(snapshot.metadata || {}),
-          file_analyzed: analysis.original_filename || snapshot.metadata?.file_analyzed || '',
-          company:       analysis.company_name || ''
-        };
+          // Generate a report for every result ID.
+          // In single mode this is one call (identical to original behaviour).
+          // In batch mode this creates one report per department in the sidebar.
+          for (const resultId of resultIds) {
+              try {
+                  const resAnalysis = await fetch(`${BASE}/api/analysis/${resultId}/`, {
+                      headers: { 'Authorization': `Bearer ${token}` }
+                  });
+                  if (!resAnalysis.ok) continue;
+                  const analysis = await resAnalysis.json();
 
-        // ← this is what was missing in the broken version
-        const payload = {
-          result_id:       resultId,
-          report_snapshot: snapshot,
-          report_s3_key:   analysis.original_filename || resultId,
-          file_size:       JSON.stringify(snapshot).length,
-          expires_in_days: 30
-        };
+                  const snapshot = { ...(analysis.raw_output || {}) };
+                  snapshot.metadata = {
+                      ...(snapshot.metadata || {}),
+                      file_analyzed: analysis.original_filename || snapshot.metadata?.file_analyzed || '',
+                      company:       analysis.company_name || '',
+                      department:    analysis.department   || analysis.dept_name || ''
+                  };
 
-        const resGenerate = await fetch(`${BASE}/api/reports/generate/`, {
-          method:  'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        });
+                  const payload = {
+                      result_id:       resultId,
+                      report_snapshot: snapshot,
+                      report_s3_key:   analysis.original_filename || resultId,
+                      file_size:       JSON.stringify(snapshot).length,
+                      expires_in_days: 30
+                  };
 
-        if (!resGenerate.ok) {
-          console.error('Failed to generate report:', await resGenerate.text());
-          this.isGenerating = false;
-          return;
-        }
+                  const resGenerate = await fetch(`${BASE}/api/reports/generate/`, {
+                      method:  'POST',
+                      headers: {
+                          'Content-Type':  'application/json',
+                          'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify(payload)
+                  });
 
-        const generated = await resGenerate.json();
+                  if (!resGenerate.ok) {
+                      console.error('Failed to generate report for', resultId, await resGenerate.text());
+                      continue;
+                  }
 
-        // Replace URL so a refresh doesn't re-generate
-        window.history.replaceState(
-          {}, '',
-          `report_viewing.html?report_id=${generated.report_id}`
-        );
+                  const generated = await resGenerate.json();
+                  lastGeneratedId = generated.report_id;
 
-        // Display the newly generated report
-        await this.loadReport(generated.report_id, token);
+              } catch (e) {
+                  console.error('Report generation failed for result', resultId, e);
+              }
+          }
 
-        // Tell the sidebar to re-fetch so the new report appears immediately
-        await this.$nextTick();
-        if (this.$refs.sidebar) {
-          this.$refs.sidebar.refreshReports();
-        }
+          if (!lastGeneratedId) {
+              this.isGenerating = false;
+              return;
+          }
+
+          // Replace URL and display the last generated report.
+          // In batch mode this shows the last department's report —
+          // the rest appear in the sidebar for the user to browse.
+          window.history.replaceState(
+              {}, '',
+              `report_viewing.html?report_id=${lastGeneratedId}`
+          );
+
+          await this.loadReport(lastGeneratedId, token);
+
+          await this.$nextTick();
+          if (this.$refs.sidebar) {
+              this.$refs.sidebar.refreshReports();
+          }
 
       } catch (e) {
-        console.error('generateReport error:', e);
+          console.error('generateReport error:', e);
       } finally {
-        this.isGenerating = false;
+          this.isGenerating = false;
       }
     },
 
     // ── Load and display an existing report by ID ──
     async loadReport(reportId, token) {
       try {
-        const res = await fetch(`${BASE}/api/reports/${reportId}/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        this.currentSnapshot  = data.report_snapshot;
-        // Build display name from snapshot metadata
-        const meta    = (data.report_snapshot || {}).metadata || {};
-        const company = (meta.company || '').trim();
-        const file    = (meta.file_analyzed || '').trim();
-        this.currentReportName = company ? `${company} — ${file}` : file || 'Report';
+          const res = await fetch(`${BASE}/api/reports/${reportId}/`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          this.currentSnapshot  = data.report_snapshot;
+          const meta       = (data.report_snapshot || {}).metadata || {};
+          const company    = (meta.company    || '').trim();
+          const dept       = (meta.department || '').trim();
+          const file       = (meta.file_analyzed || '').trim();
+          // Build name: "Company — Department — filename" or graceful fallback
+          const parts = [company, dept, file].filter(Boolean);
+          this.currentReportName = parts.join(' — ') || 'Report';
       } catch (e) {
-        console.error('loadReport error:', e);
+          console.error('loadReport error:', e);
       }
     },
 
