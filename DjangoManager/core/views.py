@@ -145,6 +145,39 @@ def _mime_type_for(file_name):
     }.get(ext, 'application/octet-stream')
 
 
+def _delete_s3_keys(keys: list, bucket: str = None) -> dict:
+    """
+    Hard-deletes a list of S3 keys from S3.
+    Returns {'deleted': [...], 'failed': [...]}.
+    Errors are logged but never raised so callers are never broken by S3 issues.
+    """
+    bucket   = bucket or settings.AWS_STORAGE_BUCKET_NAME
+    deleted, failed = [], []
+    if not keys:
+        return {"deleted": deleted, "failed": failed}
+    try:
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+        )
+        for i in range(0, len(keys), 1000):   # S3 allows max 1000 keys per call
+            batch = [{"Key": k} for k in keys[i:i + 1000]]
+            resp  = s3.delete_objects(Bucket=bucket, Delete={"Objects": batch})
+            deleted.extend(o["Key"] for o in resp.get("Deleted", []))
+            for err in resp.get("Errors", []):
+                failed.append(err["Key"])
+                logger.error(
+                    "S3 delete failed | key=%s | code=%s | msg=%s",
+                    err["Key"], err.get("Code"), err.get("Message"),
+                )
+    except (BotoCoreError, ClientError) as e:
+        logger.error("S3 bulk delete error | bucket=%s | error=%s", bucket, e)
+        failed.extend(keys)
+    return {"deleted": deleted, "failed": failed}
+
+
 # ──────────────────────────────────────────────
 # OAuth Token helpers (SSM Parameter Store)
 # ──────────────────────────────────────────────
@@ -1899,7 +1932,16 @@ def delete_account(request):
         deletion_record.save(update_fields=["status"])
         return JsonResponse({"detail": "Account deletion failed. Please try again."}, status=500)
 
-    _record_audit_log(profile, "DELETE_ACCOUNT", "user_profile", profile.user_id, True, request, AuditLog.Severity.HIGH )
+    # Hard-delete all document and report files from S3
+    all_keys = list(set(s3_keys + report_s3_keys))
+    s3_result = _delete_s3_keys(all_keys)
+    if s3_result["failed"]:
+        logger.error(
+            "Account deletion S3 cleanup incomplete | user_id=%s | failed_keys=%s",
+            profile.user_id, s3_result["failed"],
+        )
+
+    _record_audit_log(profile, "DELETE_ACCOUNT", "user_profile", profile.user_id, True, request, AuditLog.Severity.HIGH)
     return JsonResponse({"detail": "Account deleted successfully"}, status=200)
 
 
@@ -3026,3 +3068,122 @@ def mark_notifications_read(request):
 
     updated = qs.update(is_read=True)
     return JsonResponse({"detail": f"{updated} notification(s) marked as read."}, status=200)
+
+
+# ──────────────────────────────────────────────
+# Logout
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def logout(request):
+    """
+    POST /api/logout/
+    - Deletes any documents with status UPLOADED (uploaded but not yet analysed)
+      from S3 and soft-deletes their DB records so they don't leave orphan files.
+    - Clears those files from the Redis cache.
+    - Always returns 200 so the frontend can clear its local state regardless.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        # Still return 200 — token may already be expired on logout
+        return JsonResponse({"detail": "Logged out"}, status=200)
+
+    # Find documents uploaded but never analysed
+    unanalysed_docs = Document.objects.filter(
+        user=profile,
+        status=Document.Status.UPLOADED,
+        deleted_at__isnull=True,
+    )
+
+    s3_keys = list(unanalysed_docs.values_list("s3_key", flat=True))
+
+    # Clear Redis cache for those files
+    for key in s3_keys:
+        cache.delete(f"file_bytes_{key}")
+
+    # Hard-delete from S3
+    s3_result = _delete_s3_keys(s3_keys)
+    if s3_result["failed"]:
+        logger.error(
+            "Logout S3 cleanup incomplete | user_id=%s | failed_keys=%s",
+            profile.user_id, s3_result["failed"],
+        )
+
+    # Soft-delete the document records
+    now = timezone.now()
+    unanalysed_docs.update(status=Document.Status.DELETED, deleted_at=now)
+
+    _record_audit_log(profile, "LOGOUT", "user_profile", profile.user_id, True, request, AuditLog.Severity.LOW)
+    return JsonResponse({"detail": "Logged out"}, status=200)
+
+
+# ──────────────────────────────────────────────
+# Cloud Health
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def cloud_health(request):
+    """
+    GET /api/cloud-health/
+    Checks S3, ClamAV, and Flask AI service connectivity.
+    Returns overall status and per-service details.
+    Logs every result to CloudWatch for compliance monitoring.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+
+    services = {}
+
+    # ── S3 ───────────────────────────────────────────────────────────────────
+    try:
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+        )
+        s3.head_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
+        services["s3"] = {"ok": True, "message": "S3 reachable"}
+    except (BotoCoreError, ClientError) as e:
+        logger.error("CLOUD_HEALTH | S3 unreachable | %s", e)
+        services["s3"] = {"ok": False, "message": "S3 unavailable — file uploads and downloads will fail"}
+
+    # ── ClamAV ───────────────────────────────────────────────────────────────
+    try:
+        cd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        cd.settimeout(3)
+        cd.connect((settings.CLAMAV_HOST, settings.CLAMAV_PORT))
+        cd.send(b"zPING\0")
+        resp = cd.recv(20).decode(errors="ignore")
+        cd.close()
+        if "PONG" in resp:
+            services["clamav"] = {"ok": True, "message": "ClamAV reachable"}
+        else:
+            logger.warning("CLOUD_HEALTH | ClamAV unexpected response: %s", resp)
+            services["clamav"] = {"ok": False, "message": "ClamAV not responding correctly — file uploads will be blocked"}
+    except Exception as e:
+        logger.error("CLOUD_HEALTH | ClamAV unreachable | %s", e)
+        services["clamav"] = {"ok": False, "message": "ClamAV unavailable — file uploads will be blocked"}
+
+    # ── Flask AI service ─────────────────────────────────────────────────────
+    try:
+        ai_resp = requests.get(f"http://127.0.0.1:5000/health", timeout=5)
+        if ai_resp.status_code == 200:
+            services["ai_service"] = {"ok": True, "message": "AI service reachable"}
+        else:
+            logger.warning("CLOUD_HEALTH | AI service returned %s", ai_resp.status_code)
+            services["ai_service"] = {"ok": False, "message": f"AI service returned {ai_resp.status_code} — analysis will fail"}
+    except Exception as e:
+        logger.error("CLOUD_HEALTH | AI service unreachable | %s", e)
+        services["ai_service"] = {"ok": False, "message": "AI service unavailable — analysis will fail"}
+
+    overall_ok = all(s["ok"] for s in services.values())
+    logger.info("CLOUD_HEALTH | overall=%s | services=%s", "ok" if overall_ok else "degraded", services)
+
+    return JsonResponse({
+        "overall": "ok" if overall_ok else "degraded",
+        "services": services,
+    }, status=200)

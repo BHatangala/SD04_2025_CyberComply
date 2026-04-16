@@ -77,4 +77,10 @@ urlpatterns = [
     path("api/notifications/unread/", views.get_unread_notifications, name="get_unread_notifications"),
     path("api/notifications/mark-read/", views.mark_notifications_read, name="mark_notifications_read"),
 
+    # ── Auth ──────────────────────────────────────────────────────────────
+    path("api/logout/", views.logout, name="logout"),
+
+    # ── Cloud Health ──────────────────────────────────────────────────────
+    path("api/cloud-health/", views.cloud_health, name="cloud_health"),
+
 ]
