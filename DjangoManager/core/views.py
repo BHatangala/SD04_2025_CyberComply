@@ -62,6 +62,35 @@ def home(request):
 # AWS / File helpers
 # ──────────────────────────────────────────────
 
+def push_upload_metric(metric_name, value, unit='Seconds', extra_dimensions=None):
+    """
+    Pushes a single custom metric to CloudWatch under the
+    'CyberComply/Uploads' namespace.
+    Fails silently so a CloudWatch outage never breaks uploads.
+    """
+    try:
+        cw = boto3.client(
+            'cloudwatch',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+        )
+        dimensions = [{'Name': 'Environment', 'Value': 'Production'}]
+        if extra_dimensions:
+            dimensions.extend(extra_dimensions)
+        cw.put_metric_data(
+            Namespace='CyberComply/Uploads',
+            MetricData=[{
+                'MetricName': metric_name,
+                'Dimensions': dimensions,
+                'Value':      value,
+                'Unit':       unit,
+            }]
+        )
+    except Exception as e:
+        logger.warning("CloudWatch metric push failed (%s): %s", metric_name, str(e))
+
+
 def is_password_protected(file_path, file_name):
     try:
         ext = file_name.lower().split('.')[-1]
@@ -305,10 +334,14 @@ def upload_file(request):
             _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
+        upload_start = time.time()
         s3_key, s3_url = upload_to_s3(temp_path, uploaded_file.name)
+        upload_duration = time.time() - upload_start
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", uploaded_file.name, profile.user_id)
             _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request)
+            push_upload_metric('UploadFailureCount', 1, unit='Count')
+            push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
             return JsonResponse({'error': 'Failed to upload file to S3. Please try again in a few minutes.'}, status=500)
 
         with open(temp_path, 'rb') as f:
@@ -326,6 +359,8 @@ def upload_file(request):
             status=Document.Status.UPLOADED,
         )
 
+        push_upload_metric('UploadSuccessCount', 1, unit='Count')
+        push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
         _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request)
         return JsonResponse({
             'status':      'uploaded',
