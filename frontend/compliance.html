@@ -164,6 +164,7 @@
         /* --- MAIN CONTENT --- */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
+            will-change: margin-left;
             padding: 40px 60px;
             position: relative;
             z-index: 1;
@@ -698,12 +699,14 @@
                     : `${BASE}/api/analysis/latest/`;
 
                 try {
+                    await new Promise(r => setTimeout(r, 50)); // Simulate loading delay
                     const res = await fetch(url, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
 
                     if (res.status === 401 || res.status === 403) {
                         sessionStorage.clear();
+                        await new Promise(r => setTimeout(r, 100));
                         window.location.href = 'login.html';
                         return;
                     }

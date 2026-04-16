@@ -319,7 +319,7 @@
 </head>
 
 <body>
-<div id="app">
+<div id="app" :data-ready="ready ? 'true' : 'false'" >
 
   <!-- Top Header -->
   <div class="top-header">
@@ -449,7 +449,8 @@ const app = createApp({
       isAdmin: false,
       isGenerating: false,
       currentReportName: '',
-      currentSnapshot: null
+      currentSnapshot: null,
+      ready: false
     }
   },
 
@@ -474,6 +475,7 @@ const app = createApp({
       // ── Load an existing report chosen from the sidebar ──
       await this.loadReport(reportId, token);
     }
+    this.ready = true;
   },
 
   computed: {
@@ -615,6 +617,7 @@ const app = createApp({
           // Build name: "Company — Department — filename" or graceful fallback
           const parts = [company, dept, file].filter(Boolean);
           this.currentReportName = parts.join(' — ') || 'Report';
+          await this.$nextTick();
       } catch (e) {
           console.error('loadReport error:', e);
       }

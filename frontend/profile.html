@@ -103,6 +103,7 @@
         /* === MAIN CONTENT AREA === */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
+            will-change: margin-left;
             padding: 60px 40px 60px;
             position: relative;
             z-index: 1;
@@ -134,6 +135,7 @@
             border-radius: 18px;
             border: 1px solid rgba(120,160,255,0.25);
             backdrop-filter: blur(10px);
+            will-change: transform;
             box-shadow:
                 0 25px 60px rgba(0,0,0,0.55),
                 0 0 25px rgba(90,140,255,0.18);
@@ -440,6 +442,7 @@
             z-index: 300;
             backdrop-filter: blur(4px);
             animation: fadeIn 0.2s ease;
+            will-change: opacity;
         }
         
         .delete-modal {
@@ -451,6 +454,7 @@
             width: 92%;
             box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(220, 60, 60, 0.08);
             animation: popIn 0.22s ease;
+            will-change: transform, opacity;
         }
         
         .delete-modal-title {
@@ -635,6 +639,7 @@
             gap: 10px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.45);
             white-space: nowrap;
+            will-change: opacity, transform;
         }
 
         .access-toast.visible {
@@ -684,7 +689,7 @@
         ></cybercomply-sidebar>
 
         <!-- Main Content - User Profile -->
-        <div class="main-content" :class="{ shifted: sidebarOpen }">
+        <div class="main-content" :class="{ shifted: sidebarOpen }" :data-ready="ready ? 'true' : 'false'">
 
             <!-- Profile Avatar -->
             <div class="profile-avatar">
@@ -856,6 +861,7 @@
             data() {
                 return {
                     sidebarOpen: true, // Sidebar visibility state
+                    ready: false, // Component ready state
                     
                     // User Data
                     fullName: '',
@@ -932,7 +938,7 @@
                     }
 
                     try {
-                        const res = await fetch(`http://127.0.0.1:8000/api/profile/?email=${encodeURIComponent(email)}`);
+                        const res = await fetch(`/api/profile/?email=${encodeURIComponent(email)}`);
                         if (!res.ok) throw new Error('Failed to load profile');
                         const data = await res.json();
 
@@ -948,6 +954,10 @@
 
                         sessionStorage.setItem('userFullName', data.full_name);
                         sessionStorage.setItem('userEmail', data.email);
+
+                        await this.$nextTick();
+                        this.ready = true;
+                        await this.$nextTick();
                     } catch (err) {
                         console.error('Profile load failed:', err);
                         Swal.fire({
@@ -1007,7 +1017,7 @@
                     try {
                         // Step 1: If name changed → save it immediately (PATCH)
                         if (nameChanged) {
-                            const res = await fetch('http://127.0.0.1:8000/api/profile/update/', {
+                            const res = await fetch('/api/profile/update/', {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ 
@@ -1070,7 +1080,7 @@
                 async saveNameOnly() {
                     this.isSaving = true;
                     try {
-                        const res = await fetch('http://127.0.0.1:8000/api/profile/update/', {
+                        const res = await fetch('/api/profile/update/', {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ full_name: this.editedFullName.trim() })
@@ -1126,7 +1136,7 @@
 
                 async updateTwoFactorSetting() {
                     try {
-                        const response = await fetch('http://127.0.0.1:8000/api/profile/twofa/', {
+                        const response = await fetch('/api/profile/twofa/', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -1160,7 +1170,7 @@
     
                     if (fileNames.length > 0) {
                         try {
-                            await fetch('http://127.0.0.1:8000/api/delete-file/', {
+                            await fetch('/api/delete-file/', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ file_names: fileNames })
@@ -1171,6 +1181,7 @@
                     }
 
                     sessionStorage.clear();
+                    await this.$nextTick();
                     window.location.href = 'welcome.html';
                 },
                 // Navigates to admin access granting page
@@ -1205,7 +1216,7 @@
                     this.deletingAccount = true;
                 
                     try {
-                        const response = await fetch('http://127.0.0.1:8000/api/request-delete-account/', {
+                        const response = await fetch('/api/request-delete-account/', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ email: this.email })
