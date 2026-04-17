@@ -222,6 +222,13 @@
                         <p class="text-gray-400 text-sm tracking-wide">Sign in to continue</p>
                     </div>
 
+                    <transition name="fade">
+                        <div v-if="sessionExpiredMsg"
+                             class="text-sm p-3 mb-4 rounded text-center shadow-lg border bg-gray-200 text-red-600 border-red-400 w-3/4 mx-auto">
+                            {{ sessionExpiredMsg }}
+                        </div>
+                    </transition>
+
                     <form @submit.prevent="handleLogin" class="space-y-6 text-left w-3/4 mx-auto" novalidate>
 
                         <transition name="fade">
@@ -331,13 +338,22 @@
 
                 const step = ref(1); // 1: credentials | 2: otp
                 const message = reactive({ text: '', type: '' });
+
                 const showSuccessPopup = ref(false);
 
                 // Password visibility toggle
                 const showPassword = ref(false);
 
                 // Loading state for login button
-                const loading = ref(false);                
+                const loading = ref(false);
+
+                // Session-expired banner — shown when session-manager.js redirects here
+                // with ?expired=1 after inactivity timeout.
+                const sessionExpiredMsg = ref('');
+                if (new URLSearchParams(window.location.search).get('expired') === '1') {
+                    sessionExpiredMsg.value = 'Your session has expired. Please log in again.';
+                    history.replaceState(null, '', 'login.html');
+                }
 
                 const setMessage = (type, text) => {
                     message.type = type;
@@ -382,7 +398,7 @@
 
                     loading.value = true;
 
-                    const trimmedEmail = form.email.trim();
+                    const trimmedEmail = form.email.trim().toLowerCase();
 
                     if (!trimmedEmail && !form.password) {
                         setMessage('error', 'Please enter your email and password.');
@@ -401,13 +417,25 @@
                         setMessage('error', 'Please enter a valid email address.');
                         loading.value = false;
                         return;
+                    }   
+                    
+                    if (trimmedEmail.length > 254) {
+                        setMessage('error', 'Email address is too long.');
+                        loading.value = false;
+                        return;
                     }    
 
-                    if (!form.password) {
+                    if (!form.password || !form.password.trim()) {
                         setMessage('error', 'Please enter your password.');
                         loading.value = false;
                         return;
                     }
+
+                    if (form.password.length > 128) {
+                        setMessage('error', 'Password is too long.');
+                        loading.value = false;
+                        return;
+                    }    
 
                     try {
                         const response = await fetch("http://127.0.0.1:8000/api/login/", {
@@ -505,7 +533,8 @@
 
                     loading,
                     showPassword,
-                    showSuccessPopup
+                    showSuccessPopup,
+                    sessionExpiredMsg
                 }
             }
         });

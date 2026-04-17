@@ -263,18 +263,19 @@ class Finding(models.Model):
 # =========================
 class Recommendation(models.Model):
     class Status(models.TextChoices):
-        PENDING = "PENDING", "Pending"
-        IN_PROGRESS = "IN_PROGRESS", "In Progress"
-        DONE = "DONE", "Done"
+        CRITICAL = "CRITICAL", "Critical"
+        HIGH     = "HIGH",     "High"
+        MEDIUM   = "MEDIUM",   "Medium"
+        LOW      = "LOW",      "Low"
 
-    rec_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    result = models.ForeignKey(AnalysisResult, on_delete=models.CASCADE, related_name="recommendations")
+    rec_id              = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    result              = models.ForeignKey(AnalysisResult, on_delete=models.CASCADE, related_name="recommendations")
     recommendation_text = models.TextField()
-    status = models.CharField(max_length=20, choices=Status.choices)
-    act_name = models.CharField(max_length=255)
-    page_no = models.IntegerField()
-    line_no = models.IntegerField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    status              = models.CharField(max_length=10, choices=Status.choices, default=Status.MEDIUM)
+    act_name            = models.CharField(max_length=255)
+    steps_to_achieve    = models.JSONField(default=list)   # stores list of step strings
+    section             = models.CharField(max_length=255, blank=True, default='')  # e.g. "Section 4 — Compliance with the Data Protection Obligations"
+    created_at          = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "recommendations"
@@ -287,13 +288,27 @@ class Recommendation(models.Model):
 # Table: reports
 # =========================
 class Report(models.Model):
+
+    class EmailStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SENT    = "sent",    "Sent"
+        FAILED  = "failed",  "Failed"
+        SKIPPED = "skipped", "Skipped"
+
     report_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     result = models.ForeignKey(AnalysisResult, on_delete=models.CASCADE, related_name="reports", db_column="result_id")
+    dept = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name="reports")
     report_snapshot = models.JSONField()
     report_s3_key = models.CharField(max_length=255)
     file_size = models.BigIntegerField()
     generated_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
+    notification_sent = models.BooleanField(default=False)
+    email_status = models.CharField(
+        max_length=10,
+        choices=EmailStatus.choices,
+        default=EmailStatus.PENDING,
+    )
 
     class Meta:
         db_table = "reports"
@@ -306,12 +321,20 @@ class Report(models.Model):
 # Table: audit_logs
 # =========================
 class AuditLog(models.Model):
+
+    class Severity(models.TextChoices):
+        LOW         = "LOW",        "Low"
+        MEDIUM      = "MEDIUM",     "Medium"
+        HIGH        = "HIGH",      "High"
+        CRITICAL    = "CRITICAL",  "Critical"
+    
     audit_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(UserProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_logs")
     action_type = models.CharField(max_length=50)
     target_type = models.CharField(max_length=50)
     target_id = models.UUIDField(null=True, blank=True)
     success = models.BooleanField()
+    severity    = models.CharField(max_length=10, choices=Severity.choices, default=Severity.LOW)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -345,6 +368,7 @@ class AdminAccessRequest(models.Model):
                             db_column="verification_otp_id"
                           )
     org_email           = models.CharField(max_length=255, db_column="org_email")
+    original_email      = models.CharField(max_length=255, blank=True, default='')
     status              = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     requested_at        = models.DateTimeField(default=timezone.now, db_column="requested_at")
     verified_at         = models.DateTimeField(null=True, blank=True, db_column="verified_at")
@@ -478,7 +502,7 @@ class ReportShare(models.Model):
 
     shared_with_email = models.EmailField()
 
-    access_token = models.CharField(max_length=255, unique=True)
+    access_token = models.TextField(unique=True)
 
     expires_at = models.DateTimeField()
 
@@ -488,3 +512,31 @@ class ReportShare(models.Model):
 
     class Meta:
         db_table = 'report_shares'
+
+
+# =========================
+# Table: notification
+# =========================
+class Notification(models.Model):
+    class NotificationType(models.TextChoices):
+        REPORT_READY = "REPORT_READY", "Report Ready"
+
+    notification_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="notifications")
+    notification_type = models.CharField(max_length=30, choices=NotificationType.choices)
+    message = models.TextField()
+    report = models.ForeignKey(
+        Report,
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="notifications",
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "notification"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} — {self.notification_type}"

@@ -171,6 +171,7 @@
     <img src="img2.png" alt="Decorative Wave Right" class="right-wave">
 
     <script src="otp_component.js"></script>
+    <script src="session-manager.js"></script>
 
     <script>
         const { createApp, reactive, ref, computed, onMounted } = Vue;
@@ -183,6 +184,12 @@
                 const isResending = ref(false);
                 const isInitialSending = ref(false);
                 const message = reactive({ text: '', type: '' });
+
+                const currentEmail = ref(sessionStorage.getItem('userEmail') || '');
+
+                const isValidEmail = (email) => {
+                    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email || '').trim().toLowerCase());
+                };
 
                 const maskedEmail = computed(() => {
                     if (!newEmail.value) return '';
@@ -199,11 +206,33 @@
 
                 // ==================== AUTO SEND OTP ON PAGE LOAD ====================
                 const sendInitialOtp = async () => {
-                    if (!newEmail.value) {
+
+                    const trimmedNewEmail = (newEmail.value || '').trim().toLowerCase();
+                    const trimmedCurrentEmail = (currentEmail.value || '').trim().toLowerCase();
+
+                    if (!trimmedNewEmail) {
                         message.text = "No pending email change found. Please go back to profile.";
                         message.type = 'error';
                         return;
                     }
+
+                    if (!isValidEmail(trimmedNewEmail)) {
+                        message.text = "Invalid new email address.";
+                        message.type = 'error';
+                        return;
+                    }
+
+                    if (!trimmedCurrentEmail || !isValidEmail(trimmedCurrentEmail)) {
+                        message.text = "Session expired. Please log in again.";
+                        message.type = 'error';
+                        setTimeout(() => {
+                            window.location.href = 'login.html';
+                        }, 1200);
+                        return;
+                    }
+
+                    newEmail.value = trimmedNewEmail;
+                    currentEmail.value = trimmedCurrentEmail;
 
                     isInitialSending.value = true;
                     message.text = '';
@@ -213,7 +242,7 @@
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                current_email: sessionStorage.getItem('userEmail'),
+                                current_email: currentEmail.value,
                                 new_email: newEmail.value,
                                 resend: false   // First time request
                             })
@@ -245,6 +274,28 @@
                 };
 
                 const verifyOtp = async () => {
+                    const trimmedNewEmail = (newEmail.value || '').trim().toLowerCase();
+                    const trimmedCurrentEmail = (currentEmail.value || '').trim().toLowerCase();
+                    otp.value = (otp.value || '').trim();
+
+                    if (!trimmedNewEmail || !isValidEmail(trimmedNewEmail)) {
+                        message.text = 'Invalid new email address.';
+                        message.type = 'error';
+                        return;
+                    }
+
+                    if (!trimmedCurrentEmail || !isValidEmail(trimmedCurrentEmail)) {
+                        message.text = 'Session expired. Please log in again.';
+                        message.type = 'error';
+                        setTimeout(() => {
+                            window.location.href = 'login.html';
+                        }, 1200);
+                        return;
+                    }
+
+                    newEmail.value = trimmedNewEmail;
+                    currentEmail.value = trimmedCurrentEmail;
+
                     if (otp.value.length !== 6) {
                         message.text = 'Please enter a 6-digit code';
                         message.type = 'error';
@@ -261,7 +312,7 @@
                             body: JSON.stringify({
                                 otp: otp.value,
                                 new_email: newEmail.value,
-                                current_email: sessionStorage.getItem('userEmail')
+                                current_email: currentEmail.value
                             })
                         });
 
@@ -331,6 +382,27 @@
                 };
 
                 const resendOtp = async () => {
+                    const trimmedNewEmail = (newEmail.value || '').trim().toLowerCase();
+                    const trimmedCurrentEmail = (currentEmail.value || '').trim().toLowerCase();
+
+                    if (!trimmedNewEmail || !isValidEmail(trimmedNewEmail)) {
+                        message.text = 'Invalid new email address.';
+                        message.type = 'error';
+                        return;
+                    }
+
+                    if (!trimmedCurrentEmail || !isValidEmail(trimmedCurrentEmail)) {
+                        message.text = 'Session expired. Please log in again.';
+                        message.type = 'error';
+                        setTimeout(() => {
+                            window.location.href = 'login.html';
+                        }, 1200);
+                        return;
+                    }
+
+                    newEmail.value = trimmedNewEmail;
+                    currentEmail.value = trimmedCurrentEmail;
+
                     isResending.value = true;
                     message.text = '';
 
@@ -339,7 +411,7 @@
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                current_email: sessionStorage.getItem('userEmail'),
+                                current_email: currentEmail.value,
                                 new_email: newEmail.value,
                                 resend: true
                             })
@@ -368,6 +440,7 @@
                 // Automatically send OTP when component mounts
                 onMounted(() => {
                     sendInitialOtp();
+                    SessionManager.init({ timeoutMs: 1200000 });
                 });
 
                 return {

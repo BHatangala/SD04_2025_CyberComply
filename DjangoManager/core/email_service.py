@@ -74,3 +74,32 @@ def send_otp_email(email: str, otp: str, purpose: str = "verification") -> bool:
     except Exception as e:
         print(f"ERROR sending OTP email to {email}: {e}")
         return False
+
+
+def send_report_ready_email(email: str, report_name: str) -> bool:
+    """Send a 'your compliance report is ready' notification email via AWS SES."""
+    try:
+        app_name = "CyberComply"
+
+        context = {
+            "app_name": app_name,
+            "report_name": report_name,
+        }
+
+        text_content = render_to_string("emails/report_ready_email.txt", context)
+        html_content = render_to_string("emails/report_ready_email.html", context)
+
+        message = EmailMultiAlternatives(
+            subject=f"{app_name} — Your Compliance Report Is Ready",
+            body=text_content,
+            from_email=f"{app_name} <{settings.DEFAULT_FROM_EMAIL}>",
+            to=[email],
+        )
+        message.attach_alternative(html_content, "text/html")
+        message.send()
+
+        return True
+
+    except Exception as e:
+        print(f"ERROR sending report-ready email to {email}: {e}")
+        return False
