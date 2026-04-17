@@ -720,7 +720,7 @@
                     {{ analysedCompany }} — COMPLIANCE ANALYSIS REPORT
                 </div>
                 <div class="document-subtitle" v-if="isBatchMode">
-                    {{ analysedCompany }} — COMBINED COMPLIANCE ANALYSIS REPORT
+                    {{ analysedCompany ? analysedCompany + ' — ' : '' }}COMBINED COMPLIANCE ANALYSIS REPORT
                 </div>
 
                 <!-- Badge showing number of departments — batch mode only -->
@@ -778,7 +778,7 @@
                         <template v-if="isBatchMode">
                             <div class="compliance-item">{{ complianceScore }}% &nbsp;—&nbsp; {{ complianceLabel }}</div>
                             <div class="compliance-bar-wrapper">
-                                <div class="compliance-bar-label">AVERAGE COMPLIANCE SCORE ACROSS ALL DEPARTMENTS</div>
+                                <div class="compliance-bar-label">AVERAGE COMPLIANCE SCORE ACROSS ALL {{ isAdmin ? 'DEPARTMENTS' : 'DOCUMENTS' }}</div>
                                 <div class="compliance-bar-track">
                                     <div class="compliance-bar-fill" :style="{ width: barWidth }"></div>
                                 </div>
@@ -790,7 +790,7 @@
                                     v-for="dept in batchDepartments"
                                     :key="dept.id"
                                 >
-                                    {{ dept.dept_name }} — <strong>{{ dept.compliance_score }}%</strong>
+                                    {{ dept.dept_name === 'Unknown Department' ? dept.file_name : dept.dept_name }} — <strong>{{ dept.compliance_score }}%</strong>
                                 </div>
                             </div>
                         </template>
@@ -841,7 +841,7 @@
                             >
                                 <!-- Sub-box header — click to expand/collapse -->
                                 <div class="dept-rec-header" @click="toggleDept(index)">
-                                    <span class="dept-rec-name">{{ dept.dept_name }}</span>
+                                    <span class="dept-rec-name">{{ dept.dept_name === 'Unknown Department' ? dept.file_name : dept.dept_name }}</span>
                                     <span class="dept-rec-chevron" :class="{ open: dept.expanded }">&#8964;</span>
                                 </div>
 
@@ -853,7 +853,7 @@
                                         v-if="dept.all_recommendations.length === 0"
                                         class="recommendation-item"
                                     >
-                                        This department is fully compliant — no recommendations at this time.
+                                        This {{ isAdmin ? 'department' : 'document' }} is fully compliant — no recommendations at this time.
                                     </div>
 
                                     <!-- Non-compliant / partial findings -->
@@ -1038,7 +1038,7 @@
                         const data = await res.json();
 
                         this.isBatchMode     = true;
-                        this.analysedCompany = data.org_name || 'Unknown Organisation';
+                        this.analysedCompany = data.org_name || '';
 
                         // Each dept gets an `expanded: false` flag for the collapsible sub-box.
                         this.batchDepartments = (data.departments || []).map(d => ({

@@ -30,6 +30,27 @@ from botocore.exceptions import BotoCoreError, ClientError
 import logging
 logger = logging.getLogger(__name__)
 
+def sanitize_ai_text(text):
+    if not text or not isinstance(text, str):
+        return text
+    replacements = {
+        '\u2011': '-',   # non-breaking hyphen ‑
+        '\u2012': '-',   # figure dash ‒
+        '\u2013': '-',   # en dash –
+        '\u2014': '-',   # em dash —
+        '\u2015': '-',   # horizontal bar ―
+        '\u2010': '-',   # hyphen ‐
+        '\u00ad': '-',   # soft hyphen
+        '\u2018': "'",   # left single quotation mark '
+        '\u2019': "'",   # right single quotation mark '
+        '\u201c': '"',   # left double quotation mark "
+        '\u201d': '"',   # right double quotation mark "
+        '\u2026': '...', # ellipsis …
+    }
+    for unicode_char, ascii_char in replacements.items():
+        text = text.replace(unicode_char, ascii_char)
+    return text
+
 from .models import (
     UserProfile, LoginHistory, OtpVerification,
     Document, Organization, Department,
@@ -556,7 +577,7 @@ def analyze_compliance(request):
                             else 'MEDIUM' if float(result.get('compliance', {}).get('compliance_score', 0)) >= 40
                             else 'HIGH'
                         ),
-                        summary=result.get('summary') or result.get('recommendations', {}).get('top_action') or None,
+                        summary=sanitize_ai_text(result.get('summary') or result.get('recommendations', {}).get('top_action') or None),
                         raw_output=result,
                     )
                     snapshot     = {**result, 'metadata': {**result.get('metadata', {}), 'file_analyzed': file_name, 'company': company_name}}
@@ -569,8 +590,6 @@ def analyze_compliance(request):
                         file_size=len(snapshot_str),
                         expires_at=timezone.now() + timedelta(days=30),
                     )
-                    if _notify_profile is not None:
-                        _send_report_notification(_notify_profile, report, document.original_filename)
             except Exception:
                 pass
 
@@ -747,15 +766,15 @@ def analyze_batch(request):
                                     findings_to_create.append(Finding(
                                         result=analysis,
                                         finding_type=Finding.FindingType.GAP,
-                                        title=(d.get('clause') or 'Unknown Clause')[:200],
-                                        description=d.get('reasoning') or '',
+                                        title=sanitize_ai_text((d.get("clause") or "Unknown Clause"))[:200],
+                                        description=sanitize_ai_text(d.get("reasoning") or ""),
                                     ))
                             for r in result.get('risk_assessment', []):
                                 if isinstance(r, str):
                                     title_text, desc_text = r[:200], ''
                                 else:
-                                    title_text = (r.get('title') or r.get('risk') or 'Risk Item')[:200]
-                                    desc_text  = r.get('description') or r.get('detail') or ''
+                                    title_text = sanitize_ai_text(r.get("title") or r.get("risk") or "Risk Item")[:200]
+                                    desc_text  = sanitize_ai_text(r.get("description") or r.get("detail") or "")
                                 findings_to_create.append(Finding(
                                     result=analysis,
                                     finding_type=Finding.FindingType.RISK,
@@ -807,15 +826,13 @@ def get_org_comparison(request):
     GET /api/analysis/org-comparison/?result_ids=id1,id2,id3
 
     Returns per-department compliance data for all supplied result IDs.
-    Used by comparison.html and comparison_dashboard_graphical.html. (Admin only)
+    Used by comparison.html and comparison_dashboard_graphical.html.
+    Admins can access any result; general users are restricted to their own.
     """
     profile, auth_error = _get_profile_from_token(request)
     if auth_error:
         return auth_error
     assert profile is not None
-
-    if profile.role != UserProfile.Role.ADMIN:
-        return JsonResponse({'error': 'Only administrative users can access comparison data'}, status=403)
 
     raw_ids = request.GET.get('result_ids', '').strip()
     if not raw_ids:
@@ -825,23 +842,21 @@ def get_org_comparison(request):
     if not result_ids:
         return JsonResponse({'error': 'No valid result IDs provided'}, status=400)
 
-    try:
-        analyses = (
-            AnalysisResult.objects
-            .select_related('document__org', 'document__dept')
-            .filter(result_id__in=result_ids)
-        )
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    qs = (
+        AnalysisResult.objects
+        .select_related('document__org', 'document__dept')
+        .filter(result_id__in=result_ids)
+    )
+    if profile.role != UserProfile.Role.ADMIN:
+        qs = qs.filter(document__user=profile)   # general users can only see their own results
+    analyses = list(qs)
 
     if not analyses:
         return JsonResponse({'error': 'No analysis results found for the provided IDs'}, status=404)
 
-    # Verify the requesting admin belongs to the same org as the results
-    org_name = ''
+    org_name    = ''
     departments = []
 
-    # Risk severity order for sorting — critical ranks highest
     RISK_RANK = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
 
     for analysis in analyses:
@@ -849,29 +864,23 @@ def get_org_comparison(request):
         org  = doc.org
         dept = doc.dept
 
-        # Access guard — admin can only view results belonging to their own org
-        if profile.org_id and org and str(org.org_id) != str(profile.org_id):
-            continue
-
+        # Capture org name from the first result that has one.
         if not org_name and org:
-            org_name = org.org_name
+            org_name = org.org_name or ''
 
         details = (analysis.raw_output or {}).get('compliance', {}).get('details', [])
 
-        # All non-compliant and partial items — used by comparison.html
         all_issues = [
             d for d in details
             if (d.get('status') or '').lower().replace('-', '_') in ('non_compliant', 'partial')
         ]
 
-        # Top 5 by risk severity — used by comparison_dashboard_graphical.html
         top_issues = sorted(
             all_issues,
             key=lambda d: RISK_RANK.get((d.get('risk_level') or '').lower(), 0),
             reverse=True
         )[:5]
 
-        # Full list for comparison.html — clause title + PDPA reference per item
         all_recommendations = []
         for d in all_issues:
             req_id   = d.get('requirement_id') or ''
@@ -889,7 +898,6 @@ def get_org_comparison(request):
                 'reasoning':  d.get('reasoning', ''),
             })
 
-        # Top 5 summary for comparison_dashboard_graphical.html
         improvement_list = [
             {
                 'clause':         d.get('clause') or d.get('requirement_id') or 'Unknown',
@@ -919,15 +927,14 @@ def get_org_comparison(request):
         departments.append({
             'id':                   str(analysis.result_id),
             'dept_name':            dept.dept_name if dept else 'Unknown Department',
+            'file_name':            doc.original_filename or doc.s3_key or '',
             'compliance_score':     analysis.compliance_score,
             'risk':                 risk,
-            # ── For comparison_dashboard_graphical.html ──
             'improvements':         len(all_issues),
             'top_gap':              top_gap,
-            'improvement_list':     improvement_list,       # top 5 by risk severity
-            'recommended_actions':  recommended_actions,    # top 5 PDPA references
-            # ── For comparison.html ──
-            'all_recommendations':  all_recommendations,    # full list, all issues
+            'improvement_list':     improvement_list,
+            'recommended_actions':  recommended_actions,
+            'all_recommendations':  all_recommendations,
         })
 
     return JsonResponse({'org_name': org_name, 'departments': departments}, status=200)
@@ -2452,16 +2459,16 @@ def save_analysis_result(request):
                 findings_to_create.append(Finding(
                     result=analysis,
                     finding_type=Finding.FindingType.GAP,
-                    title=(d.get("clause") or "Unknown Clause")[:200],
-                    description=d.get("reasoning") or "",
+                    title=sanitize_ai_text((d.get("clause") or "Unknown Clause"))[:200],
+                    description=sanitize_ai_text(d.get("reasoning") or ""),
                 ))
 
         for r in ai_result.get("risk_assessment", []):
             if isinstance(r, str):
                 title_text, desc_text = r[:200], ""
             else:
-                title_text = (r.get("title") or r.get("risk") or "Risk Item")[:200]
-                desc_text  = r.get("description") or r.get("detail") or ""
+                title_text = sanitize_ai_text(r.get('title') or r.get('risk') or 'Risk Item')[:200]
+                desc_text  = sanitize_ai_text(r.get('description') or r.get('detail') or '')
             findings_to_create.append(Finding(
                 result=analysis, finding_type=Finding.FindingType.RISK,
                 title=title_text, description=desc_text,
@@ -2648,8 +2655,8 @@ def save_recommendations(request):
 
     created = []
     for item in recommendations:
-        recommendation_text = (item.get("recommendation_text") or "").strip()
-        act_name            = (item.get("act_name") or "").strip()
+        recommendation_text = sanitize_ai_text((item.get("recommendation_text") or "").strip())
+        act_name            = sanitize_ai_text((item.get("act_name") or "").strip())
         steps_to_achieve    = item.get("steps_to_achieve") or []
         section             = (item.get("section") or "").strip()
         status              = (item.get("status") or Recommendation.Status.MEDIUM).strip()
