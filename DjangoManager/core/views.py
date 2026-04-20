@@ -19,6 +19,7 @@ from django.core.cache import cache
 import random
 import hashlib
 import json, time
+import time as _time  # alias used by Celery polling (sleep/time calls)
 import socket
 import tempfile
 import os
@@ -28,6 +29,27 @@ import uuid
 from botocore.exceptions import BotoCoreError, ClientError
 import logging
 logger = logging.getLogger(__name__)
+
+def sanitize_ai_text(text):
+    if not text or not isinstance(text, str):
+        return text
+    replacements = {
+        '\u2011': '-',   # non-breaking hyphen ‑
+        '\u2012': '-',   # figure dash ‒
+        '\u2013': '-',   # en dash –
+        '\u2014': '-',   # em dash —
+        '\u2015': '-',   # horizontal bar ―
+        '\u2010': '-',   # hyphen ‐
+        '\u00ad': '-',   # soft hyphen
+        '\u2018': "'",   # left single quotation mark '
+        '\u2019': "'",   # right single quotation mark '
+        '\u201c': '"',   # left double quotation mark "
+        '\u201d': '"',   # right double quotation mark "
+        '\u2026': '...', # ellipsis …
+    }
+    for unicode_char, ascii_char in replacements.items():
+        text = text.replace(unicode_char, ascii_char)
+    return text
 
 from .models import (
     UserProfile, LoginHistory, OtpVerification,
@@ -60,8 +82,65 @@ def home(request):
 
 
 # ──────────────────────────────────────────────
+# CloudWatch AI Monitoring Helper
+# ──────────────────────────────────────────────
+
+def push_ai_metric(metric_name, value, unit='Count'):
+    """
+    Push a custom metric to CloudWatch for AI usage monitoring.
+    Silently fails so it never breaks the actual AI call.
+    """
+    try:
+        cloudwatch = boto3.client(
+            'cloudwatch',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+        )
+        cloudwatch.put_metric_data(
+            Namespace='CyberComply/AI',
+            MetricData=[{
+                'MetricName': metric_name,
+                'Value': value,
+                'Unit': unit,
+            }]
+        )
+    except Exception as e:
+        logger.warning("CloudWatch metric push failed (non-critical): %s", str(e))
+
+
+# ──────────────────────────────────────────────
 # AWS / File helpers
 # ──────────────────────────────────────────────
+
+def push_upload_metric(metric_name, value, unit='Seconds', extra_dimensions=None):
+    """
+    Pushes a single custom metric to CloudWatch under the
+    'CyberComply/Uploads' namespace.
+    Fails silently so a CloudWatch outage never breaks uploads.
+    """
+    try:
+        cw = boto3.client(
+            'cloudwatch',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+        )
+        dimensions = [{'Name': 'Environment', 'Value': 'Production'}]
+        if extra_dimensions:
+            dimensions.extend(extra_dimensions)
+        cw.put_metric_data(
+            Namespace='CyberComply/Uploads',
+            MetricData=[{
+                'MetricName': metric_name,
+                'Dimensions': dimensions,
+                'Value':      value,
+                'Unit':       unit,
+            }]
+        )
+    except Exception as e:
+        logger.warning("CloudWatch metric push failed (%s): %s", metric_name, str(e))
+
 
 def is_password_protected(file_path, file_name):
     try:
@@ -342,10 +421,14 @@ def upload_file(request):
             _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
+        upload_start = time.time()
         s3_key, s3_url = upload_to_s3(temp_path, uploaded_file.name)
+        upload_duration = time.time() - upload_start
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", uploaded_file.name, profile.user_id)
             _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
+            push_upload_metric('UploadFailureCount', 1, unit='Count')
+            push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
             return JsonResponse({'error': 'Failed to upload file to S3. Please try again in a few minutes.'}, status=500)
 
         with open(temp_path, 'rb') as f:
@@ -363,6 +446,8 @@ def upload_file(request):
             status=Document.Status.UPLOADED,
         )
 
+        push_upload_metric('UploadSuccessCount', 1, unit='Count')
+        push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
         _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request, AuditLog.Severity.LOW)
         return JsonResponse({
             'status':      'uploaded',
@@ -384,10 +469,11 @@ def upload_file(request):
 @csrf_exempt
 def analyze_compliance(request):
     """
-    Reads file bytes from cache, forwards to AI service, streams SSE events back,
-    and persists the result + report to the database.
+    Submits a file to the Celery-backed /api/analyze-queued endpoint, then
+    polls /api/job-status/<job_id> until the result is ready, streaming SSE
+    events back to the browser exactly as before.
 
-    SSE events emitted:
+    SSE events emitted (unchanged contract):
         data: {"status": "analysing"}
         data: {"status": "analysed", "result": {...}}
         data: {"status": "error",    "message": "..."}
@@ -416,12 +502,63 @@ def analyze_compliance(request):
         try:
             yield f"data: {json.dumps({'status': 'analysing'})}\n\n".encode('utf-8')
 
-            files    = {'file': (file_name, file_bytes, _mime_type_for(file_name))}
-            data     = {'company_name': company_name, 'department': department}
-            response = requests.post(f"{AI_API_URL}/analyze", files=files, data=data, timeout=1200)
-            result   = response.json()
+            # ── Submit to Celery queue ─────────────────────────────────────────
+            ai_start_time = _time.time()
+            submit_response = requests.post(
+                f"{AI_API_URL}/analyze-queued",
+                files={'file': (file_name, file_bytes, _mime_type_for(file_name))},
+                data={'company_name': company_name, 'department': department},
+                timeout=30,   # just the submission, not the analysis
+            )
 
-            # Persist AnalysisResult + Report to database (non-critical — don't break SSE)
+            # ── Queue full — surface 503 gracefully ───────────────────────────
+            if submit_response.status_code == 503:
+                err = submit_response.json().get('error', 'AI service is at capacity.')
+                yield f"data: {json.dumps({'status': 'error', 'message': err})}\n\n".encode('utf-8')
+                return
+
+            submit_response.raise_for_status()
+            job_id = submit_response.json()['job_id']
+
+            # ── Poll until done (max 25 min = 1500 s, matches task hard limit) ─
+            poll_interval = 5    # seconds between polls
+            max_polls     = 300  # 300 × 5 s = 1500 s ceiling
+            result        = None
+
+            for _ in range(max_polls):
+                _time.sleep(poll_interval)
+                try:
+                    status_resp = requests.get(
+                        f"{AI_API_URL}/job-status/{job_id}",
+                        timeout=10,
+                    )
+                    status_data = status_resp.json()
+                except Exception:
+                    continue   # transient network blip — keep polling
+
+                job_state = status_data.get('status')
+
+                if job_state == 'success':
+                    result = status_data.get('result', {})
+                    duration_ms = (_time.time() - ai_start_time) * 1000
+                    push_ai_metric('SuccessfulAnalysis', 1)
+                    push_ai_metric('AnalysisLatencyMs', duration_ms, unit='Milliseconds')
+                    break
+                if job_state == 'failure':
+                    push_ai_metric('FailedAnalysis', 1)
+                    yield f"data: {json.dumps({'status': 'error', 'message': status_data.get('error', 'Analysis failed.')})}\n\n".encode('utf-8')
+                    return
+                if job_state == 'timeout':
+                    push_ai_metric('FailedAnalysis', 1)
+                    yield f"data: {json.dumps({'status': 'error', 'message': 'Analysis timed out. Please try again or use a smaller document.'})}\n\n".encode('utf-8')
+                    return
+                # pending / started / unknown — keep waiting
+
+            if result is None:
+                yield f"data: {json.dumps({'status': 'error', 'message': 'Analysis did not complete within the allowed time.'})}\n\n".encode('utf-8')
+                return
+
+            # ── Persist AnalysisResult + Report to DB (non-critical) ──────────
             try:
                 import json as _json
                 document = Document.objects.filter(
@@ -440,7 +577,7 @@ def analyze_compliance(request):
                             else 'MEDIUM' if float(result.get('compliance', {}).get('compliance_score', 0)) >= 40
                             else 'HIGH'
                         ),
-                        summary=result.get('summary') or result.get('recommendations', {}).get('top_action') or None,
+                        summary=sanitize_ai_text(result.get('summary') or result.get('recommendations', {}).get('top_action') or None),
                         raw_output=result,
                     )
                     snapshot     = {**result, 'metadata': {**result.get('metadata', {}), 'file_analyzed': file_name, 'company': company_name}}
@@ -453,8 +590,6 @@ def analyze_compliance(request):
                         file_size=len(snapshot_str),
                         expires_at=timezone.now() + timedelta(days=30),
                     )
-                    if _notify_profile is not None:
-                        _send_report_notification(_notify_profile, report, document.original_filename)
             except Exception:
                 pass
 
@@ -474,24 +609,29 @@ def analyze_compliance(request):
 
 
 # ──────────────────────────────────────────────
-# Phase 2b — Analyse multiple files (batch)
+# Phase 2b — Analyse multiple files (batch SSE)
 # Triggered by the Analyse button (multiple files).
 # ──────────────────────────────────────────────
 
 @csrf_exempt
 def analyze_batch(request):
     """
-    Expected request body:
-    {
-        "company_name": "Acme Corp",
-        "files": [
-            {"file_name": "policy.pdf",  "department": "IT"},
-            {"file_name": "report.docx", "department": "Finance"}
-        ]
-    }
+    Submits each file to /api/analyze-queued, then polls /api/job-status per file,
+    streaming SSE events so the frontend updates each file card in real time.
+
+    SSE events emitted (unchanged contract):
+        data: {"status": "analysing",     "file_name": "policy.pdf"}
+        data: {"status": "analysed",      "file_name": "policy.pdf",  "result_id": "<uuid>"}
+        data: {"status": "error",         "file_name": "policy.pdf",  "message": "..."}
+        data: {"status": "batch_complete","result_ids": ["<uuid>", ...]}
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
 
     try:
         payload = json.loads(request.body.decode('utf-8'))
@@ -504,6 +644,8 @@ def analyze_batch(request):
     if not files or not isinstance(files, list):
         return JsonResponse({'error': 'A non-empty "files" list is required'}, status=400)
 
+    # Validate all files and pull bytes from cache before starting the stream.
+    # Failing early here avoids opening an SSE connection only to error immediately.
     multipart_files = []
     for entry in files:
         file_name  = (entry.get('file_name') or '').strip()
@@ -516,29 +658,286 @@ def analyze_batch(request):
                 {'error': f'File bytes for "{file_name}" not found in cache. Please re-upload.'},
                 status=400,
             )
-        multipart_files.append({'file_name': file_name, 'department': department, 'file_bytes': file_bytes})
+        multipart_files.append({
+            'file_name':  file_name,
+            'department': department,
+            'file_bytes': file_bytes,
+        })
 
-    try:
-        files_payload = [
-            ('files', (f['file_name'], f['file_bytes'], _mime_type_for(f['file_name'])))
-            for f in multipart_files
-        ]
-        data_payload = {
-            'company_name': company_name,
-            'departments':  ','.join(f['department'] for f in multipart_files),
-        }
-        response = requests.post(f"{AI_API_URL}/analyze-batch", files=files_payload, data=data_payload, timeout=1200)
-        result   = response.json()
+    def event_stream():
+        collected_result_ids = []
 
         for f in multipart_files:
-            cache.delete(f'file_bytes_{f["file_name"]}')
+            file_name  = f['file_name']
+            department = f['department']
+            file_bytes = f['file_bytes']
 
-        return JsonResponse({'status': 'analysed', 'result': result})
+            yield f"data: {json.dumps({'status': 'analysing', 'file_name': file_name})}\n\n".encode('utf-8')
 
-    except requests.exceptions.ConnectionError:
-        return JsonResponse({'error': 'AI Server is not running.'}, status=503)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+            try:
+                # ── Submit to Celery queue ─────────────────────────────────────
+                ai_start_time = _time.time()
+                submit_response = requests.post(
+                    f"{AI_API_URL}/analyze-queued",
+                    files={'file': (file_name, file_bytes, _mime_type_for(file_name))},
+                    data={'company_name': company_name, 'department': department},
+                    timeout=30,
+                )
+
+                if submit_response.status_code == 503:
+                    err = submit_response.json().get('error', 'AI service is at capacity.')
+                    yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': err})}\n\n".encode('utf-8')
+                    cache.delete(f'file_bytes_{file_name}')
+                    continue
+
+                submit_response.raise_for_status()
+                job_id = submit_response.json()['job_id']
+
+                # ── Poll until done ────────────────────────────────────────────
+                poll_interval = 5
+                max_polls     = 300
+                result        = None
+
+                for _ in range(max_polls):
+                    _time.sleep(poll_interval)
+                    try:
+                        status_resp = requests.get(
+                            f"{AI_API_URL}/job-status/{job_id}",
+                            timeout=10,
+                        )
+                        status_data = status_resp.json()
+                    except Exception:
+                        continue
+
+                    job_state = status_data.get('status')
+
+                    if job_state == 'success':
+                        result = status_data.get('result', {})
+                        duration_ms = (_time.time() - ai_start_time) * 1000
+                        push_ai_metric('SuccessfulAnalysis', 1)
+                        push_ai_metric('AnalysisLatencyMs', duration_ms, unit='Milliseconds')
+                        break
+                    if job_state == 'failure':
+                        push_ai_metric('FailedAnalysis', 1)
+                        yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': status_data.get('error', 'Analysis failed.')})}\n\n".encode('utf-8')
+                        result = None
+                        break
+                    if job_state == 'timeout':
+                        push_ai_metric('FailedAnalysis', 1)
+                        yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': 'Analysis timed out.'})}\n\n".encode('utf-8')
+                        result = None
+                        break
+
+                if result is None:
+                    # Either poll exhausted or an error path set result=None above
+                    cache.delete(f'file_bytes_{file_name}')
+                    continue
+
+                # ── Persist AnalysisResult + Findings to DB ────────────────────
+                try:
+                    document = Document.objects.filter(
+                        s3_key=file_name, deleted_at__isnull=True
+                    ).order_by('-uploaded_at').first()
+
+                    if document is not None:
+                        raw_score        = result.get('compliance', {}).get('compliance_score', 0)
+                        compliance_score = max(0, min(100, int(round(float(raw_score)))))
+                        risk_level       = _score_to_risk_level(compliance_score)
+                        summary          = (
+                            result.get('summary')
+                            or result.get('recommendations', {}).get('top_action')
+                            or None
+                        )
+
+                        with transaction.atomic():
+                            AnalysisResult.objects.filter(document=document).delete()
+                            analysis = AnalysisResult.objects.create(
+                                document=document,
+                                compliance_score=compliance_score,
+                                risk_level=risk_level,
+                                summary=summary,
+                                raw_output=result,
+                            )
+
+                            findings_to_create = []
+                            for d in result.get('compliance', {}).get('details', []):
+                                raw_status = (d.get('status') or '').lower().replace('-', '_')
+                                if raw_status in ('non_compliant', 'partial'):
+                                    findings_to_create.append(Finding(
+                                        result=analysis,
+                                        finding_type=Finding.FindingType.GAP,
+                                        title=sanitize_ai_text((d.get("clause") or "Unknown Clause"))[:200],
+                                        description=sanitize_ai_text(d.get("reasoning") or ""),
+                                    ))
+                            for r in result.get('risk_assessment', []):
+                                if isinstance(r, str):
+                                    title_text, desc_text = r[:200], ''
+                                else:
+                                    title_text = sanitize_ai_text(r.get("title") or r.get("risk") or "Risk Item")[:200]
+                                    desc_text  = sanitize_ai_text(r.get("description") or r.get("detail") or "")
+                                findings_to_create.append(Finding(
+                                    result=analysis,
+                                    finding_type=Finding.FindingType.RISK,
+                                    title=title_text,
+                                    description=desc_text,
+                                ))
+                            if findings_to_create:
+                                Finding.objects.bulk_create(findings_to_create)
+
+                        if document.status != Document.Status.COMPLETED:
+                            document.status = Document.Status.COMPLETED
+                            document.save(update_fields=['status'])
+
+                        _record_audit_log(profile, 'ANALYSE', 'analysis_result', analysis.result_id, True, request, AuditLog.Severity.LOW)
+                        collected_result_ids.append(str(analysis.result_id))
+
+                        yield f"data: {json.dumps({'status': 'analysed', 'file_name': file_name, 'result_id': str(analysis.result_id)})}\n\n".encode('utf-8')
+                    else:
+                        yield f"data: {json.dumps({'status': 'analysed', 'file_name': file_name})}\n\n".encode('utf-8')
+
+                except Exception as db_err:
+                    logger.error("Batch DB save failed for %s: %s", file_name, str(db_err))
+                    yield f"data: {json.dumps({'status': 'analysed', 'file_name': file_name})}\n\n".encode('utf-8')
+
+            except requests.exceptions.ConnectionError:
+                yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': 'AI Server is not running.'})}\n\n".encode('utf-8')
+            except Exception as e:
+                yield f"data: {json.dumps({'status': 'error', 'file_name': file_name, 'message': str(e)})}\n\n".encode('utf-8')
+            finally:
+                cache.delete(f'file_bytes_{file_name}')
+
+        yield f"data: {json.dumps({'status': 'batch_complete', 'result_ids': collected_result_ids})}\n\n".encode('utf-8')
+
+    return StreamingHttpResponse(
+        event_stream(),
+        content_type='text/event-stream',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'},
+    )
+
+
+# ──────────────────────────────────────────────
+# Org-level comparison data for admin dashboard
+# ──────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_org_comparison(request):
+    """
+    GET /api/analysis/org-comparison/?result_ids=id1,id2,id3
+
+    Returns per-department compliance data for all supplied result IDs.
+    Used by comparison.html and comparison_dashboard_graphical.html.
+    Admins can access any result; general users are restricted to their own.
+    """
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
+    raw_ids = request.GET.get('result_ids', '').strip()
+    if not raw_ids:
+        return JsonResponse({'error': 'result_ids query parameter is required'}, status=400)
+
+    result_ids = [rid.strip() for rid in raw_ids.split(',') if rid.strip()]
+    if not result_ids:
+        return JsonResponse({'error': 'No valid result IDs provided'}, status=400)
+
+    qs = (
+        AnalysisResult.objects
+        .select_related('document__org', 'document__dept')
+        .filter(result_id__in=result_ids)
+    )
+    if profile.role != UserProfile.Role.ADMIN:
+        qs = qs.filter(document__user=profile)   # general users can only see their own results
+    analyses = list(qs)
+
+    if not analyses:
+        return JsonResponse({'error': 'No analysis results found for the provided IDs'}, status=404)
+
+    org_name    = ''
+    departments = []
+
+    RISK_RANK = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
+
+    for analysis in analyses:
+        doc  = analysis.document
+        org  = doc.org
+        dept = doc.dept
+
+        # Capture org name from the first result that has one.
+        if not org_name and org:
+            org_name = org.org_name or ''
+
+        details = (analysis.raw_output or {}).get('compliance', {}).get('details', [])
+
+        all_issues = [
+            d for d in details
+            if (d.get('status') or '').lower().replace('-', '_') in ('non_compliant', 'partial')
+        ]
+
+        top_issues = sorted(
+            all_issues,
+            key=lambda d: RISK_RANK.get((d.get('risk_level') or '').lower(), 0),
+            reverse=True
+        )[:5]
+
+        all_recommendations = []
+        for d in all_issues:
+            req_id   = d.get('requirement_id') or ''
+            stripped = req_id.replace('SL-PDPA-S', '')
+            parts    = stripped.split('-')
+            ref      = f"Section {parts[0]}"
+            if len(parts) > 1:
+                ref += f"({parts[1]})"
+            ref += " of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)"
+            all_recommendations.append({
+                'clause':     d.get('clause') or d.get('requirement_id') or 'Unknown',
+                'reference':  ref,
+                'status':     d.get('status', ''),
+                'risk_level': d.get('risk_level', ''),
+                'reasoning':  d.get('reasoning', ''),
+            })
+
+        improvement_list = [
+            {
+                'clause':         d.get('clause') or d.get('requirement_id') or 'Unknown',
+                'requirement_id': d.get('requirement_id') or ''
+            }
+            for d in top_issues
+        ]
+        recommended_actions = []
+        for d in top_issues:
+            req_id   = d.get('requirement_id') or ''
+            stripped = req_id.replace('SL-PDPA-S', '')
+            parts    = stripped.split('-')
+            ref      = f"Section {parts[0]}"
+            if len(parts) > 1:
+                ref += f"({parts[1]})"
+            ref += " of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)"
+            recommended_actions.append(ref)
+
+        top_gap = improvement_list[0]['clause'] if improvement_list else 'None identified'
+
+        risk = (
+            'Low'    if analysis.compliance_score >= 75
+            else 'Medium' if analysis.compliance_score >= 40
+            else 'High'
+        )
+
+        departments.append({
+            'id':                   str(analysis.result_id),
+            'dept_name':            dept.dept_name if dept else 'Unknown Department',
+            'file_name':            doc.original_filename or doc.s3_key or '',
+            'compliance_score':     analysis.compliance_score,
+            'risk':                 risk,
+            'improvements':         len(all_issues),
+            'top_gap':              top_gap,
+            'improvement_list':     improvement_list,
+            'recommended_actions':  recommended_actions,
+            'all_recommendations':  all_recommendations,
+        })
+
+    return JsonResponse({'org_name': org_name, 'departments': departments}, status=200)
 
 
 # ──────────────────────────────────────────────
@@ -610,7 +1009,7 @@ def delete_file(request):
             Bucket=settings.AWS_STORAGE_BUCKET_NAME,
             Delete={'Objects': [{'Key': k} for k in keys_to_delete]},
         )
-        _record_audit_log(profile, "DELETE", "document", None, True, request)
+        _record_audit_log(profile, "DELETE", "document", None, True, request, AuditLog.Severity.LOW)
         return JsonResponse({'status': f'{len(keys_to_delete)} file(s) deleted'})
 
     except (BotoCoreError, ClientError) as e:
@@ -954,7 +1353,7 @@ def signup(request):
 
     if len(full_name) < 3:
         return JsonResponse({"detail": "Please enter your full name (first and last name)"}, status=400)
-    
+
     if len(full_name) > 150:
         return JsonResponse({"detail": "Full name is too long."}, status=400)
 
@@ -1449,6 +1848,9 @@ def _generate_and_store_otp(profile: UserProfile, purpose: str) -> str:
 
 
 def _record_audit_log(profile, action_type: str, target_type: str, target_id, success: bool, request=None, severity: str = AuditLog.Severity.LOW) -> None:
+    # Skip the audit log entry rather than crashing on the NOT NULL constraint for rejection events.
+    if target_id is None:
+        return
     ip = request.META.get("REMOTE_ADDR") if request else None
     AuditLog.objects.create(
         user=profile, action_type=action_type, target_type=target_type,
@@ -1991,8 +2393,8 @@ def _serialize_analysis(analysis: AnalysisResult) -> dict:
         "result_id":         str(analysis.result_id),
         "document_id":       str(analysis.document_id),
         "original_filename": analysis.document.original_filename,
-        "company_name":      analysis.document.org.org_name if analysis.document.org else "", 
-        "department":        analysis.document.dept.dept_name if analysis.document.dept else "", 
+        "company_name":      analysis.document.org.org_name if analysis.document.org else "",
+        "department":        analysis.document.dept.dept_name if analysis.document.dept else "",
         "compliance_score":  analysis.compliance_score,
         "risk_level":        analysis.risk_level,
         "summary":           analysis.summary,
@@ -2057,16 +2459,16 @@ def save_analysis_result(request):
                 findings_to_create.append(Finding(
                     result=analysis,
                     finding_type=Finding.FindingType.GAP,
-                    title=(d.get("clause") or "Unknown Clause")[:200],
-                    description=d.get("reasoning") or "",
+                    title=sanitize_ai_text((d.get("clause") or "Unknown Clause"))[:200],
+                    description=sanitize_ai_text(d.get("reasoning") or ""),
                 ))
 
         for r in ai_result.get("risk_assessment", []):
             if isinstance(r, str):
                 title_text, desc_text = r[:200], ""
             else:
-                title_text = (r.get("title") or r.get("risk") or "Risk Item")[:200]
-                desc_text  = r.get("description") or r.get("detail") or ""
+                title_text = sanitize_ai_text(r.get('title') or r.get('risk') or 'Risk Item')[:200]
+                desc_text  = sanitize_ai_text(r.get('description') or r.get('detail') or '')
             findings_to_create.append(Finding(
                 result=analysis, finding_type=Finding.FindingType.RISK,
                 title=title_text, description=desc_text,
@@ -2253,8 +2655,8 @@ def save_recommendations(request):
 
     created = []
     for item in recommendations:
-        recommendation_text = (item.get("recommendation_text") or "").strip()
-        act_name            = (item.get("act_name") or "").strip()
+        recommendation_text = sanitize_ai_text((item.get("recommendation_text") or "").strip())
+        act_name            = sanitize_ai_text((item.get("act_name") or "").strip())
         steps_to_achieve    = item.get("steps_to_achieve") or []
         section             = (item.get("section") or "").strip()
         status              = (item.get("status") or Recommendation.Status.MEDIUM).strip()
@@ -2402,6 +2804,7 @@ def list_reports(request):
 
     return JsonResponse({"last_7_days": last_7_days, "last_30_days": last_30_days}, status=200)
 
+
 @csrf_exempt
 def debug_reports_dept(request):
     """GET /api/debug-reports-dept/ — Temporary: shows dept data for all admin reports."""
@@ -2430,6 +2833,7 @@ def debug_reports_dept(request):
             "display_name":     r.report_s3_key,
         })
     return JsonResponse({"reports": rows}, status=200)
+
 
 @csrf_exempt
 def list_departments(request):
@@ -2488,7 +2892,7 @@ def generate_report(request):
     report_s3_key   = (payload.get("report_s3_key") or "").strip()
     file_size       = payload.get("file_size")
     expires_in_days = payload.get("expires_in_days", 30)
-    dept_id = (payload.get("dept_id") or "").strip() or None
+    dept_id         = (payload.get("dept_id") or "").strip() or None
 
     if not result_id or not report_snapshot or not report_s3_key or file_size is None:
         return JsonResponse({"detail": "result_id, report_snapshot, report_s3_key and file_size are required"}, status=400)
@@ -2497,7 +2901,7 @@ def generate_report(request):
         analysis_result = AnalysisResult.objects.get(result_id=result_id)
     except (AnalysisResult.DoesNotExist, Exception):
         return JsonResponse({"detail": "analysis_result not found"}, status=404)
-    
+
     dept = None
     if dept_id:
         try:
@@ -2515,11 +2919,9 @@ def generate_report(request):
     except Exception as e:
         logger.exception(
             "Failed to create report | user_id=%s | result_id=%s | report_s3_key=%s",
-            profile.user_id,
-            result_id,
-            report_s3_key,
+            profile.user_id, result_id, report_s3_key,
         )
-        return JsonResponse({"detail": "Failed to create report: {str(e)}"}, status=500)
+        return JsonResponse({"detail": f"Failed to create report: {str(e)}"}, status=500)
 
     _record_audit_log(profile, "GENERATE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.LOW)
 
@@ -2555,8 +2957,7 @@ def get_report(request, report_id):
     except Exception:
         logger.exception(
             "Unexpected error while retrieving report | user_id=%s | report_id=%s",
-            profile.user_id,
-            report_id,
+            profile.user_id, report_id,
         )
         return JsonResponse({"detail": "Failed to load report."}, status=500)
 
@@ -2643,8 +3044,7 @@ def download_report(request):
     except Exception:
         logger.exception(
             "Unexpected error while fetching report for download | user_id=%s | report_id=%s",
-            profile.user_id,
-            report_id,
+            profile.user_id, report_id,
         )
         return JsonResponse({"error": "Failed to process download request."}, status=500)
 
@@ -2661,15 +3061,14 @@ def download_report(request):
     except Exception:
         logger.exception(
             "Failed to record report download | user_id=%s | report_id=%s",
-            profile.user_id,
-            report_id,
+            profile.user_id, report_id,
         )
         return JsonResponse({"error": "Failed to record download."}, status=500)
 
 
 @csrf_exempt
 def share_report(request):
-    """POST /api/share-report/ — Creates a share token. Admin only."""
+    """POST /api/share-report/ — Uploads PDF to S3 and returns a pre-signed URL. Admin only."""
     if request.method != "POST":
         return JsonResponse({"error": "Invalid request"}, status=405)
 
@@ -2679,7 +3078,7 @@ def share_report(request):
 
     if profile.role != UserProfile.Role.ADMIN:
         return JsonResponse({"error": "Only administrative users can share reports"}, status=403)
-    
+
     report_id = request.POST.get("report_id", "").strip()
     pdf_file  = request.FILES.get("pdf")
 
@@ -2695,8 +3094,7 @@ def share_report(request):
     except Exception:
         logger.exception(
             "Unexpected error while fetching report for sharing | user_id=%s | report_id=%s",
-            profile.user_id,
-            report_id,
+            profile.user_id, report_id,
         )
         return JsonResponse({"error": "Failed to load report for sharing."}, status=500)
 
@@ -2705,7 +3103,7 @@ def share_report(request):
     is_org_admin = profile.org_id is not None and str(doc.org_id) == str(profile.org_id)
     if not is_owner and not is_org_admin:
         return JsonResponse({"error": "You do not have access to this report"}, status=403)
-    
+
     # Reuse existing active share if one exists
     existing_share = ReportShare.objects.filter(
         report=report, shared_by=profile, is_active=True, expires_at__gt=timezone.now()
@@ -2716,7 +3114,7 @@ def share_report(request):
             "message": "Report shared successfully",
             "share_url": existing_share.access_token
         })
-    
+
     # Write PDF to temp file and upload to S3
     try:
         s3_key = f"shared-reports/{report_id}.pdf"
@@ -2762,17 +3160,16 @@ def share_report(request):
     # Store pre-signed URL as access_token in ReportShare
     try:
         ReportShare.objects.create(
-            report=report, 
+            report=report,
             shared_by=profile,
             shared_with_email=profile.auth_user.email,
-            access_token=presigned_url, 
+            access_token=presigned_url,
             expires_at=timezone.now() + timedelta(days=7),
         )
     except Exception:
         logger.exception(
             "Failed to create ReportShare record | user_id=%s | report_id=%s",
-            profile.user_id,
-            report_id,
+            profile.user_id, report_id,
         )
         return JsonResponse({"error": "Report uploaded, but share record creation failed."}, status=500)
 
@@ -2797,15 +3194,15 @@ def log_client_error(request):
     except json.JSONDecodeError:
         return JsonResponse({"detail": "Invalid JSON"}, status=400)
 
-    source = (data.get("source") or "unknown").strip()
-    message = (data.get("message") or "No message provided").strip()
-    stack = data.get("stack") or ""
-    page = (data.get("page") or "").strip()
-    url = (data.get("url") or "").strip()
+    source    = (data.get("source") or "unknown").strip()
+    message   = (data.get("message") or "No message provided").strip()
+    stack     = data.get("stack") or ""
+    page      = (data.get("page") or "").strip()
+    url       = (data.get("url") or "").strip()
     report_id = data.get("report_id")
     user_role = data.get("user_role") or profile.role
     timestamp = data.get("timestamp")
-    extra = data.get("extra", {})
+    extra     = data.get("extra", {})
 
     logger.error(
         "CLIENT_ERROR | user_id=%s | email=%s | role=%s | source=%s | page=%s | url=%s | report_id=%s | timestamp=%s | message=%s | extra=%s | stack=%s",
@@ -2883,8 +3280,8 @@ def request_admin_access(request):
     ).order_by("-created_at").first()
 
     access_request = AdminAccessRequest.objects.create(
-        user=profile, 
-        verification_otp=otp_row, 
+        user=profile,
+        verification_otp=otp_row,
         org_email=org_email,
         original_email=profile.auth_user.email,
         status=AdminAccessRequest.Status.PENDING,
@@ -2973,9 +3370,9 @@ def verify_admin_access(request):
 
     _record_audit_log(profile, "ADMIN_ACCESS_APPROVED", "admin_access_request", access_request.request_id, True, request, AuditLog.Severity.HIGH)
     return JsonResponse({
-        "detail": "Administrative access granted successfully.", 
-        "role": profile.role,
-        "email": access_request.org_email,
+        "detail": "Administrative access granted successfully.",
+        "role":   profile.role,
+        "email":  access_request.org_email,
     }, status=200)
 
 

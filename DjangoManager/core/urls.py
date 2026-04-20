@@ -52,6 +52,7 @@ urlpatterns = [
     path("api/analysis/history/", views.get_analysis_history, name="get_analysis_history"),
     path("api/analysis/<uuid:result_id>/", views.get_analysis_by_id, name="get_analysis_by_id"),
     path("api/analysis/<uuid:result_id>/findings/", views.get_findings_for_result, name="get_findings_for_result"),
+    path('api/analysis/org-comparison/', views.get_org_comparison),
 
     # ── Recommendations ───────────────────────────────────────────────────
     path("api/recommendations/save/", views.save_recommendations, name="save_recommendations"),

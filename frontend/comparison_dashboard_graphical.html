@@ -492,7 +492,7 @@
         border-color: #4a8fe7;
       }
 
-      /* Drill-Down Model */
+      /* Drill-Down Modal */
       .modal-backdrop {
         position: fixed;
         inset: 0;
@@ -506,7 +506,7 @@
 
       .modal {
         width: 100%;
-        max-width: 760px;
+        max-width: 1000px;
         border-radius: 18px;
         background: rgba(13, 20, 32, 0.92);
         border: 1px solid rgba(96, 122, 146, 0.4);
@@ -653,14 +653,23 @@
 
       <!-- Main Dashboard Area -->
       <div class="main-content" :class="{ shifted: sidebarOpen }">
-        <div class="dashboard-titles">
+        <!-- Loading state -->
+        <div v-if="isLoading" style="text-align:center; padding: 80px 0; color: #8bb8f0; font-size: 15px; letter-spacing: 1px;">
+            ⏳ Loading department comparison data…
+        </div>
+
+        <!-- Error state -->
+        <div v-if="!isLoading && loadError" style="max-width:700px; margin: 80px auto; background: rgba(231,74,74,0.08); border: 1px solid rgba(231,74,74,0.25); border-radius: 10px; padding: 20px 24px; color: #e74a4a; font-size: 14px;">
+            ⚠ {{ loadError }}
+        </div>
+
+        <div class="dashboard-titles" v-if="!isLoading && !loadError">
           <div class="dashboard-title-main">COMPARISON DASHBOARD</div>
           <div class="dashboard-title-sub">Graphical view</div>
-
         </div>
 
         <!-- Dashboard Controls -->
-        <div class="controls-wrap">
+        <div class="controls-wrap" v-if="!isLoading && !loadError">
           <div class="controls-row">
             <div class="control-group">
               <div class="control-label">Risk Filter</div>
@@ -689,7 +698,7 @@
           </div>
         </div>
 
-        <div class="dashboard-shell">
+        <div class="dashboard-shell" v-if="!isLoading && !loadError">
           <!-- Chart Card -->
           <div class="card">
             <div class="card-title">
@@ -760,7 +769,8 @@
             </div>
 
             <div class="pie-note">
-              Note: Pie slice sizes are proportional to each department’s compliance percentage.
+              Note: Pie slice sizes are proportional to each department's
+              {{ sortBy === 'improvements' ? 'number of improvement needs' : sortBy === 'risk' ? 'risk level (High = largest)' : 'compliance percentage' }}.
             </div>
           </div>
 
@@ -816,7 +826,7 @@
         </div>
       </div>
 
-      <!-- Drill-Down Model -->
+      <!-- Drill-Down Modal -->
       <div v-if="detailOpen && selectedDept" class="modal-backdrop" @click.self="closeDetail">
         <div class="modal">
           <div class="modal-head">
@@ -871,70 +881,30 @@
     <script>
       const { createApp } = Vue;
 
+      const BASE = 'http://127.0.0.1:8000/ai';
+
       const app = createApp({
         data() {
           return {
             sidebarOpen: true,
             isAdmin: false,
 
-            companyLabel: "ABC Company",
+            companyLabel: "Unknown Organisation",
 
             riskFilter: "All",
             sortBy: "compliance",
             sortOrder: "desc",
 
-            departments: [
-              {
-                id: "d1",
-                name: "Department 1",
-                compliance: 72,
-                risk: "Medium",
-                improvements: 5,
-                topGap: "Access control reviews",
-                improvementList: ["Review user access quarterly", "Enforce strong password policy", "Audit shared accounts"],
-                recommendedActions: ["Enable MFA for all users", "Run an access review workshop", "Update access approval flow"],
-              },
-              {
-                id: "d2",
-                name: "Department 2",
-                compliance: 58,
-                risk: "High",
-                improvements: 8,
-                topGap: "Incident response readiness",
-                improvementList: ["Update incident playbook", "Improve logging coverage", "Run a tabletop exercise"],
-                recommendedActions: ["Assign IR owners", "Enable centralized logging", "Test response procedures monthly"],
-              },
-              {
-                id: "d3",
-                name: "Department 3",
-                compliance: 84,
-                risk: "Low",
-                improvements: 3,
-                topGap: "Data retention alignment",
-                improvementList: ["Document retention periods", "Label sensitive data", "Review disposal process"],
-                recommendedActions: ["Publish retention policy", "Train staff on retention", "Automate deletion reminders"],
-              },
-              {
-                id: "d4",
-                name: "Department 4",
-                compliance: 66,
-                risk: "Medium",
-                improvements: 6,
-                topGap: "Vendor / third-party checks",
-                improvementList: ["Collect vendor evidence", "Review DPAs", "Maintain vendor risk register"],
-                recommendedActions: ["Create vendor checklist", "Schedule annual vendor reviews", "Add contract compliance clause"],
-              },
-              {
-                id: "d5",
-                name: "Department 5",
-                compliance: 47,
-                risk: "High",
-                improvements: 9,
-                topGap: "Encryption & backups",
-                improvementList: ["Encrypt stored files", "Validate backups", "Rotate keys regularly"],
-                recommendedActions: ["Enable encryption at rest", "Test restore drills", "Implement key rotation policy"],
-              },
-            ],
+            // Populated from get_org_comparison in mounted().
+            departments: [],
+
+            // Clause summary map — loaded from clause_summaries.json.
+            // Maps requirement_id → short one-line action string.
+            clauseSummaries: {},
+
+            // Loading / error state
+            isLoading: true,
+            loadError: '',
 
             activeSliceIndex: null,
 
@@ -953,11 +923,11 @@
         computed: {
           displayedDepartments() {
             const riskRank = { High: 3, Medium: 2, Low: 1 };
-            const palette = ["#f2f6fa", "#94a6b4", "#1c3f60", "#355679", "#afc1cf", "#7b8ea3"];
+            const palette  = ["#f2f6fa", "#94a6b4", "#1c3f60", "#355679", "#afc1cf", "#7b8ea3"];
 
             let list = this.departments.map((d, idx) => ({
               ...d,
-              color: palette[idx % palette.length],
+              color:    palette[idx % palette.length],
               riskRank: riskRank[d.risk] || 0,
             }));
 
@@ -968,9 +938,9 @@
             const dir = this.sortOrder === "asc" ? 1 : -1;
 
             list.sort((a, b) => {
-              if (this.sortBy === "compliance") return (a.compliance - b.compliance) * dir;
+              if (this.sortBy === "compliance")   return (a.compliance   - b.compliance)   * dir;
               if (this.sortBy === "improvements") return (a.improvements - b.improvements) * dir;
-              if (this.sortBy === "risk") return (a.riskRank - b.riskRank) * dir;
+              if (this.sortBy === "risk")         return (a.riskRank     - b.riskRank)     * dir;
               return 0;
             });
 
@@ -981,13 +951,18 @@
             const center = { x: 100, y: 100 };
             const radius = 95;
 
-            const total = this.displayedDepartments.reduce((sum, d) => sum + d.compliance, 0) || 1;
+            const getMetricValue = (d) => {
+              if (this.sortBy === 'improvements') return d.improvements;
+              if (this.sortBy === 'risk')         return { High: 3, Medium: 2, Low: 1 }[d.risk] || 1;
+              return d.compliance;
+            };
+            const total = this.displayedDepartments.reduce((sum, d) => sum + getMetricValue(d), 0) || 1;
 
             let startAngle = -90;
 
             return this.displayedDepartments.map((dept) => {
-              const value = (dept.compliance / total) * 100;
-              const sweep = (value / 100) * 360;
+              const value    = (getMetricValue(dept) / total) * 100;
+              const sweep    = (value / 100) * 360;
               const endAngle = startAngle + sweep;
               const midAngle = (startAngle + endAngle) / 2;
 
@@ -995,20 +970,144 @@
               startAngle = endAngle;
 
               return {
-                id: dept.id,
+                id:                dept.id,
                 d,
-                fill: dept.color,
+                fill:              dept.color,
                 midAngle,
-                name: dept.name,
-                compliance: dept.compliance,
-                risk: dept.risk,
-                improvements: dept.improvements,
-                topGap: dept.topGap,
-                improvementList: dept.improvementList,
+                name:              dept.name,
+                compliance:        dept.compliance,
+                risk:              dept.risk,
+                improvements:      dept.improvements,
+                topGap:            dept.topGap,
+                improvementList:   dept.improvementList,
                 recommendedActions: dept.recommendedActions,
               };
             });
           },
+        },
+
+        // ── Single merged mounted() ───────────────────────────────────────
+        // Combines feature/database additions (isAdmin flag, SessionManager)
+        // with the sprint-3 full data-loading logic.
+        async mounted() {
+          // ── Auth guard ──────────────────────────────────────────────────
+          const token = sessionStorage.getItem('authToken');
+          if (!token) {
+            window.location.href = 'login.html';
+            return;
+          }
+
+          // ── Set RBAC flag + session timeout (from feature/database) ─────
+          const roleRaw = sessionStorage.getItem('userRole');
+          this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
+          SessionManager.init({ timeoutMs: 1200000 });
+
+          // ── Admin guard ─────────────────────────────────────────────────
+          // This page is only for admins — redirect general users back to
+          // comparison.html which shows the single-result view.
+          if (roleRaw !== 'ADMINISTRATIVE_USER') {
+            window.location.href = 'comparison.html';
+            return;
+          }
+
+          // ── Read batch result IDs from sessionStorage ───────────────────
+          const batchIdsRaw = sessionStorage.getItem('batchResultIds');
+
+          if (!batchIdsRaw) {
+            this.loadError = 'No batch results found. Please run a multi-department analysis first.';
+            this.isLoading = false;
+            return;
+          }
+
+          let resultIds = [];
+          try {
+            resultIds = JSON.parse(batchIdsRaw);
+          } catch {
+            this.loadError = 'Batch result data is corrupted. Please re-run the analysis.';
+            this.isLoading = false;
+            return;
+          }
+
+          if (!Array.isArray(resultIds) || resultIds.length === 0) {
+            this.loadError = 'No batch results found. Please re-run the analysis.';
+            this.isLoading = false;
+            return;
+          }
+
+          // ── Load clause summary map ─────────────────────────────────────
+          // clause_summaries.json maps requirement_id → short one-line action.
+          // Sits alongside the HTML files in the frontend directory.
+          try {
+            const sumRes = await fetch('clause_summaries.json');
+            if (sumRes.ok) {
+              this.clauseSummaries = await sumRes.json();
+              console.log('[INFO] Clause summaries loaded —', Object.keys(this.clauseSummaries).length, 'entries');
+            } else {
+              console.warn('[WARN] clause_summaries.json not found — falling back to clause titles');
+            }
+          } catch (e) {
+            console.warn('[WARN] Could not load clause summaries:', e.message);
+          }
+
+          // ── Fetch org comparison data ───────────────────────────────────
+          try {
+            const url = `${BASE}/api/analysis/org-comparison/?result_ids=${resultIds.join(',')}`;
+            const res = await fetch(url, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.status === 401 || res.status === 403) {
+              sessionStorage.clear();
+              window.location.href = 'login.html';
+              return;
+            }
+
+            if (!res.ok) {
+              this.loadError = 'Could not load comparison data. Please re-run the analysis.';
+              this.isLoading = false;
+              return;
+            }
+
+            const data = await res.json();
+
+            this.companyLabel = data.org_name || 'Unknown Organisation';
+
+            // ── Normalise backend field names to match template expectations ──
+            // Also defensively handles top_gap and improvement_list whether the
+            // backend returns plain strings or { clause, requirement_id } objects,
+            // ensuring the Summary card and modal always render clean strings.
+            this.departments = (data.departments || []).map(d => ({
+              id:           d.id,
+              name:         d.dept_name,
+              compliance:   d.compliance_score,
+              risk:         d.risk,
+              improvements: d.improvements,
+
+              // top_gap: extract .clause if the backend returned an object,
+              // otherwise use the string directly
+              topGap: typeof d.top_gap === 'object'
+                ? (d.top_gap.clause || 'None identified')
+                : (d.top_gap || 'None identified'),
+
+              // improvement_list: normalise each entry to { clause, requirement_id }
+              // regardless of whether the backend sent strings or objects
+              improvementList: (d.improvement_list || []).map(item =>
+                typeof item === 'object'
+                  ? item
+                  : { clause: item, requirement_id: '' }
+              ),
+
+              // recommended_actions kept for reference but will be overridden
+              // per-dept in openDept() using the clause summary lookup
+              recommendedActions: d.recommended_actions || [],
+            }));
+
+          } catch (e) {
+            console.error('Failed to load graphical comparison data:', e);
+            this.loadError = 'Could not reach the server. Please check your connection.';
+          } finally {
+            this.isLoading = false;
+          }
         },
 
         methods: {
@@ -1022,8 +1121,8 @@
 
           resetControls() {
             this.riskFilter = "All";
-            this.sortBy = "compliance";
-            this.sortOrder = "desc";
+            this.sortBy     = "compliance";
+            this.sortOrder  = "desc";
           },
 
           showProfile() {
@@ -1034,43 +1133,77 @@
             const idx = this.pieSlices.findIndex((s) => s.id === id);
             if (idx !== -1) {
               this.activeSliceIndex = idx;
-              this.tooltip.data = this.pieSlices[idx];
-              this.tooltip.show = true;
+              this.tooltip.data     = this.pieSlices[idx];
+              this.tooltip.show     = true;
             }
           },
 
           onSliceEnter(i, slice) {
             this.activeSliceIndex = i;
-            this.tooltip.data = slice;
-            this.tooltip.show = true;
+            this.tooltip.data     = slice;
+            this.tooltip.show     = true;
           },
 
           onSliceLeave() {
             this.activeSliceIndex = null;
-            this.tooltip.show = false;
-            this.tooltip.data = null;
+            this.tooltip.show     = false;
+            this.tooltip.data     = null;
           },
 
           onMouseMove(e) {
-            const rect = e.currentTarget.getBoundingClientRect();
+            const rect     = e.currentTarget.getBoundingClientRect();
             this.tooltip.x = e.clientX - rect.left;
             this.tooltip.y = e.clientY - rect.top;
           },
 
           openDept(deptOrSlice) {
-            const id = deptOrSlice.id;
+            const id    = deptOrSlice.id;
             const found = this.departments.find((d) => d.id === id) || deptOrSlice;
-            this.selectedDept = found;
+
+            // ── Compute recommended actions from clause_summaries.json ──────
+            // For each top improvement need (up to 5), look up the requirement_id
+            // in clauseSummaries for a short plain-English action sentence.
+            // Falls back to the clause title if no mapping exists.
+            const computedActions = (found.improvementList || []).slice(0, 5).map(item => {
+              const reqId  = typeof item === 'object' ? (item.requirement_id || '') : '';
+              const clause = typeof item === 'object' ? (item.clause || item) : item;
+
+              if (reqId) {
+                // Try exact ID match first (e.g. "SL-PDPA-S11-2")
+                const exact = this.clauseSummaries[reqId];
+                if (exact) return exact;
+
+                // Fall back to section-level key (e.g. "SL-PDPA-S11")
+                const sectionKey = reqId.replace(/-\d+$/, '');
+                const sectionMatch = this.clauseSummaries[sectionKey];
+                if (sectionMatch) return sectionMatch;
+              }
+
+              // Last resort — use clause title itself
+              return `Address compliance gap: ${clause}`;
+            });
+
+            // Build a display-ready copy with:
+            // - improvementList as plain strings for the bullet list
+            // - recommendedActions replaced with clause-summary-derived actions
+            this.selectedDept = {
+              ...found,
+              improvementList: (found.improvementList || []).map(
+                item => typeof item === 'object' ? (item.clause || item) : item
+              ),
+              recommendedActions: computedActions,
+            };
+
             this.detailOpen = true;
           },
 
           closeDetail() {
-            this.detailOpen = false;
+            this.detailOpen   = false;
             this.selectedDept = null;
           },
 
           riskClass(r) {
-            if (r === "High") return "high";
+            if (r === "High")   return "high";
             if (r === "Medium") return "medium";
             return "low";
           },
@@ -1079,8 +1212,8 @@
             if (this.activeSliceIndex !== i) return "";
             const pop = 8;
             const rad = (slice.midAngle * Math.PI) / 180;
-            const dx = pop * Math.cos(rad);
-            const dy = pop * Math.sin(rad);
+            const dx  = pop * Math.cos(rad);
+            const dy  = pop * Math.sin(rad);
             return `translate(${dx} ${dy})`;
           },
 
@@ -1090,8 +1223,8 @@
           },
 
           describeArc(cx, cy, r, startAngle, endAngle) {
-            const start = this.polarToCartesian(cx, cy, r, startAngle);
-            const end = this.polarToCartesian(cx, cy, r, endAngle);
+            const start        = this.polarToCartesian(cx, cy, r, startAngle);
+            const end          = this.polarToCartesian(cx, cy, r, endAngle);
             const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
             return [
               `M ${cx} ${cy}`,
@@ -1105,18 +1238,8 @@
             window.location.href = "comparison.html";
           },
         },
-
-        async mounted() {
-          const token   = sessionStorage.getItem('authToken');
-          const roleRaw = sessionStorage.getItem('userRole');
-          if (!token) {
-            window.location.href = 'login.html';
-            return;
-          }
-          this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
-          SessionManager.init({ timeoutMs: 1200000 });
-        },
       });
+
       registerSidebarComponent(app);
       app.mount('#app');
     </script>

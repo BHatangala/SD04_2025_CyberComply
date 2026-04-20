@@ -1171,7 +1171,7 @@
                 uploadEndpoint: 'http://127.0.0.1:8000/ai/upload/',
                 // Phase 2a (single file): SSE stream → AI → result.
                 analyzeEndpoint: 'http://127.0.0.1:8000/ai/analyze/',
-                // Phase 2b (multiple files): batch JSON → AI → result.
+                // Phase 2b (multiple files): batch SSE stream → AI → result per file.
                 analyzeBatchEndpoint: 'http://127.0.0.1:8000/ai/analyze-batch/',
                 // S3 file deletion + DB soft-delete (called by × button).
                 deleteEndpoint: 'http://127.0.0.1:8000/api/delete-file/',
@@ -1237,9 +1237,9 @@
             companyName() {
                 this.errorMessages = this.errorMessages.filter(
                     msg => !msg.includes('Organisation')
-                );    
+                );
             }
-        },    
+        },
 
         async mounted() {
             // Restore org name if we're returning from a OneDrive OAuth redirect
@@ -1286,6 +1286,7 @@
             this.userRole     = roleRaw;
 
             // Session timeout — 30 min because analysis can take ~20 min
+            // (from feature/database branch)
             SessionManager.init({ timeoutMs: 1800000 });
 
             // Populate sidebar with real analysis history from the database
@@ -1379,10 +1380,11 @@
                     this.errorMessages.push(`Maximum 10 files allowed. You currently have ${this.uploadedFiles.length} file(s) uploaded.`);
                     return;
                 }
-        
+
                 for (const file of files) {
 
-                    if (this.uploadedFiles.some(f => 
+                    // Duplicate check — from feature/database branch
+                    if (this.uploadedFiles.some(f =>
                         f.name === file.name && f.size === file.size
                     )) {
                         this.errorMessages.push(`"${file.name}" is already uploaded.`);
@@ -1501,9 +1503,9 @@
             },
 
             // ── Phase 2a: Single file — SSE stream ──
-            // Replaces the feature/ai-development approach of writing the result to
-            // localStorage. Result is now persisted to PostgreSQL via saveAnalysisEndpoint,
-            // and only the result_id is kept in sessionStorage for the report page.
+            // Sprint-3 SSE logic with Authorization header from feature/database.
+            // Result is persisted to PostgreSQL via saveAnalysisEndpoint;
+            // only the result_id is kept in sessionStorage for the report page.
             async analyseSingle(fileObj) {
                 const getIndex     = () => this.uploadedFiles.indexOf(fileObj);
                 const updateStatus = (newStatus) => {
@@ -1529,6 +1531,12 @@
                         },
                         body: formData
                     });
+
+                    if (response.status === 401 || response.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
 
                     if (!response.ok) {
                         throw new Error(`Server returned HTTP ${response.status}`);
@@ -1567,10 +1575,8 @@
                                         updateStatus('analysed');
                                         this.analysisProgressText = 'Analysis complete. Redirecting…';
 
-                                        // ── Persist result to PostgreSQL (replaces localStorage) ──
-                                        // feature/ai-development stored the full result object in
-                                        // localStorage under 'latestAnalysisResult'. The merged flow
-                                        // instead POSTs to the DB and stores only the result_id in
+                                        // ── Persist result to PostgreSQL ──
+                                        // POSTs to the DB and stores only the result_id in
                                         // sessionStorage, which document_analysis.html reads to fetch
                                         // the full result from the backend.
                                         try {
@@ -1632,14 +1638,11 @@
                 }
             },
 
-            // ── Phase 2b: Multiple files — batch JSON request ──
+            // ── Phase 2b: Multiple files — batch SSE stream ──
+            // Sprint-3 SSE implementation with Authorization header from feature/database.
+            // Events arrive one per file as the backend processes them sequentially.
             async analyseBatch(files) {
-                this.analysisProgressText = `Sending ${files.length} files to AI for batch analysis…`;
-
-                files.forEach(fileObj => {
-                    const i = this.uploadedFiles.indexOf(fileObj);
-                    if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'analysing' });
-                });
+                this.analysisProgressText = `Preparing ${files.length} files for analysis…`;
 
                 const payload = {
                     company_name: this.companyName || '',
@@ -1649,67 +1652,132 @@
                     }))
                 };
 
-                console.log(`Analysing (batch): ${files.map(f => f.name).join(', ')}`);
+                console.log(`Analysing (batch SSE): ${files.map(f => f.name).join(', ')}`);
 
                 try {
                     const response = await fetch(this.analyzeBatchEndpoint, {
                         method:  'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body:    JSON.stringify(payload)
+                        headers: {
+                            'Content-Type':  'application/json',
+                            'Authorization': `Bearer ${this.sessionToken}`
+                        },
+                        body: JSON.stringify(payload)
                     });
 
-                    const data = await response.json();
+                    if (response.status === 401 || response.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
 
                     if (!response.ok) {
-                        throw new Error(data.error || `Server returned HTTP ${response.status}`);
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.error || `Server returned HTTP ${response.status}`);
                     }
 
-                    files.forEach(fileObj => {
-                        const i = this.uploadedFiles.indexOf(fileObj);
-                        if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'analysed' });
-                    });
+                    // ── Read the SSE stream ──
+                    // Identical reader pattern to analyseSingle.
+                    // Events arrive one per file as the backend processes them sequentially.
+                    const reader  = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let   buffer  = '';
 
-                    this.analysisProgressText = 'Batch analysis complete. Redirecting…';
+                    // Tracks result_ids collected from 'analysed' events.
+                    // batch_complete also carries the full list, but we collect here
+                    // as a safety net in case the final event is malformed.
+                    const collectedResultIds = [];
 
-                    // Persist batch result to PostgreSQL
-                    try {
-                        const firstFile = files[0];
-                        const saveRes = await fetch(this.saveAnalysisEndpoint, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type':  'application/json',
-                                'Authorization': `Bearer ${this.sessionToken}`
-                            },
-                            body: JSON.stringify({
-                                result:      data.result,
-                                document_id: firstFile.documentId || '',
-                                filename:    files.map(f => f.name).join(', '),
-                                company:     this.companyName || ''
-                            })
-                        });
-                        if (saveRes.ok) {
-                            const saved = await saveRes.json();
-                            if (saved.result_id) {
-                                sessionStorage.setItem('latestResultId', saved.result_id);
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const events = buffer.split('\n\n');
+                        buffer = events.pop();
+
+                        for (const event of events) {
+                            const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+                            if (!dataLine) continue;
+
+                            try {
+                                const payload = JSON.parse(dataLine.slice(6));
+                                console.log(`📡 [batch] SSE:`, payload.status, payload.file_name || '');
+
+                                switch (payload.status) {
+
+                                    case 'analysing': {
+                                        // Mark the specific file card as analysing
+                                        const idx = this.uploadedFiles.findIndex(f => f.name === payload.file_name);
+                                        if (idx !== -1) Object.assign(this.uploadedFiles[idx], { status: 'analysing' });
+                                        this.analysisProgressText = `Analysing "${payload.file_name}"…`;
+                                        break;
+                                    }
+
+                                    case 'analysed': {
+                                        // Mark the specific file card as analysed
+                                        const idx = this.uploadedFiles.findIndex(f => f.name === payload.file_name);
+                                        if (idx !== -1) Object.assign(this.uploadedFiles[idx], { status: 'analysed' });
+                                        // Collect result_id if the backend saved it successfully
+                                        if (payload.result_id) collectedResultIds.push(payload.result_id);
+                                        this.analysisProgressText = `"${payload.file_name}" analysed…`;
+                                        break;
+                                    }
+
+                                    case 'error': {
+                                        // Mark only the failed file — batch continues for remaining files
+                                        const idx = this.uploadedFiles.findIndex(f => f.name === payload.file_name);
+                                        if (idx !== -1) Object.assign(this.uploadedFiles[idx], { status: 'error' });
+                                        const msg = payload.message || '';
+                                        const friendly = msg.includes('not running') || msg.includes('connect')
+                                            ? `Analysis unavailable for "${payload.file_name}". The AI service is not responding.`
+                                            : `Error processing "${payload.file_name}". Please try again.`;
+                                        this.errorMessages.push(friendly);
+                                        break;
+                                    }
+
+                                    case 'batch_complete': {
+                                        // Use the server's list as the authoritative set of result IDs.
+                                        // Fall back to what we collected from individual 'analysed' events
+                                        // if the server list is missing or empty.
+                                        const resultIds = (payload.result_ids && payload.result_ids.length > 0)
+                                            ? payload.result_ids
+                                            : collectedResultIds;
+
+                                        this.analysisProgressText = 'Batch analysis complete. Redirecting…';
+
+                                        // Store batch result IDs for comparison pages.
+                                        // Clear any stale single-file result ID so comparison.html
+                                        // doesn't fall back to the old single-result fetch path.
+                                        sessionStorage.removeItem('latestResultId');
+                                        sessionStorage.setItem('batchResultIds', JSON.stringify(resultIds));
+
+                                        console.log(`Batch complete — ${resultIds.length} result(s) stored:`, resultIds);
+
+                                        // Brief pause so the user sees all cards reach ✓ ANALYSED
+                                        setTimeout(() => {
+                                            window.location.href = 'document_analysis.html';
+                                        }, 1500);
+                                        break;
+                                    }
+                                }
+
+                            } catch (parseError) {
+                                console.warn('Could not parse batch SSE line:', dataLine);
                             }
-                        } else {
-                            console.warn('Batch analysis save returned HTTP', saveRes.status);
                         }
-                    } catch (saveErr) {
-                        console.warn('Could not persist batch analysis result:', saveErr);
                     }
-
-                    setTimeout(() => {
-                        window.location.href = 'document_analysis.html';
-                    }, 1500);
 
                 } catch (error) {
                     console.error('Batch analysis failed:', error);
+                    // Mark any file still in 'uploaded' state as error —
+                    // files already marked 'analysed' keep their status
                     files.forEach(fileObj => {
                         const i = this.uploadedFiles.indexOf(fileObj);
-                        if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'error' });
+                        if (i !== -1 && this.uploadedFiles[i].status === 'uploaded') {
+                            Object.assign(this.uploadedFiles[i], { status: 'error' });
+                        }
                     });
-                    this.errorMessages.push(`Batch analysis is temporarily unavailable. The AI service is not responding — please wait a moment and try again.`);
+                    this.errorMessages.push('Batch analysis is temporarily unavailable. The AI service is not responding — please wait a moment and try again.');
                     this.isAnalysing = false;
                 }
             },
@@ -1722,6 +1790,7 @@
             async removeFile(index) {
                 const file = this.uploadedFiles[index];
 
+                // Clear any "already uploaded" error for this file — from feature/database branch
                 this.errorMessages = this.errorMessages.filter(
                     msg => msg !== `"${file.name}" is already uploaded.`
                 );
@@ -1775,6 +1844,7 @@
 
                     if (fileObj.source === 'google' && fileObj._driveFileId) {
 
+                        // Duplicate guard before triggering deferred Drive upload
                         if (this.uploadedFiles.some((f, i) =>
                             i !== index &&
                             f.name === fileObj.name &&
@@ -1793,6 +1863,7 @@
 
                     } else if (fileObj.source === 'onedrive' && fileObj._oneDriveFileId) {
 
+                        // Duplicate guard before triggering deferred OneDrive upload
                         if (this.uploadedFiles.some((f, i) =>
                             i !== index &&
                             f.name === fileObj.name &&
@@ -1940,12 +2011,13 @@
                     return;
                 }
 
-                if (this.uploadedFiles.some(f => 
+                // Duplicate check — from feature/database branch
+                if (this.uploadedFiles.some(f =>
                     f.name === fileName && f.size === fileSize
                 )) {
                     this.errorMessages.push(`"${fileName}" is already uploaded.`);
                     return;
-                }    
+                }
 
                 if (this.isAdmin && !this.validateOrgName()) return;
                 this.showStorageNotice = true;
@@ -2322,7 +2394,7 @@
                         }
 
                         const gridView = overlay.querySelector('#od-grid-view');
-                        gridView.innerHTML = ''; 
+                        gridView.innerHTML = '';
 
                         allFiles.forEach((f, i) => {
                             const item = document.createElement('div');
@@ -2359,7 +2431,7 @@
 
                             if (f._folder) {
                                 const folderSpan = document.createElement('span');
-                                folderSpan.textContent = f._folder; 
+                                folderSpan.textContent = f._folder;
                                 folderSpan.style.cssText = `
                                     font-size:10px;
                                     color:#999;
@@ -2387,7 +2459,6 @@
                                 border:1.5px solid transparent;
                             `;
 
-                            // LEFT SIDE
                             const left = document.createElement('div');
                             left.style.cssText = `
                                 display:flex;
@@ -2406,7 +2477,7 @@
                             textContainer.style.overflow = 'hidden';
 
                             const nameDiv = document.createElement('div');
-                            nameDiv.textContent = f.name;   
+                            nameDiv.textContent = f.name;
                             nameDiv.style.cssText = `
                                 font-size:13px;
                                 color:#333;
@@ -2480,12 +2551,13 @@
                 if (this.isAdmin && !this.validateOrgName()) return;
                 this.showStorageNotice = true;
 
-                if (this.uploadedFiles.some(f => 
+                // Duplicate check — from feature/database branch
+                if (this.uploadedFiles.some(f =>
                     f.name === file.name && f.size === file.size
                 )) {
                     this.errorMessages.push(`"${file.name}" is already uploaded.`);
                     return;
-                }    
+                }
 
                 const fileObj = {
                     name:            file.name,

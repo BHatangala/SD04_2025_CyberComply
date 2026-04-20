@@ -186,6 +186,90 @@
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
 
+        /* Batch summary badge shown below logo in multi-dept mode */
+        .batch-summary-badge {
+            display: inline-block;
+            margin-top: 16px;
+            background: rgba(74, 143, 231, 0.15);
+            border: 1px solid rgba(74, 143, 231, 0.35);
+            color: #4a8fe7;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            padding: 5px 18px;
+            border-radius: 20px;
+        }
+
+        /* ── Department accordion wrapper (batch mode) ── */
+        .dept-accordion {
+            max-width: 900px;
+            margin: 0 auto 16px;
+            border: 1px solid rgba(74, 143, 231, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .dept-accordion-header {
+            background: #1a2845;
+            padding: 16px 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: background 0.2s;
+            user-select: none;
+        }
+
+        .dept-accordion-header:hover {
+            background: #1e3058;
+        }
+
+        .dept-accordion-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .dept-accordion-name {
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #ffffff;
+        }
+
+        .dept-accordion-count {
+            font-size: 12px;
+            color: #8b9dc3;
+        }
+
+        .dept-accordion-chevron {
+            font-size: 18px;
+            color: #4a8fe7;
+            font-weight: 300;
+            transition: transform 0.25s ease;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .dept-accordion-chevron.open {
+            transform: rotate(180deg);
+        }
+
+        /* Body uses max-height transition for smooth open/close */
+        .dept-accordion-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease, padding 0.35s ease;
+            padding: 0 22px;
+        }
+
+        .dept-accordion-body.open {
+            max-height: 9999px;
+            padding: 16px 22px;
+        }
+
         /* Recommendation card base */
         .recommendation {
             max-width: 900px;
@@ -194,6 +278,16 @@
             padding: 25px 30px;
             border-radius: 12px;
             border-left: 5px solid #4a8fe7;
+        }
+
+        /* Inside accordion body the card loses auto-margin since accordion provides padding */
+        .dept-accordion-body .recommendation {
+            max-width: 100%;
+            margin: 0 0 14px;
+        }
+
+        .dept-accordion-body .recommendation:last-child {
+            margin-bottom: 0;
         }
 
         /* Wavy Background */
@@ -219,7 +313,7 @@
         .sidebar::-webkit-scrollbar-thumb { background: #2a4a7c; border-radius: 3px; }
         .sidebar::-webkit-scrollbar-thumb:hover { background: #4a8fe7; }
 
-        /* ── Dynamic recommendation card styles (ai-development) ── */
+        /* ── Dynamic recommendation card styles (ai-development — unchanged) ── */
         .rec-heading {
             font-size: 15px;
             font-weight: 700;
@@ -367,6 +461,13 @@
     <div class="main-content" :class="{ shifted: sidebarOpen }">
         <div class="logo">
             <h1>CYBERCOMPLY<br/>RECOMMENDATIONS</h1>
+
+            <!-- Batch summary badge — shown only in multi-dept mode -->
+            <div class="batch-summary-badge" v-if="isBatchMode">
+                {{ deptGroups.length }} DEPARTMENT{{ deptGroups.length !== 1 ? 'S' : '' }}
+                &nbsp;·&nbsp;
+                {{ totalRecommendations }} RECOMMENDATION{{ totalRecommendations !== 1 ? 'S' : '' }}
+            </div>
         </div>
 
         <!-- Loading state -->
@@ -374,43 +475,98 @@
             ⏳ Loading recommendations…
         </div>
 
-        <!-- No data / error state (ai-development) -->
-        <div class="no-data-banner" v-if="!isLoading && (loadError || recommendations.length === 0)">
+        <!-- No data / error state -->
+        <div
+            class="no-data-banner"
+            v-if="!isLoading && (loadError || (!isBatchMode && recommendations.length === 0))"
+        >
             ⚠ {{ loadError || 'No analysis result found. Please run a document analysis first from the home page.' }}
         </div>
 
-        <!-- Count label (ai-development) -->
-        <div class="rec-count" v-if="!isLoading && recommendations.length > 0">
-            {{ recommendations.length }} recommendation{{ recommendations.length !== 1 ? 's' : '' }}
-            generated from non-compliant and partially compliant requirements
-        </div>
+        <!-- ── SINGLE FILE MODE: original flat card list ── -->
+        <template v-if="!isLoading && !isBatchMode && recommendations.length > 0">
 
-        <!-- Dynamic recommendation cards (ai-development) -->
-        <div
-            class="recommendation"
-            v-for="(rec, index) in recommendations"
-            :key="rec.requirementId"
-        >
-            <!-- Clause title + risk badge -->
-            <div class="rec-heading">
-                <span>{{ index + 1 }}. {{ rec.clauseTitle }}</span>
-                <span class="risk-badge" :class="`risk-${rec.riskLevel}`">{{ rec.riskLevel }}</span>
+            <div class="rec-count">
+                {{ recommendations.length }} recommendation{{ recommendations.length !== 1 ? 's' : '' }}
+                generated from non-compliant and partially compliant requirements
             </div>
 
-            <!-- AI reasoning for why this clause is non-compliant -->
-            <div class="rec-reasoning">{{ rec.reasoning }}</div>
-
-            <!-- Actionable steps derived from PDPA requirement text -->
-            <div class="rec-steps-label">Steps to Achieve Compliance</div>
-            <ul class="rec-steps">
-                <li v-for="step in rec.steps" :key="step">{{ step }}</li>
-            </ul>
-
-            <!-- PDPA Act reference -->
-            <div class="rec-reference">
-                Personal Data Protection Act No. 9 of 2022 (Sri Lanka) — {{ rec.reference }}
+            <div
+                class="recommendation"
+                v-for="(rec, index) in recommendations"
+                :key="rec.requirementId"
+            >
+                <div class="rec-heading">
+                    <span>{{ index + 1 }}. {{ rec.clauseTitle }}</span>
+                    <span class="risk-badge" :class="`risk-${rec.riskLevel}`">{{ rec.riskLevel }}</span>
+                </div>
+                <div class="rec-reasoning">{{ rec.reasoning }}</div>
+                <div class="rec-steps-label">Steps to Achieve Compliance</div>
+                <ul class="rec-steps">
+                    <li v-for="step in rec.steps" :key="step">{{ step }}</li>
+                </ul>
+                <div class="rec-reference">
+                    Personal Data Protection Act No. 9 of 2022 (Sri Lanka) — {{ rec.reference }}
+                </div>
             </div>
-        </div>
+
+        </template>
+
+        <!-- ── BATCH MODE: one collapsible accordion per department ── -->
+        <template v-if="!isLoading && isBatchMode">
+
+            <div
+                class="dept-accordion"
+                v-for="(group, gi) in deptGroups"
+                :key="group.deptName"
+            >
+                <!-- Accordion header — click to expand/collapse -->
+                <div class="dept-accordion-header" @click="toggleGroup(gi)">
+                    <div class="dept-accordion-left">
+                        <span class="dept-accordion-name">{{ group.deptName }}</span>
+                        <span class="dept-accordion-count">
+                            {{ group.recommendations.length }}
+                            recommendation{{ group.recommendations.length !== 1 ? 's' : '' }}
+                        </span>
+                    </div>
+                    <span class="dept-accordion-chevron" :class="{ open: group.expanded }">&#8964;</span>
+                </div>
+
+                <!-- Accordion body — individual recommendation cards -->
+                <div class="dept-accordion-body" :class="{ open: group.expanded }">
+
+                    <div
+                        class="recommendation"
+                        v-for="(rec, index) in group.recommendations"
+                        :key="rec.requirementId"
+                    >
+                        <div class="rec-heading">
+                            <span>{{ index + 1 }}. {{ rec.clauseTitle }}</span>
+                            <span class="risk-badge" :class="`risk-${rec.riskLevel}`">{{ rec.riskLevel }}</span>
+                        </div>
+                        <div class="rec-reasoning">{{ rec.reasoning }}</div>
+                        <div class="rec-steps-label">Steps to Achieve Compliance</div>
+                        <ul class="rec-steps">
+                            <li v-for="step in rec.steps" :key="step">{{ step }}</li>
+                        </ul>
+                        <div class="rec-reference">
+                            Personal Data Protection Act No. 9 of 2022 (Sri Lanka) — {{ rec.reference }}
+                        </div>
+                    </div>
+
+                    <!-- Empty state for a fully compliant department -->
+                    <div
+                        v-if="group.recommendations.length === 0"
+                        style="padding: 20px 0; font-size: 13px; color: #4caf50; letter-spacing: 0.5px;"
+                    >
+                        ✓ This department is fully compliant — no recommendations at this time.
+                    </div>
+
+                </div>
+            </div>
+
+        </template>
+
     </div>
 
     <!-- Wavy Background -->
@@ -428,8 +584,6 @@
     // ── Helpers (ai-development — fully preserved) ────────────────────────────
 
     // Builds a human-readable PDPA reference string from a requirement object.
-    // e.g. { section: 6, subsection: 1, clause: 'a', clause_title: '...' }
-    //   → "Section 6(1)(a) — <clause_title>"
     function buildReference(req) {
         let ref = `Section ${req.section}`;
         if (req.subsection) ref += `(${req.subsection})`;
@@ -439,7 +593,6 @@
     }
 
     // Rephrases legal third-person language into second-person action language.
-    // e.g. "Every controller shall ensure..." → "Ensure that the organisation..."
     function actionify(text) {
         return text
             .replace(/^Every controller shall\s+/i,  'Ensure that the organisation ')
@@ -456,14 +609,9 @@
     }
 
     // Transforms a legal requirement string into plain-English action steps.
-    // 1. Splits on lettered sub-clauses (a), (b), (c)... when 2+ are present
-    // 2. Otherwise splits on ". " for multi-sentence requirements
-    // 3. Appends one schedule condition as an extra step if available
-    // 4. Capped at 4 steps to keep cards concise
     function deriveSteps(req) {
         const raw = req.requirement;
         const steps = [];
-
         const subClauseMatches = [...raw.matchAll(/\([a-z]\)\s+/g)];
 
         if (subClauseMatches.length >= 2) {
@@ -479,7 +627,6 @@
             }
         }
 
-        // Supplement with one schedule condition if steps are sparse
         if (req.schedule_content && steps.length < 4) {
             for (const [, sched] of Object.entries(req.schedule_content)) {
                 if (sched.conditions && sched.conditions.length > 0) {
@@ -498,6 +645,67 @@
             : [`Implement controls to satisfy: ${raw.substring(0, 150)}...`];
     }
 
+    // Builds a recommendation card object from a compliance detail item + pdpaIndex.
+    // Includes backend-ready fields needed for the DB save step.
+    function buildRecCard(d, pdpaIndex) {
+        const req       = pdpaIndex[d.requirement_id];
+        const steps     = req
+            ? deriveSteps(req)
+            : [`Address the requirements under ${d.requirement_id}.`];
+        const reference = req ? buildReference(req) : d.requirement_id;
+        return {
+            requirementId:       d.requirement_id,
+            clauseTitle:         d.clause || (req?.clause_title ?? d.requirement_id),
+            reasoning:           d.reasoning,
+            riskLevel:           d.risk_level || 'unknown',
+            steps,
+            reference,
+            // backend-ready fields (used in saveRecommendations)
+            recommendation_text: d.reasoning,
+            act_name:            d.clause || (req?.clause_title ?? d.requirement_id),
+            status:              (d.risk_level || 'unknown').toUpperCase(),
+            steps_to_achieve:    steps,
+            section:             reference
+        };
+    }
+
+    // ── Saves recommendations to the backend DB for a given result_id ─────────
+    // Uses a sessionStorage flag per result_id to avoid duplicate saves on
+    // page re-visits. Called from both loadSingle() and loadBatch().
+    async function saveRecommendations(token, resultId, recs) {
+        const alreadySaved = sessionStorage.getItem(`recsSaved_${resultId}`);
+        if (!recs.length || !resultId || alreadySaved) return;
+
+        try {
+            const payload = {
+                result_id: resultId,
+                recommendations: recs.map(rec => ({
+                    recommendation_text: rec.recommendation_text,
+                    act_name:            rec.act_name,
+                    status:              rec.status,
+                    steps_to_achieve:    rec.steps_to_achieve,
+                    section:             rec.section
+                }))
+            };
+            const saveRes = await fetch(`${BASE}/api/recommendations/save/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            if (saveRes.ok) {
+                console.log(`[INFO] Recommendations saved to DB for result ${resultId}.`);
+                sessionStorage.setItem(`recsSaved_${resultId}`, '1');
+            } else {
+                console.warn('[WARN] Failed to save recommendations:', await saveRes.text());
+            }
+        } catch (saveErr) {
+            console.warn('[WARN] Could not save recommendations to DB:', saveErr.message);
+        }
+    }
+
     // ── Vue App ───────────────────────────────────────────────────────────────
 
     const app = createApp({
@@ -510,13 +718,27 @@
                 // Path: ../AIModel/data/pdpa_requirements_full.json
                 pdpaIndex: {},
 
-                // Recommendation cards — built from the DB result
+                // ── Single file mode fields ──
+                // isBatchMode=false: flat list rendered directly
                 recommendations: [],
+
+                // ── Batch mode fields ──
+                // isBatchMode=true: array of dept groups rendered as accordions
+                // Each entry: { deptName, recommendations: [...], expanded: bool }
+                isBatchMode: false,
+                deptGroups:  [],
 
                 // Loading / error state
                 isLoading: true,
                 loadError: ''
             };
+        },
+
+        computed: {
+            // Total recommendation count across all departments (batch mode only)
+            totalRecommendations() {
+                return this.deptGroups.reduce((sum, g) => sum + g.recommendations.length, 0);
+            }
         },
 
         async mounted() {
@@ -529,7 +751,7 @@
 
             SessionManager.init({ timeoutMs: 1200000 });
 
-            // ── Step 1: Load PDPA requirements JSON from local file ─────
+            // ── Load PDPA requirements JSON from local file ─────────────
             // Static file fetch — identical to ai-development approach.
             // Not served by Django; lives at ../AIModel/data/ relative to frontend.
             const PDPA_PATH = '../AIModel/data/pdpa_requirements_full.json';
@@ -548,125 +770,170 @@
                 console.warn('[WARN] Could not load PDPA JSON:', e.message);
             }
 
-            // ── Step 2: Fetch compliance details from DB ────────────────
-            // Replaces the localStorage read from ai-development.
-            // Reads latestResultId written by home.html after analysis save.
-            // Falls back to /latest/ if none is stored.
-            const resultId = sessionStorage.getItem('latestResultId');
-            const url = resultId
-                ? `${BASE}/api/analysis/${resultId}/`
-                : `${BASE}/api/analysis/latest/`;
+            // ── Detect mode: batch or single ───────────────────────────
+            // batchResultIds takes priority (written by home.html on batch_complete).
+            // latestResultId is the single-file path (unchanged behaviour).
+            const batchIdsRaw = sessionStorage.getItem('batchResultIds');
+            const singleId    = sessionStorage.getItem('latestResultId');
 
-            try {
-                const res = await fetch(url, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (res.status === 401 || res.status === 403) {
-                    sessionStorage.clear();
-                    window.location.href = 'login.html';
-                    return;
-                }
-
-                if (!res.ok) {
-                    this.loadError = 'No analysis results found. Please upload and analyse a document first.';
-                    this.isLoading = false;
-                    return;
-                }
-
-                const data = await res.json();
-
-                // data.compliance.details has the same shape that was previously
-                // stored in localStorage under result.compliance.details —
-                // so all the card-building logic below is identical to ai-development.
-                const details = data.compliance?.details || [];
-
-                // ── Step 3: Filter, sort, and build recommendation cards ──
-                // Identical logic to ai-development — only the data source changed.
-                const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
-
-                const flagged = details
-                    .filter(d => d.status === 'non_compliant' || d.status === 'partial')
-                    .sort((a, b) =>
-                        (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4)
-                    );
-
-                this.recommendations = flagged.map(d => {
-                    const req = this.pdpaIndex[d.requirement_id];
-                    const steps = req
-                        ? deriveSteps(req)
-                        : [`Address the requirements under ${d.requirement_id}.`];
-                    const reference = req ? buildReference(req) : d.requirement_id;
-                    return {
-                        requirementId:   d.requirement_id,
-                        clauseTitle:     d.clause || (req?.clause_title ?? d.requirement_id),
-                        reasoning:       d.reasoning,
-                        riskLevel:       d.risk_level || 'unknown',
-                        steps:           steps,
-                        reference:       reference,
-                        // backend-ready fields (used in saveRecommendations below)
-                        recommendation_text: d.reasoning,
-                        act_name:            d.clause || (req?.clause_title ?? d.requirement_id),
-                        status:              (d.risk_level || 'unknown').toUpperCase(),
-                        steps_to_achieve:    steps,
-                        section:             reference
-                    };
-                });
-
-                console.log('[INFO] Recommendations built —', this.recommendations.length, 'cards');
-                
-
-                // ── Step 4: Save recommendations to the backend DB ────────
-                const alreadySaved = sessionStorage.getItem(`recsSaved_${resultId}`);
-                if (this.recommendations.length > 0 && resultId && !alreadySaved) {
-                    try {
-                        const payload = {
-                            result_id: resultId,
-                            recommendations: this.recommendations.map(rec => ({
-                                recommendation_text: rec.recommendation_text,
-                                act_name:            rec.act_name,
-                                status:              rec.status,
-                                steps_to_achieve:    rec.steps_to_achieve,
-                                section:             rec.section
-                            }))
-                        };
-                        const saveRes = await fetch(`${BASE}/api/recommendations/save/`, {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${token}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(payload)
-                        });
-                        if (saveRes.ok) {
-                            console.log('[INFO] Recommendations saved to DB successfully.');
-                            sessionStorage.setItem(`recsSaved_${resultId}`, '1');
-                        } else {
-                            console.warn('[WARN] Failed to save recommendations:', await saveRes.text());
-                        }
-                    } catch (saveErr) {
-                        console.warn('[WARN] Could not save recommendations to DB:', saveErr.message);
-                    }
-                }
-
-            } catch (e) {
-                console.error('Failed to load recommendations:', e);
-                this.loadError = 'Could not reach the server. Please check your connection.';
-            } finally {
-                this.isLoading = false;
+            if (batchIdsRaw) {
+                await this.loadBatch(token, batchIdsRaw);
+            } else {
+                await this.loadSingle(token, singleId);
             }
         },
 
         methods: {
-            showProfile() {
-                window.location.href = 'profile.html';
+
+            // ── Batch loader ──────────────────────────────────────────────
+            // Fetches the full compliance details for each result_id individually,
+            // builds per-dept recommendation cards, and saves each dept's
+            // recommendations to the backend DB before moving to the next.
+            async loadBatch(token, batchIdsRaw) {
+                let resultIds = [];
+                try {
+                    resultIds = JSON.parse(batchIdsRaw);
+                } catch {
+                    this.loadError = 'Batch result data is corrupted. Please re-run the analysis.';
+                    this.isLoading = false;
+                    return;
+                }
+
+                if (!Array.isArray(resultIds) || resultIds.length === 0) {
+                    this.loadError = 'No batch results found. Please re-run the analysis.';
+                    this.isLoading = false;
+                    return;
+                }
+
+                const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+
+                try {
+                    const groups = [];
+
+                    for (let i = 0; i < resultIds.length; i++) {
+                        const rid = resultIds[i];
+                        try {
+                            const res = await fetch(`${BASE}/api/analysis/${rid}/`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+
+                            if (res.status === 401 || res.status === 403) {
+                                sessionStorage.clear();
+                                window.location.href = 'login.html';
+                                return;
+                            }
+
+                            if (!res.ok) {
+                                console.warn(`[WARN] Could not fetch result ${rid} — skipping`);
+                                continue;
+                            }
+
+                            const data     = await res.json();
+                            const details  = data.compliance?.details || [];
+                            const deptName = data.department || data.dept_name || `Department ${i + 1}`;
+
+                            const flagged = details
+                                .filter(d => d.status === 'non_compliant' || d.status === 'partial')
+                                .sort((a, b) =>
+                                    (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4)
+                                );
+
+                            const recs = flagged.map(d => buildRecCard(d, this.pdpaIndex));
+
+                            // ── Save this dept's recommendations to the DB ──
+                            await saveRecommendations(token, rid, recs);
+
+                            groups.push({
+                                deptName,
+                                recommendations: recs,
+                                // First dept auto-expanded, rest collapsed
+                                expanded: i === 0
+                            });
+
+                        } catch (e) {
+                            console.warn(`[WARN] Failed to load result ${rid}:`, e.message);
+                        }
+                    }
+
+                    if (groups.length === 0) {
+                        this.loadError = 'No recommendation data found. Please re-run the analysis.';
+                        this.isLoading = false;
+                        return;
+                    }
+
+                    this.isBatchMode = true;
+                    this.deptGroups  = groups;
+                    console.log('[INFO] Batch recommendations built —', groups.length, 'departments');
+
+                } catch (e) {
+                    console.error('Failed to load batch recommendations:', e);
+                    this.loadError = 'Could not reach the server. Please check your connection.';
+                } finally {
+                    this.isLoading = false;
+                }
             },
-            goBack() {
-                window.location.href = 'document_analysis.html';
+
+            // ── Single file loader ────────────────────────────────────────
+            // Original logic from database branch — fetches a single result,
+            // builds recommendation cards, and saves them to the backend DB.
+            async loadSingle(token, resultId) {
+                const url = resultId
+                    ? `${BASE}/api/analysis/${resultId}/`
+                    : `${BASE}/api/analysis/latest/`;
+
+                const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+
+                try {
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (res.status === 401 || res.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (!res.ok) {
+                        this.loadError = 'No analysis results found. Please upload and analyse a document first.';
+                        this.isLoading = false;
+                        return;
+                    }
+
+                    const data    = await res.json();
+                    const details = data.compliance?.details || [];
+
+                    const flagged = details
+                        .filter(d => d.status === 'non_compliant' || d.status === 'partial')
+                        .sort((a, b) =>
+                            (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4)
+                        );
+
+                    this.recommendations = flagged.map(d => buildRecCard(d, this.pdpaIndex));
+                    console.log('[INFO] Recommendations built —', this.recommendations.length, 'cards');
+
+                    // ── Save recommendations to the backend DB ────────────
+                    // Uses the result_id from the fetched data if available,
+                    // otherwise falls back to the sessionStorage value.
+                    const savedResultId = data.result_id || resultId;
+                    await saveRecommendations(token, savedResultId, this.recommendations);
+
+                } catch (e) {
+                    console.error('Failed to load recommendations:', e);
+                    this.loadError = 'Could not reach the server. Please check your connection.';
+                } finally {
+                    this.isLoading = false;
+                }
             },
-            goHome() {
-                window.location.href = 'home.html';
-            }
+
+            // ── Toggle a department accordion open/closed ─────────────────
+            toggleGroup(index) {
+                this.deptGroups[index].expanded = !this.deptGroups[index].expanded;
+            },
+
+            showProfile() { window.location.href = 'profile.html'; },
+            goBack()      { window.location.href = 'document_analysis.html'; },
+            goHome()      { window.location.href = 'home.html'; }
         }
     });
 

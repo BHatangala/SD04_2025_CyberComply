@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -195,6 +196,20 @@
             font-weight: 400;
         }
 
+        /* ─── Batch badge (shown below subtitle in batch mode) ─── */
+        .batch-badge {
+            display: inline-block;
+            margin-top: 10px;
+            background: rgba(74, 143, 231, 0.15);
+            border: 1px solid rgba(74, 143, 231, 0.35);
+            color: #4a8fe7;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            padding: 5px 16px;
+            border-radius: 20px;
+        }
+
         /* ─── Content Container ─── */
         .content-container {
             max-width: 1000px;
@@ -322,6 +337,29 @@
             transition: width 1s ease-in-out;
         }
 
+        /* ─── Per-department score chips (batch mode) ─── */
+        .dept-chips-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .dept-chip {
+            background: rgba(74, 143, 231, 0.1);
+            border: 1px solid rgba(74, 143, 231, 0.25);
+            border-radius: 20px;
+            padding: 5px 14px;
+            font-size: 12px;
+            color: #8bb8f0;
+            letter-spacing: 0.3px;
+        }
+
+        .dept-chip strong {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
         /* ─── Recommendations List ─── */
         .recommendations-list {
             padding: 18px 28px;
@@ -359,6 +397,64 @@
         .recommendations-section .section-header {
             align-items: flex-start;
             padding-top: 42px;
+        }
+
+        /* ─── Collapsible department sub-box (batch mode) ─── */
+        .dept-rec-box {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(74, 143, 231, 0.18);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .dept-rec-box:last-child {
+            margin-bottom: 0;
+        }
+
+        .dept-rec-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            user-select: none;
+        }
+
+        .dept-rec-header:hover {
+            background: rgba(74, 143, 231, 0.08);
+        }
+
+        .dept-rec-name {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #c5d0e6;
+        }
+
+        .dept-rec-chevron {
+            font-size: 14px;
+            color: #4a8fe7;
+            transition: transform 0.25s ease;
+            line-height: 1;
+        }
+
+        .dept-rec-chevron.open {
+            transform: rotate(180deg);
+        }
+
+        .dept-rec-body {
+            padding: 0 16px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+
+        .dept-rec-body.open {
+            max-height: 2000px;
+            padding: 4px 16px 14px;
         }
 
         /* ─── Action Buttons ─── */
@@ -439,6 +535,7 @@
             gap: 10px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.45);
             white-space: nowrap;
+            will-change: opacity, transform;
         }
 
         .access-toast.visible {
@@ -582,7 +679,7 @@
     </style>
 </head>
 <body>
-    <div id="app">
+    <div id="app" :data-ready="ready ? 'true' : 'false'">
         <!-- Top Header -->
         <div class="top-header">
             <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
@@ -613,11 +710,44 @@
                     </svg>
                 </div>
                 <div class="document-title">DOCUMENT ANALYSIS</div>
-                <div class="document-subtitle">{{ analysedCompany }} — COMPLIANCE ANALYSIS REPORT</div>
+
+                <!--
+                    Subtitle changes depending on mode.
+                    Single file: "ORG — COMPLIANCE ANALYSIS REPORT" (original behaviour)
+                    Batch: "ORG — COMBINED COMPLIANCE ANALYSIS REPORT"
+                -->
+                <div class="document-subtitle" v-if="!isBatchMode">
+                    {{ analysedCompany }} — COMPLIANCE ANALYSIS REPORT
+                </div>
+                <div class="document-subtitle" v-if="isBatchMode">
+                    {{ analysedCompany ? analysedCompany + ' — ' : '' }}COMBINED COMPLIANCE ANALYSIS REPORT
+                </div>
+
+                <!-- Badge showing number of departments — batch mode only -->
+                <div class="batch-badge" v-if="isBatchMode">
+                    {{ deptCount }} DEPARTMENT{{ deptCount !== 1 ? 'S' : '' }} ANALYSED
+                </div>
             </div>
 
             <!-- Content Container -->
             <div class="content-container">
+
+                <!-- Error banner -->
+                <div v-if="loadError" style="
+                    max-width: 900px;
+                    margin: 0 auto 28px;
+                    background: rgba(231,74,74,0.08);
+                    border: 1px solid rgba(231,74,74,0.25);
+                    border-radius: 10px;
+                    padding: 18px 24px;
+                    font-size: 14px;
+                    color: #e74a4a;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                ">
+                    ⚠ {{ loadError }}
+                </div>
 
                 <!-- Compliance Score Section -->
                 <div class="compliance-section">
@@ -632,13 +762,39 @@
                         </button>
                     </div>
                     <div class="compliance-details">
-                        <div class="compliance-item">{{ complianceScore }}% &nbsp;—&nbsp; {{ complianceLabel }}</div>
-                        <div class="compliance-bar-wrapper">
-                            <div class="compliance-bar-label">COMPLIANCE SCORE</div>
-                            <div class="compliance-bar-track">
-                                <div class="compliance-bar-fill" :style="{ width: barWidth }"></div>
+
+                        <!-- ── Single file mode: original layout ── -->
+                        <template v-if="!isBatchMode">
+                            <div class="compliance-item">{{ complianceScore }}% &nbsp;—&nbsp; {{ complianceLabel }}</div>
+                            <div class="compliance-bar-wrapper">
+                                <div class="compliance-bar-label">COMPLIANCE SCORE</div>
+                                <div class="compliance-bar-track">
+                                    <div class="compliance-bar-fill" :style="{ width: barWidth }"></div>
+                                </div>
                             </div>
-                        </div>
+                        </template>
+
+                        <!-- ── Batch mode: combined score + per-dept chips ── -->
+                        <template v-if="isBatchMode">
+                            <div class="compliance-item">{{ complianceScore }}% &nbsp;—&nbsp; {{ complianceLabel }}</div>
+                            <div class="compliance-bar-wrapper">
+                                <div class="compliance-bar-label">AVERAGE COMPLIANCE SCORE ACROSS ALL {{ isAdmin ? 'DEPARTMENTS' : 'DOCUMENTS' }}</div>
+                                <div class="compliance-bar-track">
+                                    <div class="compliance-bar-fill" :style="{ width: barWidth }"></div>
+                                </div>
+                            </div>
+                            <!-- Per-department score chips -->
+                            <div class="dept-chips-row">
+                                <div
+                                    class="dept-chip"
+                                    v-for="dept in batchDepartments"
+                                    :key="dept.id"
+                                >
+                                    {{ dept.dept_name === 'Unknown Department' ? dept.file_name : dept.dept_name }} — <strong>{{ dept.compliance_score }}%</strong>
+                                </div>
+                            </div>
+                        </template>
+
                     </div>
                 </div>
 
@@ -658,19 +814,62 @@
                             Recommendations
                         </button>
                     </div>
+
                     <div class="recommendations-list">
-                        <!-- Per-clause findings from AI -->
-                        <div
-                            class="recommendation-item"
-                            v-for="detail in complianceDetails"
-                            :key="detail.requirement_id"
-                        >
-                            <strong>{{ detail.clause }}</strong>
-                            <span>{{ detail.reasoning }}</span>
-                        </div>
-                        <div v-if="!topRecommendation && complianceDetails.length === 0" class="recommendation-item">
-                            No recommendations available.
-                        </div>
+
+                        <!-- ── Single file mode: original flat list ── -->
+                        <template v-if="!isBatchMode">
+                            <div
+                                class="recommendation-item"
+                                v-for="detail in complianceDetails"
+                                :key="detail.requirement_id"
+                            >
+                                <strong>{{ detail.clause }}</strong>
+                                <span>{{ detail.reasoning }}</span>
+                            </div>
+                            <div v-if="!topRecommendation && complianceDetails.length === 0" class="recommendation-item">
+                                No recommendations available.
+                            </div>
+                        </template>
+
+                        <!-- ── Batch mode: one collapsible sub-box per department ── -->
+                        <template v-if="isBatchMode">
+                            <div
+                                class="dept-rec-box"
+                                v-for="(dept, index) in batchDepartments"
+                                :key="dept.id"
+                            >
+                                <!-- Sub-box header — click to expand/collapse -->
+                                <div class="dept-rec-header" @click="toggleDept(index)">
+                                    <span class="dept-rec-name">{{ dept.dept_name === 'Unknown Department' ? dept.file_name : dept.dept_name }}</span>
+                                    <span class="dept-rec-chevron" :class="{ open: dept.expanded }">&#8964;</span>
+                                </div>
+
+                                <!-- Sub-box body — collapses/expands via CSS transition -->
+                                <div class="dept-rec-body" :class="{ open: dept.expanded }">
+
+                                    <!-- Compliant department -->
+                                    <div
+                                        v-if="dept.all_recommendations.length === 0"
+                                        class="recommendation-item"
+                                    >
+                                        This {{ isAdmin ? 'department' : 'document' }} is fully compliant — no recommendations at this time.
+                                    </div>
+
+                                    <!-- Non-compliant / partial findings -->
+                                    <div
+                                        class="recommendation-item"
+                                        v-for="rec in dept.all_recommendations"
+                                        :key="rec.reference"
+                                    >
+                                        <strong>{{ rec.clause }}</strong>
+                                        <span>{{ rec.reasoning }}</span>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </template>
+
                     </div>
                 </div>
 
@@ -742,26 +941,34 @@
                     toastVisible: false,
                     toastTimer: null,
 
-                    // ── AI Result Fields ──
+                    // ── Mode flag ──
+                    // true when the user arrived after a multi-file batch analysis.
+                    // Drives all v-if branches in the template.
+                    isBatchMode: false,
+
+                    // ── Batch mode fields ──
+                    // batchDepartments: array of dept objects from get_org_comparison,
+                    // each extended with an `expanded` flag for the collapsible sub-box.
+                    batchDepartments: [],
+                    deptCount: 0,
+
+                    // ── AI Result Fields (used in both modes) ──
                     complianceScore: 0,
                     complianceLabel: 'Loading...',
                     barWidth: '0%',
                     analysedFilename: 'DOCUMENT ANALYSIS',
                     analysedCompany: '',
                     topRecommendation: '',
-                    complianceDetails: [],
-
-                    // ── Sidebar History ──
-                    last7Days: [],
-                    last30Days: [],
-                    filteredLast7Days: [],
-                    filteredLast30Days: [],
+                    complianceDetails: [],   // single-file mode only
 
                     // Loading / error state
                     isLoading: true,
-                    loadError: ''
+                    loadError: '',
+
+                    ready: false
                 }
             },
+
             async mounted() {
                 const token = sessionStorage.getItem('authToken');
                 if (!token) {
@@ -776,75 +983,168 @@
                 // Session timeout — 30 min because analysis can take ~20 min
                 SessionManager.init({ timeoutMs: 1800000 });
 
-                // ── Determine which result to display ────────────────────
-                // Prefer an explicit result_id written by home.html after save.
-                // Fall back to /api/analysis/latest/ if none is stored.
-                const resultId = sessionStorage.getItem('latestResultId');
-                const url = resultId
-                    ? `${BASE}/api/analysis/${encodeURIComponent(resultId)}/`
-                    : `${BASE}/api/analysis/latest/`;
+                // ── Detect which mode to use ──────────────────────────────
+                // batchResultIds written by home.html on batch_complete takes priority.
+                // latestResultId is the single-file path (unchanged behaviour).
+                const batchIdsRaw = sessionStorage.getItem('batchResultIds');
+                const singleId    = sessionStorage.getItem('latestResultId');
 
-                try {
-                    const res = await fetch(url, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
+                if (batchIdsRaw) {
+                    // ── BATCH MODE ────────────────────────────────────────
+                    await this.loadBatchResults(token, batchIdsRaw);
+                } else {
+                    // ── SINGLE FILE MODE ──────────────────────────────────
+                    await this.loadSingleResult(token, singleId);
+                }
+            },
 
-                    if (res.status === 401 || res.status === 403) {
-                        sessionStorage.clear();
-                        window.location.href = 'login.html';
-                        return;
-                    }
+            methods: {
 
-                    if (!res.ok) {
-                        this.loadError = 'No analysis results found. Please upload and analyse a document first.';
-                        this.complianceLabel = 'No results yet';
+                // ── Batch result loader ──────────────────────────────────
+                async loadBatchResults(token, batchIdsRaw) {
+                    let resultIds = [];
+                    try {
+                        resultIds = JSON.parse(batchIdsRaw);
+                    } catch {
+                        this.loadError = 'Batch result data is corrupted. Please re-run the analysis.';
                         this.isLoading = false;
                         return;
                     }
 
-                    const data = await res.json();
-
-                    // ── Populate UI fields ────────────────────────────────
-                    this.analysedFilename = data.original_filename || 'Document Analysis';
-                    this.analysedCompany = data.company_name || '';
-                    this.complianceScore  = Math.round(data.compliance_score ?? 0);
-                    this.complianceLabel  = data.compliance_label || (
-                        this.complianceScore >= 75 ? 'High Compliance Level' :
-                        this.complianceScore >= 40 ? 'Medium Compliance Level' :
-                                                     'Low Compliance Level'
-                    );
-
-                    // Per-clause details for the Recommendations panel
-                    this.complianceDetails = (
-                        (data.compliance?.details || []).filter(
-                            d => d.status === 'non-compliant'
-                              || d.status === 'partial'
-                              || d.status === 'non_compliant'
-                        )
-                    );
-
-                    // Top-level recommendation from the AI payload
-                    this.topRecommendation = data.recommendations?.top_action || '';
-
-                    // Store result_id so sub-pages (compliance, recommendations) can pick it up
-                    if (data.result_id) {
-                        sessionStorage.setItem('latestResultId', data.result_id);
+                    if (!Array.isArray(resultIds) || resultIds.length === 0) {
+                        this.loadError = 'No batch results found. Please re-run the analysis.';
+                        this.isLoading = false;
+                        return;
                     }
 
-                    // Animate progress bar
-                    setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 300);
+                    try {
+                        const url = `${BASE}/api/analysis/org-comparison/?result_ids=${resultIds.join(',')}`;
+                        const res = await fetch(url, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
 
-                } catch (e) {
-                    console.error('Failed to load analysis result:', e);
-                    this.loadError = 'Could not reach the server. Please check your connection.';
-                } finally {
-                    this.isLoading = false;
-                }
+                        if (res.status === 401 || res.status === 403) {
+                            sessionStorage.clear();
+                            window.location.href = 'login.html';
+                            return;
+                        }
 
-                // ── Populate sidebar history ──────────────────────────────
-                await this.fetchHistory(token);
-            },
-            methods: {
+                        if (!res.ok) {
+                            this.loadError = 'Could not load batch results. Please re-run the analysis.';
+                            this.isLoading = false;
+                            return;
+                        }
+
+                        const data = await res.json();
+
+                        this.isBatchMode     = true;
+                        this.analysedCompany = data.org_name || '';
+
+                        // Each dept gets an `expanded: false` flag for the collapsible sub-box.
+                        this.batchDepartments = (data.departments || []).map(d => ({
+                            ...d,
+                            expanded: false
+                        }));
+
+                        this.deptCount = this.batchDepartments.length;
+
+                        // Combined score = simple average of all department scores
+                        if (this.deptCount > 0) {
+                            const total = this.batchDepartments.reduce((sum, d) => sum + d.compliance_score, 0);
+                            this.complianceScore = Math.round(total / this.deptCount);
+                        } else {
+                            this.complianceScore = 0;
+                        }
+
+                        this.complianceLabel = (
+                            this.complianceScore >= 75 ? 'High Compliance Level' :
+                            this.complianceScore >= 40 ? 'Medium Compliance Level' :
+                                                         'Low Compliance Level'
+                        );
+
+                        // Animate progress bar
+                        setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 300);
+
+                    } catch (e) {
+                        console.error('Failed to load batch results:', e);
+                        this.loadError = 'Could not reach the server. Please check your connection.';
+                    } finally {
+                        this.isLoading = false;
+                        this.ready = true;
+                    }
+                },
+
+                // ── Single file result loader ────────────────────────────
+                async loadSingleResult(token, resultId) {
+                    const url = resultId
+                        ? `${BASE}/api/analysis/${resultId}/`
+                        : `${BASE}/api/analysis/latest/`;
+
+                    try {
+                        const res = await fetch(url, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        if (res.status === 401 || res.status === 403) {
+                            sessionStorage.clear();
+                            window.location.href = 'login.html';
+                            return;
+                        }
+
+                        if (!res.ok) {
+                            this.loadError = 'No analysis results found. Please upload and analyse a document first.';
+                            this.complianceLabel = 'No results yet';
+                            this.isLoading = false;
+                            return;
+                        }
+
+                        const data = await res.json();
+
+                        // ── Populate UI fields ────────────────────────────────
+                        this.analysedFilename = data.original_filename || 'Document Analysis';
+                        this.analysedCompany  = data.company_name || '';
+                        this.complianceScore  = Math.round(data.compliance_score ?? 0);
+                        this.complianceLabel  = data.compliance_label || (
+                            this.complianceScore >= 75 ? 'High Compliance Level' :
+                            this.complianceScore >= 40 ? 'Medium Compliance Level' :
+                                                         'Low Compliance Level'
+                        );
+
+                        // Per-clause details for the Recommendations panel
+                        this.complianceDetails = (
+                            (data.compliance?.details || []).filter(
+                                d => d.status === 'non-compliant'
+                                  || d.status === 'partial'
+                                  || d.status === 'non_compliant'
+                            )
+                        );
+
+                        // Top-level recommendation from the AI payload
+                        this.topRecommendation = data.recommendations?.top_action || '';
+
+                        // Store result_id so sub-pages can pick it up
+                        if (data.result_id) {
+                            sessionStorage.setItem('latestResultId', data.result_id);
+                        }
+
+                        // Animate progress bar
+                        await Vue.nextTick();
+                        setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 100);
+
+                    } catch (e) {
+                        console.error('Failed to load analysis result:', e);
+                        this.loadError = 'Could not reach the server. Please check your connection.';
+                    } finally {
+                        this.isLoading = false;
+                        this.ready = true;
+                    }
+                },
+
+                // ── Toggle a department sub-box open/closed ──────────────
+                toggleDept(index) {
+                    this.batchDepartments[index].expanded = !this.batchDepartments[index].expanded;
+                },
+
                 toggleSidebar() {
                     this.sidebarOpen = !this.sidebarOpen;
                 },
@@ -856,34 +1156,6 @@
                 },
                 goBack() {
                     window.location.href = 'home.html';
-                },
-
-                // ── Sidebar history navigation ──
-                openReport(report) {
-                    // report may be a history object { resultId, label } or a plain string
-                    const resultId = report.resultId || null;
-                    if (resultId) {
-                        sessionStorage.setItem('latestResultId', resultId);
-                        window.location.href = 'document_analysis.html';
-                    } else {
-                        window.location.href = `report_viewing.html?report=${encodeURIComponent(report.label || report)}`;
-                    }
-                },
-
-                async fetchHistory(token) {
-                    try {
-                        const res = await fetch(`${BASE}/api/analysis/history/`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        if (!res.ok) return;
-                        const data = await res.json();
-                        this.last7Days  = (data.last_7_days  || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
-                        this.last30Days = (data.last_30_days || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
-                        this.filteredLast7Days  = [...this.last7Days];
-                        this.filteredLast30Days = [...this.last30Days];
-                    } catch (e) {
-                        console.warn('Could not load analysis history:', e);
-                    }
                 },
 
                 // ── Compliance Score: open to all ──

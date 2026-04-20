@@ -104,6 +104,7 @@
         /* === MAIN CONTENT AREA === */
         .main-content {
             transition: margin-left 0.3s ease-in-out;
+            will-change: margin-left;
             padding: 60px 40px 60px;
             position: relative;
             z-index: 1;
@@ -135,6 +136,7 @@
             border-radius: 18px;
             border: 1px solid rgba(120,160,255,0.25);
             backdrop-filter: blur(10px);
+            will-change: transform;
             box-shadow:
                 0 25px 60px rgba(0,0,0,0.55),
                 0 0 25px rgba(90,140,255,0.18);
@@ -441,6 +443,7 @@
             z-index: 300;
             backdrop-filter: blur(4px);
             animation: fadeIn 0.2s ease;
+            will-change: opacity;
         }
         
         .delete-modal {
@@ -452,6 +455,7 @@
             width: 92%;
             box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(220, 60, 60, 0.08);
             animation: popIn 0.22s ease;
+            will-change: transform, opacity;
         }
         
         .delete-modal-title {
@@ -636,6 +640,7 @@
             gap: 10px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.45);
             white-space: nowrap;
+            will-change: opacity, transform;
         }
 
         .access-toast.visible {
@@ -685,7 +690,7 @@
         ></cybercomply-sidebar>
 
         <!-- Main Content - User Profile -->
-        <div class="main-content" :class="{ shifted: sidebarOpen }">
+        <div class="main-content" :class="{ shifted: sidebarOpen }" :data-ready="ready ? 'true' : 'false'">
 
             <!-- Profile Avatar -->
             <div class="profile-avatar">
@@ -857,6 +862,7 @@
             data() {
                 return {
                     sidebarOpen: true, // Sidebar visibility state
+                    ready: false, // Component ready state
                     
                     // User Data
                     fullName: '',
@@ -950,6 +956,10 @@
 
                         sessionStorage.setItem('userFullName', data.full_name);
                         sessionStorage.setItem('userEmail', data.email);
+
+                        await this.$nextTick();
+                        this.ready = true;
+                        await this.$nextTick();
                     } catch (err) {
                         console.error('Profile load failed:', err);
                         Swal.fire({
@@ -1183,6 +1193,7 @@
                     }
 
                     sessionStorage.clear();
+                    await this.$nextTick();
                     window.location.href = 'welcome.html';
                 },
                 // Navigates to admin access granting page

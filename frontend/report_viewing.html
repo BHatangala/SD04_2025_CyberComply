@@ -162,7 +162,7 @@
         padding: 30px;
         min-height: calc(100vh - 60px);
         width: min(1100px, calc(100vw - 60px));
-        margin: 0 auto; 
+        margin: 0 auto;
         transition: margin 0.3s ease;
     }
 
@@ -200,7 +200,7 @@
         border-radius: 22px;
         color: #162033;
         overflow: auto;
-        box-shadow: 
+        box-shadow:
           0 24px 60px rgba(0, 0, 0, 0.28),
           inset 0 1px 0 rgba(255, 255, 255, 0.6);
         padding: 28px;
@@ -210,7 +210,6 @@
     .report-actions {
         position: fixed;
         bottom: 70px;
-        /* Center within remaining right-side space */
         right: 30px;
         display: flex;
         flex-direction: column;
@@ -376,7 +375,7 @@
 
     .item-card:hover{
        background: #eff1f2;
-       transform: translateY(-1px); 
+       transform: translateY(-1px);
     }
 
     .item-index {
@@ -740,6 +739,12 @@
                           <div class="summary-value">{{ currentSnapshot.metadata?.company || '—' }}</div>
                       </div>
 
+                      <!-- ── NEW: Department card (only when present) ── -->
+                      <div v-if="currentSnapshot.metadata?.department" class="summary-card">
+                          <div class="summary-label">Department</div>
+                          <div class="summary-value">{{ currentSnapshot.metadata.department }}</div>
+                      </div>
+
                       <div class="summary-card">
                           <div class="summary-label">Risk Level</div>
                           <div class="summary-value">
@@ -930,10 +935,10 @@
     <div class="report-actions" :class="{ shifted: sidebarOpen }">
 
       <div class="action-btn-wrapper">
-        <button 
-          class="download-btn" 
+        <button
+          class="download-btn"
           :class="{ locked: !isAdmin }"
-          @click="isAdmin ? downloadReport() : null" 
+          @click="isAdmin ? downloadReport() : null"
           title="Download Report">
           <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
               <path d="M5 20h14v-2H5v2zm7-18v12l4-4h-3V2h-2v8H8l4 4z"/>
@@ -945,10 +950,10 @@
       </div>
 
       <div class="action-btn-wrapper">
-        <button 
-          class="share-btn" 
+        <button
+          class="share-btn"
           :class="{ locked: !isAdmin }"
-          @click="isAdmin ? shareReport() : null" 
+          @click="isAdmin ? shareReport() : null"
           title="Share Report">
           <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
             <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11c.53.5 1.23.81 2.07.81 1.66 0 3-1.34 3-3S19.66 2 18 2s-3 1.34-3 3c0 .24.03.47.09.7l-7.02 4.11c-.53-.5-1.23-.81-2.07-.81-1.66 0-3 1.34-3 3s1.34 3 3 3c.84 0 1.54-.31 2.07-.81l7.13 4.16c-.06.21-.1.43-.1.65 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/>
@@ -963,7 +968,7 @@
 
     <div class="wavy-background">
       <img src="img1.png" alt="Wavy Design">
-  </div> 
+  </div>
 
 </div>
 
@@ -1024,7 +1029,6 @@ const app = createApp({
     const generate = params.get('generate');  // 'true' when coming from document_analysis
 
     if (generate === 'true') {
-      // ── Generate a new report from the latest saved analysis result ──
       await this.generateReport(token);
       return;
     }
@@ -1036,7 +1040,7 @@ const app = createApp({
       }
       await this.loadReport(reportId, token);
     }
-  },  
+  },
 
   computed: {
     topRecommendation() {
@@ -1059,7 +1063,6 @@ const app = createApp({
         });
     },
 
-    // Non-compliant only, sorted by risk — used in Gap Identification
     gaps() {
         const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
         return (this.currentSnapshot?.compliance?.details || [])
@@ -1067,7 +1070,6 @@ const app = createApp({
             .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
     },
 
-    // Non-compliant + partial, sorted by risk — used in Risk Assessment, Recommendations, Comparison
     riskItems() {
         const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
         return (this.currentSnapshot?.compliance?.details || [])
@@ -1075,7 +1077,6 @@ const app = createApp({
             .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
     },
 
-    // Overall risk label derived from compliance score — used in Comparison
     overallRiskLevel() {
         const score = this.currentSnapshot?.compliance?.compliance_score ?? 0;
         if (score >= 75) return 'Low';
@@ -1083,7 +1084,6 @@ const app = createApp({
         return 'High';
     },
 
-    // Departmental recommendation list — used in Comparison
     departmentRecs() {
         return this.riskItems.map(d => ({
             requirementId: d.requirement_id,
@@ -1155,104 +1155,160 @@ const app = createApp({
       return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test((value || '').trim());
     },
 
+    // ── Generate reports ──────────────────────────────────────────────────────
+    // Supports both single (latestResultId) and batch (batchResultIds) modes.
+    // In batch mode every result ID gets its own report; the last one is
+    // displayed while the rest become available in the sidebar.
     async generateReport(token) {
       this.clearUiMessage();
       this.isGenerating = true;
 
-      const resultId = (sessionStorage.getItem('latestResultId') || '').trim();
-      if (!resultId) {
+      // ── Detect batch vs single ──────────────────────────────────────────────
+      const batchIdsRaw = sessionStorage.getItem('batchResultIds');
+      const singleId    = (sessionStorage.getItem('latestResultId') || '').trim();
+
+      let resultIds = [];
+      if (batchIdsRaw) {
+        try {
+          const parsed = JSON.parse(batchIdsRaw);
+          resultIds = Array.isArray(parsed) ? parsed : [];
+        } catch {
+          resultIds = [];
+        }
+      }
+
+      // Fall back to single-ID mode when no batch list is present
+      if (resultIds.length === 0 && singleId) {
+        resultIds = [singleId];
+      }
+
+      if (resultIds.length === 0) {
         this.showUiMessage('No analysis result found. Please analyse a document first.');
         this.isGenerating = false;
         return;
       }
 
-      if (!this.isValidUuid(resultId)) {
+      // Validate every ID up-front; drop invalid ones and warn
+      const validIds = resultIds.filter(id => {
+        if (!this.isValidUuid((id || '').trim())) {
+          console.warn('Skipping invalid result ID:', id);
+          return false;
+        }
+        return true;
+      });
+
+      if (validIds.length === 0) {
         this.showUiMessage('Invalid analysis result ID.');
         this.isGenerating = false;
         return;
       }
 
       try {
-        const resAnalysis = await fetch(`${BASE}/api/analysis/${resultId}/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!resAnalysis.ok) {
-          const msg = await this.getErrorMessage(resAnalysis, 'Failed to retrieve analysis result.');
+        let lastGeneratedId = null;
 
-          if (resAnalysis.status === 401) {
-            this.showUiMessage(msg, 'error', 'Failed to retrieve analysis result.');
-            sessionStorage.clear();
-            window.location.href = 'login.html';
-            return;
+        for (const resultId of validIds) {
+          try {
+            // ── Fetch the analysis record ─────────────────────────────────
+            const resAnalysis = await fetch(`${BASE}/api/analysis/${resultId}/`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!resAnalysis.ok) {
+              if (resAnalysis.status === 401) {
+                this.showUiMessage(
+                  await this.getErrorMessage(resAnalysis, 'Session expired.'),
+                  'error',
+                  'Session expired.'
+                );
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+                return;
+              }
+              console.warn('Failed to fetch analysis for', resultId, resAnalysis.status);
+              continue;
+            }
+
+            const analysis = await resAnalysis.json();
+
+            if (!analysis || !analysis.result_id) {
+              console.warn('Invalid analysis data for', resultId);
+              continue;
+            }
+
+            if (!analysis.original_filename) {
+              console.warn('Missing original_filename for', resultId);
+              continue;
+            }
+
+            // ── Build snapshot — include department in metadata ────────────
+            const snapshot = { ...(analysis.raw_output || {}) };
+            snapshot.metadata = {
+              ...(snapshot.metadata || {}),
+              file_analyzed: analysis.original_filename || snapshot.metadata?.file_analyzed || '',
+              company:       analysis.company_name  || '',
+              // ── NEW: capture department from the analysis record ──────────
+              department:    analysis.department || analysis.dept_name || ''
+            };
+
+            const payload = {
+              result_id:       resultId,
+              report_snapshot: snapshot,
+              report_s3_key:   analysis.original_filename || resultId,
+              file_size:       JSON.stringify(snapshot).length,
+              expires_in_days: 30
+            };
+
+            // ── Generate the report on the backend ────────────────────────
+            const resGenerate = await fetch(`${BASE}/api/reports/generate/`, {
+              method:  'POST',
+              headers: {
+                'Content-Type':  'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify(payload)
+            });
+
+            if (!resGenerate.ok) {
+              if (resGenerate.status === 401) {
+                this.showUiMessage(
+                  await this.getErrorMessage(resGenerate, 'Session expired.'),
+                  'error',
+                  'Session expired.'
+                );
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+                return;
+              }
+              console.warn('Failed to generate report for', resultId, resGenerate.status);
+              continue;
+            }
+
+            const generated = await resGenerate.json();
+
+            if (!generated || !generated.report_id) {
+              console.warn('Report created but server returned invalid response for', resultId);
+              continue;
+            }
+
+            lastGeneratedId = generated.report_id;
+
+          } catch (innerErr) {
+            await this.logClientError('generateReport.loop', innerErr, { resultId });
           }
+        }
 
-          this.showUiMessage(msg, 'error', 'Failed to retrieve analysis result.');
+        if (!lastGeneratedId) {
+          this.showUiMessage('Report generation failed for all selected documents. Please try again.');
           return;
         }
 
-        const analysis = await resAnalysis.json();
-
-        if (!analysis || !analysis.result_id) {
-          this.showUiMessage('Invalid analysis data received from the server.');
-          return;
-        }
-
-        if (!analysis.original_filename) {
-          this.showUiMessage('Report cannot be generated because the file name is missing.');
-          return;
-        }
-
-        const snapshot = { ...(analysis.raw_output || {}) };
-        snapshot.metadata = {
-          ...(snapshot.metadata || {}),
-          file_analyzed: analysis.original_filename || snapshot.metadata?.file_analyzed || '',
-          company:       analysis.company_name || ''
-        };
-
-        const payload = {
-          result_id:       resultId,
-          report_snapshot: snapshot,
-          report_s3_key:   analysis.original_filename || resultId,
-          file_size:       JSON.stringify(snapshot).length,
-          expires_in_days: 30
-        };
-
-        const resGenerate = await fetch(`${BASE}/api/reports/generate/`, {
-          method:  'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (!resGenerate.ok) {
-          const msg = await this.getErrorMessage(resGenerate, 'Failed to generate report.');
-
-          if (resGenerate.status === 401) {
-            this.showUiMessage(msg, 'error', 'Failed to generate report.')
-            sessionStorage.clear();
-            window.location.href = 'login.html';
-            return;
-          }
-
-          this.showUiMessage(msg, 'error', 'Failed to generate report.');
-          return;
-        }
-
-        const generated = await resGenerate.json();
-
-        if (!generated || !generated.report_id) {
-          this.showUiMessage('Report was created, but the server returned an invalid response.');
-          return;
-        }
-
+        // ── Display the last generated report; sidebar gets the rest ─────
         window.history.replaceState(
           {}, '',
-          `report_viewing.html?report_id=${generated.report_id}`
+          `report_viewing.html?report_id=${lastGeneratedId}`
         );
 
-        await this.loadReport(generated.report_id, token);
+        await this.loadReport(lastGeneratedId, token);
 
         await this.$nextTick();
         if (this.$refs.sidebar && typeof this.$refs.sidebar.refreshReports === 'function') {
@@ -1261,7 +1317,8 @@ const app = createApp({
 
       } catch (e) {
         await this.logClientError('generateReport', e, {
-            latestResultId: sessionStorage.getItem('latestResultId')
+            batchResultIds: batchIdsRaw,
+            latestResultId: singleId
         });
         this.showUiMessage(
             'Unable to connect to the backend. Please check whether the server is running.',
@@ -1273,6 +1330,7 @@ const app = createApp({
       }
     },
 
+    // ── Load and display an existing report by ID ─────────────────────────────
     async loadReport(reportId, token) {
       this.clearUiMessage();
       if (!reportId || !this.isValidUuid(reportId)) {
@@ -1302,22 +1360,32 @@ const app = createApp({
 
           this.showUiMessage(msg, 'error', 'Failed to load report.');
           return;
-        } 
+        }
         const data = await res.json();
         if (!data || !data.report_snapshot) {
           this.showUiMessage('Report data is missing or invalid.');
           return;
         }
-        this.currentSnapshot  = data.report_snapshot;
+        this.currentSnapshot = data.report_snapshot;
         this.clearUiMessage();
         this.resultId = data.result_id || null;
         
         const meta    = (data.report_snapshot || {}).metadata || {};
-        const company = (meta.company || '').trim();
+        const company = (meta.company    || '').trim();
+        const dept    = (meta.department || '').trim();
         const file    = (meta.file_analyzed || '').trim();
-        this.currentReportName = company ? `${company} — ${file}` : file || 'Report';
 
-        if (this.resultId) {
+        // ── NEW: include department in the displayed report name ───────────
+        const nameParts = [company, dept, file].filter(Boolean);
+        this.currentReportName = nameParts.join(' — ') || 'Report';
+
+        // ── Keep departmentName in sync for the Comparison section ────────
+        // Prefer the value already stored in snapshot metadata; fall back to
+        // a separate analysis API call (preserves database-branch behaviour
+        // for older reports that pre-date the department metadata field).
+        if (dept) {
+          this.departmentName = dept;
+        } else if (this.resultId) {
           try {
             const aRes = await fetch(`${BASE}/api/analysis/${this.resultId}/`, {
               headers: { 'Authorization': `Bearer ${token}` }
@@ -1326,15 +1394,20 @@ const app = createApp({
               const aData = await aRes.json();
               this.departmentName = aData.department || '';
             }
-          } catch (_) { }
+          } catch (_) {
+            this.departmentName = '';
+          }
+        } else {
+          this.departmentName = '';
         }
+
       } catch (e) {
         console.error('loadReport error:', e, { reportId });
         this.showUiMessage('Something went wrong while loading the report.');
       }
     },
 
-    // --- Single helper to generate the JS PDF Document ---
+    // ── Unified PDF generator (unchanged from database branch) ────────────────
     generatePdfDoc() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -1346,18 +1419,16 @@ const app = createApp({
         const margin   = 20;
         const contentW = pageW - margin * 2;
 
-        const BRAND_COLOR = [26, 40, 69]; // #1a2845
+        const BRAND_COLOR = [26, 40, 69];
         const TEXT_COLOR = [30, 30, 30];
         const LIGHT_GRAY = [245, 246, 248];
         const BORDER_COLOR = [200, 205, 215];
         
-        // Highly readable PDF colors
         const RED = [210, 60, 60];
         const ORANGE = [220, 120, 0];
-        const YELLOW = [190, 150, 0]; 
+        const YELLOW = [190, 150, 0];
         const GREEN = [60, 160, 60];
 
-        // --- Helper: Render Header Banner ---
         const addHeader = () => {
             doc.setFillColor(...BRAND_COLOR);
             doc.rect(0, 0, pageW, 22, 'F');
@@ -1371,17 +1442,15 @@ const app = createApp({
             doc.setTextColor(...TEXT_COLOR);
         };
 
-        // --- Helper: Check Page Limits & Pagination ---
         const checkPage = (currentY, needed) => {
             if (currentY + needed > pageH - 20) {
                 doc.addPage();
                 addHeader();
-                return 35; // Reset Y below header
+                return 35;
             }
             return currentY;
         };
 
-        // --- Helper: Print Professional Section Title ---
         const printSectionTitle = (title, currentY) => {
             currentY = checkPage(currentY, 15);
             doc.setFont('times', 'bold');
@@ -1395,18 +1464,15 @@ const app = createApp({
             return currentY + 12;
         };
 
-        // Render Start
         addHeader();
         let y = 35;
 
-        // --- REPORT TITLE ---
         doc.setFont('times', 'bold');
         doc.setFontSize(18);
         const titleLines = doc.splitTextToSize(this.currentReportName || 'Compliance Analysis Report', contentW);
         doc.text(titleLines, margin, y);
         y += (titleLines.length * 8) + 5;
 
-        // --- SECTION 1: OVERVIEW ---
         y = printSectionTitle('1. Executive Overview', y);
         doc.setFontSize(11);
         
@@ -1415,6 +1481,12 @@ const app = createApp({
         
         doc.setFont('times', 'bold'); doc.text('Company:', metaLeftX, y);
         doc.setFont('times', 'normal'); doc.text(meta.company || '—', metaRightX, y); y += 7;
+
+        // ── NEW: include department in PDF overview when present ───────────
+        if (meta.department) {
+            doc.setFont('times', 'bold'); doc.text('Department:', metaLeftX, y);
+            doc.setFont('times', 'normal'); doc.text(meta.department, metaRightX, y); y += 7;
+        }
 
         doc.setFont('times', 'bold'); doc.text('File Analyzed:', metaLeftX, y);
         doc.setFont('times', 'normal'); doc.text(meta.file_analyzed || '—', metaRightX, y); y += 7;
@@ -1430,7 +1502,7 @@ const app = createApp({
             doc.setFont('times', 'bold'); doc.text('Key Risk Factors:', margin, y); y += 6;
             doc.setFont('times', 'normal');
             snap.risks.factors.forEach(f => {
-                doc.setFontSize(11); // Ensure size is correct before splitting
+                doc.setFontSize(11);
                 const fLines = doc.splitTextToSize(`• ${f || 'Unknown factor'}`, contentW - 5);
                 y = checkPage(y, fLines.length * 5);
                 doc.text(fLines, margin + 5, y);
@@ -1439,10 +1511,8 @@ const app = createApp({
             y += 5;
         }
 
-        // --- SECTION 2: COMPLIANCE FINDINGS ---
         y = printSectionTitle('2. Compliance Findings', y);
 
-        // Sub 2.1: Gaps
         y = checkPage(y, 15);
         doc.setFont('times', 'bold'); doc.setFontSize(12); doc.text('2.1 Gap Identification', margin, y); y += 6;
         doc.setFont('times', 'normal'); doc.setFontSize(10);
@@ -1455,20 +1525,18 @@ const app = createApp({
                 const clauseStr = gap.clause || 'Unknown Requirement';
                 const riskStr   = (gap.risk_level || 'unknown').toUpperCase();
                 
-                doc.setFontSize(10); // Explicitly set before splitting
+                doc.setFontSize(10);
                 const titleLines = doc.splitTextToSize(`${idx + 1}. ${clauseStr}`, contentW - 20);
                 const reasonLines = doc.splitTextToSize(`Reasoning: ${gap.reasoning || 'No reasoning provided.'}`, contentW - 20);
                 
                 const blockH = (titleLines.length * 5) + 6 + (reasonLines.length * 5) + 6;
                 y = checkPage(y, blockH);
 
-                // Print Title
                 doc.setFont('times', 'bold');
                 doc.setTextColor(...TEXT_COLOR);
-                doc.text(titleLines, margin + 5, y); 
+                doc.text(titleLines, margin + 5, y);
                 y += titleLines.length * 5;
 
-                // Print Clean Status/Risk Badges
                 let riskColor = TEXT_COLOR;
                 if (riskStr === 'CRITICAL') riskColor = RED;
                 else if (riskStr === 'HIGH') riskColor = ORANGE;
@@ -1481,16 +1549,14 @@ const app = createApp({
                 
                 y += 6;
 
-                // Print Reasoning
                 doc.setFontSize(10);
                 doc.setFont('times', 'normal');
                 doc.setTextColor(...TEXT_COLOR);
-                doc.text(reasonLines, margin + 5, y); 
+                doc.text(reasonLines, margin + 5, y);
                 y += reasonLines.length * 5 + 4;
             });
         }
 
-        // Sub 2.2: Risk Assessment
         y = checkPage(y, 15);
         doc.setFont('times', 'bold'); doc.setFontSize(12); doc.text('2.2 Risk Assessment', margin, y); y += 6;
         doc.setFont('times', 'normal'); doc.setFontSize(10);
@@ -1504,20 +1570,18 @@ const app = createApp({
                 const statusStr = (item.status || 'unknown').toUpperCase();
                 const riskStr   = (item.risk_level || 'unknown').toUpperCase();
                 
-                doc.setFontSize(10); // Explicitly set before splitting
+                doc.setFontSize(10);
                 const titleLines = doc.splitTextToSize(`${idx + 1}. ${clauseStr}`, contentW - 20);
                 const reasonLines = doc.splitTextToSize(`Reasoning: ${item.reasoning || 'No reasoning provided.'}`, contentW - 20);
                 
                 const blockH = (titleLines.length * 5) + 6 + (reasonLines.length * 5) + 6;
                 y = checkPage(y, blockH);
 
-                // Print Title
                 doc.setFont('times', 'bold');
                 doc.setTextColor(...TEXT_COLOR);
-                doc.text(titleLines, margin + 5, y); 
+                doc.text(titleLines, margin + 5, y);
                 y += titleLines.length * 5;
 
-                // Print Clean Status/Risk Labels
                 doc.setFontSize(9);
                 
                 let statusColor = TEXT_COLOR;
@@ -1541,19 +1605,16 @@ const app = createApp({
                 
                 y += 6;
                 
-                // Print Reasoning
                 doc.setFontSize(10);
                 doc.setFont('times', 'normal');
                 doc.setTextColor(...TEXT_COLOR);
-                doc.text(reasonLines, margin + 5, y); 
+                doc.text(reasonLines, margin + 5, y);
                 y += reasonLines.length * 5 + 4;
             });
         }
 
-        // --- SECTION 3 & 4: ADMIN ONLY VIEWS ---
         if (this.isAdmin) {
             
-            // SECTION 3: COMPARISON
             y = printSectionTitle('3. Department Comparison', y);
             doc.setFontSize(11);
             doc.setFont('times', 'bold'); doc.text('Department:', margin, y);
@@ -1567,7 +1628,7 @@ const app = createApp({
                 doc.setFont('times', 'bold'); doc.text('Departmental Recommendations:', margin, y); y += 6;
                 doc.setFont('times', 'normal'); doc.setFontSize(10);
                 this.departmentRecs.forEach(rec => {
-                    doc.setFontSize(10); // Explicitly set before splitting
+                    doc.setFontSize(10);
                     const recLines = doc.splitTextToSize(`• ${rec.clauseTitle || 'Unknown'} - ${rec.reference || ''}`, contentW - 5);
                     y = checkPage(y, recLines.length * 5);
                     doc.text(recLines, margin + 5, y); y += recLines.length * 5 + 2;
@@ -1575,7 +1636,6 @@ const app = createApp({
                 y += 5;
             }
 
-            // SECTION 4: RECOMMENDATIONS (Action Plan)
             y = printSectionTitle('4. Action Plan & Recommendations', y);
             if (this.riskItems.length === 0) {
                 doc.setFontSize(10);
@@ -1583,7 +1643,6 @@ const app = createApp({
             } else {
                 this.riskItems.forEach((item, idx) => {
                     
-                    // MUST explicitly define fonts & sizes before splitTextToSize calculations
                     doc.setFont('times', 'bold');
                     doc.setFontSize(11);
                     const titleLines = doc.splitTextToSize(`Rec ${idx + 1}: ${item.clause || 'Unknown Action'}`, contentW - 10);
@@ -1597,31 +1656,30 @@ const app = createApp({
                     doc.setFontSize(9);
                     const refLines = doc.splitTextToSize(`Ref: ${this.buildReferenceFromId(item.requirement_id)}`, contentW - 10);
 
-                    // Tighter spacing multiplier (5 instead of 6) to keep boxes clean
                     const blockH = (titleLines.length * 5) + (actionLines.length * 5) + (refLines.length * 5) + 6;
                     y = checkPage(y, blockH);
 
                     doc.setFillColor(...LIGHT_GRAY);
                     doc.setDrawColor(...BORDER_COLOR);
                     doc.setLineWidth(0.2);
-                    doc.rect(margin, y, contentW, blockH - 3, 'FD'); 
+                    doc.rect(margin, y, contentW, blockH - 3, 'FD');
 
                     let innerY = y + 6;
                     
                     doc.setFont('times', 'bold');
                     doc.setFontSize(11);
-                    doc.text(titleLines, margin + 5, innerY); 
+                    doc.text(titleLines, margin + 5, innerY);
                     innerY += titleLines.length * 5;
                     
                     doc.setFont('times', 'normal');
                     doc.setFontSize(10);
-                    doc.text(actionLines, margin + 5, innerY); 
+                    doc.text(actionLines, margin + 5, innerY);
                     innerY += actionLines.length * 5;
                     
                     doc.setFont('times', 'italic');
                     doc.setFontSize(9);
-                    doc.setTextColor(100, 100, 100); 
-                    doc.text(refLines, margin + 5, innerY); 
+                    doc.setTextColor(100, 100, 100);
+                    doc.text(refLines, margin + 5, innerY);
                     doc.setTextColor(...TEXT_COLOR);
 
                     y += blockH;
@@ -1629,7 +1687,6 @@ const app = createApp({
             }
         }
 
-        // --- Add Page Numbers ---
         const pageCount = doc.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
@@ -1643,7 +1700,7 @@ const app = createApp({
     },
 
     async downloadReport() {
-      this.clearUiMessage();  
+      this.clearUiMessage();
       if (!this.isAdmin) {
         this.showUiMessage('Only administrative users can download reports.');
         return;
@@ -1664,9 +1721,9 @@ const app = createApp({
       try {
           const params = new URLSearchParams(window.location.search);
           const report_id = params.get('report_id');
-          if (!report_id) { 
-            this.showUiMessage("Report ID missing."); 
-            return; 
+          if (!report_id) {
+            this.showUiMessage("Report ID missing.");
+            return;
           }
 
           if (!this.isValidUuid(report_id)) {
@@ -1690,7 +1747,6 @@ const app = createApp({
             return;
           }
 
-          // Use the unified PDF generator
           const doc = this.generatePdfDoc();
           doc.save(`${this.currentReportName || 'report'}.pdf`);
 
@@ -1735,7 +1791,7 @@ const app = createApp({
     },
     
     async openReport(report) {
-      this.clearUiMessage();  
+      this.clearUiMessage();
       const token = sessionStorage.getItem('authToken');
       if (!token) {
         this.showUiMessage('Your session has expired. Please log in again.');
@@ -1785,24 +1841,31 @@ const app = createApp({
         this.clearUiMessage();
         this.resultId = data.result_id || null;
 
-        if (this.resultId) {
-            try {
-                const aRes = await fetch(`${BASE}/api/analysis/${this.resultId}/`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (aRes.ok) {
-                    const aData = await aRes.json();
-                    this.departmentName = aData.department || '';
-                }
-            } catch (_) {
-                this.departmentName = '';
-            }
-        }        
+        const meta    = (data.report_snapshot || {}).metadata || {};
+        const company = (meta.company    || '').trim();
+        const dept    = (meta.department || '').trim();
+        const file    = (meta.file_analyzed || '').trim();
 
-        const meta = (data.report_snapshot || {}).metadata || {};
-        const company = (meta.company || '').trim();
-        const file = (meta.file_analyzed || '').trim();
-        this.currentReportName = company ? `${company} — ${file}` : file || report.display_name || 'Report';
+        // ── NEW: include department in report name ─────────────────────────
+        const nameParts = [company, dept, file].filter(Boolean);
+        this.currentReportName = nameParts.join(' — ') || report.display_name || 'Report';
+
+        // ── Sync departmentName for Comparison section ─────────────────────
+        if (dept) {
+          this.departmentName = dept;
+        } else if (this.resultId) {
+          try {
+            const aRes = await fetch(`${BASE}/api/analysis/${this.resultId}/`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (aRes.ok) {
+              const aData = await aRes.json();
+              this.departmentName = aData.department || '';
+            }
+          } catch (_) {
+            this.departmentName = '';
+          }
+        }
 
         window.history.replaceState({}, '', `report_viewing.html?report_id=${report.report_id}`);
       } catch (e) {
@@ -1812,9 +1875,9 @@ const app = createApp({
         this.showUiMessage('Something went wrong while loading the report.');
       }
     },
- 
+
     async shareReport() {
-      this.clearUiMessage();  
+      this.clearUiMessage();
       if (!this.isAdmin) {
         this.showUiMessage('Only administrative users can share reports.');
         return;
@@ -1845,11 +1908,9 @@ const app = createApp({
       }
 
       try {
-        // Step 1: Generate PDF blob using unified logic
         const doc = this.generatePdfDoc();
         const pdfBlob = doc.output('blob');
 
-        // Step 2: Send blob + report_id to backend
         const formData = new FormData();
         formData.append('report_id', reportId);
         formData.append('pdf', pdfBlob, `${this.currentReportName || 'report'}.pdf`);
@@ -1876,7 +1937,6 @@ const app = createApp({
             return;
         }
 
-        // Share
         if (navigator.share) {
           navigator.share({
             title: this.currentReportName,
