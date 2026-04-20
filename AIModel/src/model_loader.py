@@ -40,7 +40,7 @@ class DeepSeekLoader:
             try:
                 return self._call_model(model, prompt, max_length, temperature, retries)
             except _ProviderDownError:
-                print(f"[WARN] Model {model} returned 500 (provider down). Marking dead for this session.")
+                print(f"[WARN] Model {model} returned provider error. Marking dead for this session.")
                 self._dead_models.add(model)
                 continue
 
@@ -87,16 +87,29 @@ class DeepSeekLoader:
 
                 if isinstance(result, dict) and "choices" in result:
                     content = result["choices"][0]["message"]["content"]
+                    if not content:
+                        # Empty body on a 200 — provider is up but returned nothing.
+                        # Treat as provider fault and trigger fallback rather than
+                        # retrying the same dead model repeatedly.
+                        print(f"[DEBUG] Empty response body on attempt {attempt}. Treating as provider fault.")
+                        raise _ProviderDownError(f"Empty content from {model}")
                     print(f"[DEBUG] Success — Response length: {len(content)} chars")
                     print(f"[DEBUG] Response content: {content[:300]}")
                     return content
 
                 if isinstance(result, dict) and "error" in result:
-                    print(f"[DEBUG] OpenRouter error: {result['error']}")
-                    # Treat upstream faults (code 500 inside the JSON body) as provider-down too
-                    if isinstance(result["error"], dict) and result["error"].get("code") == 500:
-                        raise _ProviderDownError(f"Upstream fault from {model}")
-                    return ""
+                    error = result["error"]
+                    print(f"[DEBUG] OpenRouter error: {error}")
+                    # Any error object in the response body means the provider failed —
+                    # raise _ProviderDownError so the fallback chain triggers immediately.
+                    # Previously only code==500 was caught; 524 (Cloudflare gateway timeout)
+                    # and other upstream fault codes were silently returning "" instead of
+                    # falling through to openrouter/free.
+                    if isinstance(error, dict):
+                        raise _ProviderDownError(
+                            f"Upstream fault from {model}: code={error.get('code')} — {error.get('message', '')}"
+                        )
+                    raise _ProviderDownError(f"Upstream fault from {model}: {error}")
 
                 return str(result)
 

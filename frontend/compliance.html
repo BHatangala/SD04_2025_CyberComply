@@ -7,6 +7,7 @@
     <title>CyberComply - Compliance Score</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -192,6 +193,8 @@
             padding: 25px 30px;
             border-radius: 12px;
             border-left: 5px solid #4a8fe7;
+            max-height: 500px;
+            overflow-y: auto;
         }
 
         /* section-header margin-bottom updated to 15px (sprint-2) */
@@ -454,6 +457,128 @@
         @media screen and (max-width: 1200px) {
             .main-content.shifted { margin-left: 0; }
         }
+
+        /* --- BATCH MODE: document-level collapsible box --- */
+        .doc-box {
+            max-width: 900px;
+            margin: 0 auto 14px;
+            background-color: #1a2845;
+            border-radius: 12px;
+            border-left: 5px solid #4a8fe7;
+            overflow: hidden;
+        }
+
+        .doc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 22px;
+        }
+
+        .doc-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .doc-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #c5d0e6;
+            letter-spacing: 0.3px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .issue-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 10px;
+            border-radius: 99px;
+            background: rgba(74, 143, 231, 0.12);
+            color: #4a8fe7;
+            border: 1px solid rgba(74, 143, 231, 0.25);
+            white-space: nowrap;
+            flex-shrink: 0;
+            letter-spacing: 0.4px;
+        }
+
+        .issue-badge.no-issues {
+            background: rgba(102, 204, 102, 0.12);
+            color: #66cc66;
+            border-color: rgba(102, 204, 102, 0.3);
+        }
+
+        .doc-body {
+            border-top: 1px solid rgba(74, 143, 231, 0.12);
+            padding: 4px 18px 18px;
+        }
+
+        /* --- BATCH MODE: sub-section collapsible (gaps / risks inside each doc box) --- */
+        .sub-box {
+            margin-top: 12px;
+            background: rgba(0, 0, 0, 0.18);
+            border-radius: 8px;
+            border: 1px solid rgba(74, 143, 231, 0.1);
+            overflow: hidden;
+        }
+
+        .sub-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 11px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .sub-header:hover { background: rgba(74, 143, 231, 0.06); }
+
+        .sub-header-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #8b9dc3;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            flex: 1;
+        }
+
+        .sub-count {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 99px;
+            background: rgba(74, 143, 231, 0.12);
+            color: #4a8fe7;
+            border: 1px solid rgba(74, 143, 231, 0.2);
+            letter-spacing: 0.5px;
+        }
+
+        .sub-chevron {
+            font-size: 16px;
+            color: #6b7a99;
+            transition: transform 0.25s;
+            line-height: 1;
+        }
+
+        .sub-chevron.open { transform: rotate(180deg); }
+
+        .sub-body {
+            padding: 2px 16px 14px;
+            border-top: 1px solid rgba(74, 143, 231, 0.08);
+        }
+
+        .doc-count-label {
+            max-width: 900px;
+            margin: 0 auto 10px;
+            font-size: 11px;
+            color: #6b7a99;
+            letter-spacing: 0.5px;
+            padding-left: 2px;
+        }
     </style>
 </head>
 
@@ -496,15 +621,19 @@
             </div>
 
             <!-- Error / no-data state -->
-            <div class="no-data-banner" v-if="!isLoading && (loadError || allDetails.length === 0)">
+            <div class="no-data-banner" v-if="!isLoading && (loadError || noData)">
                 ⚠ {{ loadError || 'No analysis result found. Please run a document analysis first from the home page.' }}
             </div>
 
-            <!-- Summary chips — shown only when data is available -->
+            <!-- ══════════════════════════════════════════════════════
+                 SINGLE FILE MODE — original flat layout (unchanged)
+                 ══════════════════════════════════════════════════════ -->
+
+            <!-- Summary chips -->
             <div
                 class="summary-bar"
                 :class="{ 'has-filter': activeFilter !== null }"
-                v-if="!isLoading && allDetails.length > 0"
+                v-if="!isBatchMode && !isLoading && allDetails.length > 0"
             >
                 <div class="summary-chip chip-critical"
                     :class="{ 'chip-active': activeFilter === 'critical' }"
@@ -528,14 +657,14 @@
                 </div>
             </div>
 
-            <!-- Active filter label -->
-            <div class="filter-label" v-if="activeFilter">
+            <!-- Active filter label (single mode) -->
+            <div class="filter-label" v-if="!isBatchMode && activeFilter">
                 Showing <strong style="color:#c5d0e6">{{ activeFilter }}</strong> severity only —
                 <span class="filter-clear" @click="toggleFilter(activeFilter)">Clear filter ✕</span>
             </div>
 
-            <!-- Gap Identification -->
-            <div class="info-section" v-if="!isLoading && allDetails.length > 0">
+            <!-- Gap Identification (single mode) -->
+            <div class="info-section" v-if="!isBatchMode && !isLoading && allDetails.length > 0">
                 <h2 class="section-header">Gap Identification</h2>
                 <p class="section-meta">
                     Requirements completely absent from the policy —
@@ -559,8 +688,8 @@
                 </div>
             </div>
 
-            <!-- Risk Assessment -->
-            <div class="info-section" v-if="!isLoading && allDetails.length > 0">
+            <!-- Risk Assessment (single mode) -->
+            <div class="info-section" v-if="!isBatchMode && !isLoading && allDetails.length > 0">
                 <h2 class="section-header">Risk Assessment</h2>
                 <p class="section-meta">
                     All non-compliant and partially compliant requirements, sorted by severity —
@@ -578,20 +707,14 @@
                             {{ item.clause }}
                             <span v-if="item.status === 'partial'" class="status-partial">Partially Implemented</span>
                         </div>
-
-                        <!-- Risk title from static mapping file -->
                         <div class="risk-title" v-if="riskMapping[item.requirement_id]">
                             {{ riskMapping[item.requirement_id].risk_title }}
                         </div>
-
-                        <!-- Consequence from mapping; falls back to AI reasoning if not mapped -->
                         <div class="gap-reasoning">
                             {{ riskMapping[item.requirement_id]
                                 ? riskMapping[item.requirement_id].consequence
                                 : item.reasoning }}
                         </div>
-
-                        <!-- Business impact pills -->
                         <div class="impact-pills"
                             v-if="riskMapping[item.requirement_id]?.business_impact?.length">
                             <span class="impact-pill"
@@ -606,6 +729,150 @@
                     </span>
                 </div>
             </div>
+
+            <!-- ══════════════════════════════════════════════════════
+                 BATCH MODE — per-document collapsible boxes
+                 ══════════════════════════════════════════════════════ -->
+
+            <!-- Aggregated summary chips (batch mode) -->
+            <div
+                class="summary-bar"
+                :class="{ 'has-filter': activeFilter !== null }"
+                v-if="isBatchMode && !isLoading && batchDocuments.length > 0"
+            >
+                <div class="summary-chip chip-critical"
+                    :class="{ 'chip-active': activeFilter === 'critical' }"
+                    @click="toggleFilter('critical')">
+                    {{ batchRiskCounts.critical }} Critical
+                </div>
+                <div class="summary-chip chip-high"
+                    :class="{ 'chip-active': activeFilter === 'high' }"
+                    @click="toggleFilter('high')">
+                    {{ batchRiskCounts.high }} High
+                </div>
+                <div class="summary-chip chip-medium"
+                    :class="{ 'chip-active': activeFilter === 'medium' }"
+                    @click="toggleFilter('medium')">
+                    {{ batchRiskCounts.medium }} Medium
+                </div>
+                <div class="summary-chip chip-low"
+                    :class="{ 'chip-active': activeFilter === 'low' }"
+                    @click="toggleFilter('low')">
+                    {{ batchRiskCounts.low }} Low Risk
+                </div>
+            </div>
+
+            <!-- Active filter label (batch mode) -->
+            <div class="filter-label" v-if="isBatchMode && activeFilter">
+                Showing <strong style="color:#c5d0e6">{{ activeFilter }}</strong> severity only —
+                <span class="filter-clear" @click="toggleFilter(activeFilter)">Clear filter ✕</span>
+            </div>
+
+            <!-- Document count label -->
+            <div class="doc-count-label" v-if="isBatchMode && !isLoading && batchDocuments.length > 0">
+                {{ batchDocuments.length }} DOCUMENT{{ batchDocuments.length !== 1 ? 'S' : '' }} ANALYSED
+            </div>
+
+            <!-- Per-document collapsible boxes -->
+            <template v-if="isBatchMode && !isLoading && batchDocuments.length > 0">
+                <div
+                    v-for="(doc, di) in batchDocuments"
+                    :key="di"
+                    class="doc-box"
+                >
+                    <!-- Document header (static — sub-boxes handle their own expand/collapse) -->
+                    <div class="doc-header">
+                        <div class="doc-header-left">
+                            <span class="doc-name">{{ doc.displayName }}</span>
+                            <span
+                                class="issue-badge"
+                                :class="{ 'no-issues': doc.issueCount === 0 }"
+                            >
+                                {{ doc.issueCount }} issue{{ doc.issueCount !== 1 ? 's' : '' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Document body — always visible -->
+                    <div class="doc-body">
+
+                        <!-- ── Gap Identification sub-box ── -->
+                        <div class="sub-box">
+                            <div class="sub-header" @click="toggleDocGaps(di)">
+                                <span class="sub-header-title">Gap Identification</span>
+                                <span class="sub-count">{{ gapsFor(doc).length }}</span>
+                                <span class="sub-chevron" :class="{ open: doc.gapsOpen }">⌄</span>
+                            </div>
+                            <div class="sub-body" v-show="doc.gapsOpen">
+                                <div v-if="gapsFor(doc).length === 0" class="empty-state">
+                                    No compliance gaps detected. All requirements are at least partially addressed.
+                                </div>
+                                <div
+                                    v-for="(item, idx) in gapsFor(doc)"
+                                    :key="'gap-' + di + '-' + idx"
+                                    class="gap-item"
+                                >
+                                    <div class="gap-id">{{ idx + 1 }}</div>
+                                    <div class="gap-text">
+                                        <div class="gap-clause">{{ item.clause }}</div>
+                                        <div class="gap-reasoning">{{ item.reasoning }}</div>
+                                    </div>
+                                    <span class="risk-badge" :class="`risk-${item.risk_level || 'unknown'}`">
+                                        {{ item.risk_level || 'unknown' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── Risk Assessment sub-box ── -->
+                        <div class="sub-box">
+                            <div class="sub-header" @click="toggleDocRisks(di)">
+                                <span class="sub-header-title">Risk Assessment</span>
+                                <span class="sub-count">{{ risksFor(doc).length }}</span>
+                                <span class="sub-chevron" :class="{ open: doc.risksOpen }">⌄</span>
+                            </div>
+                            <div class="sub-body" v-show="doc.risksOpen">
+                                <div v-if="risksFor(doc).length === 0" class="empty-state">
+                                    No risks identified. This document is fully compliant.
+                                </div>
+                                <div
+                                    v-for="(item, idx) in risksFor(doc)"
+                                    :key="'risk-' + di + '-' + idx"
+                                    class="gap-item"
+                                >
+                                    <div class="gap-id">{{ idx + 1 }}</div>
+                                    <div class="gap-text">
+                                        <div class="gap-clause">
+                                            {{ item.clause }}
+                                            <span v-if="item.status === 'partial'" class="status-partial">Partially Implemented</span>
+                                        </div>
+                                        <div class="risk-title" v-if="riskMapping[item.requirement_id]">
+                                            {{ riskMapping[item.requirement_id].risk_title }}
+                                        </div>
+                                        <div class="gap-reasoning">
+                                            {{ riskMapping[item.requirement_id]
+                                                ? riskMapping[item.requirement_id].consequence
+                                                : item.reasoning }}
+                                        </div>
+                                        <div class="impact-pills"
+                                            v-if="riskMapping[item.requirement_id]?.business_impact?.length">
+                                            <span class="impact-pill"
+                                                v-for="impact in riskMapping[item.requirement_id].business_impact"
+                                                :key="impact">
+                                                {{ impact }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <span class="risk-badge" :class="`risk-${item.risk_level || 'unknown'}`">
+                                        {{ item.risk_level || 'unknown' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </template>
         </div>
 
         <!-- Wavy Background -->
@@ -634,8 +901,13 @@
                     // the filesystem path ../AIModel/data/risk_mapping.json.
                     riskMapping: {},
 
-                    // Raw compliance details array — populated from the DB via fetch
+                    // Single file mode — raw compliance details array from DB
                     allDetails: [],
+
+                    // Batch mode — one entry per document/department
+                    isBatchMode: false,
+                    isAdmin: false,
+                    batchDocuments: [],
 
                     // Loading / error state
                     isLoading: true,
@@ -675,6 +947,34 @@
                         }
                     }
                     return counts;
+                },
+
+                // ── Batch mode computeds ─────────────────────────────────────
+
+                // Flat list of all risks across every document — respects activeFilter
+                // Used only to derive batchRiskCounts for the summary chips.
+                batchAllRisks() {
+                    return this.batchDocuments.flatMap(doc =>
+                        doc.risks.filter(item => !this.activeFilter || item.risk_level === this.activeFilter)
+                    );
+                },
+
+                // Chip counts aggregated across all documents (mirrors riskCounts behaviour)
+                batchRiskCounts() {
+                    const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+                    for (const item of this.batchAllRisks) {
+                        if (item.risk_level && counts[item.risk_level] !== undefined) {
+                            counts[item.risk_level]++;
+                        }
+                    }
+                    return counts;
+                },
+
+                // True when there is nothing to display in the current mode
+                noData() {
+                    return this.isBatchMode
+                        ? this.batchDocuments.length === 0
+                        : this.allDetails.length === 0;
                 }
             },
 
@@ -686,49 +986,128 @@
                     return;
                 }
 
+                SessionManager.init({ timeoutMs: 1200000 });
+
+                this.isAdmin = sessionStorage.getItem('userRole') === 'ADMINISTRATIVE_USER';
+
                 // ── Load static risk mapping from local file (ai-development) ──
                 // Not a Django endpoint — fetched directly from the filesystem.
                 this.loadRiskMapping();
 
-                // ── Fetch compliance details from DB ────────────────────────
-                // Reads result_id written by home.html after the analysis was saved.
-                // Falls back to the /latest/ endpoint if no id is stored.
-                const resultId = sessionStorage.getItem('latestResultId');
-                const url = resultId
-                    ? `${BASE}/api/analysis/${resultId}/`
-                    : `${BASE}/api/analysis/latest/`;
+                // ── Detect mode: batch (multiple docs) vs single file ───────
+                const batchIdsRaw = sessionStorage.getItem('batchResultIds');
+                const resultId    = sessionStorage.getItem('latestResultId');
 
-                try {
-                    await new Promise(r => setTimeout(r, 50)); // Simulate loading delay
-                    const res = await fetch(url, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
+                if (batchIdsRaw) {
+                    // ── BATCH MODE ──────────────────────────────────────────
+                    this.isBatchMode = true;
 
-                    if (res.status === 401 || res.status === 403) {
-                        sessionStorage.clear();
-                        await new Promise(r => setTimeout(r, 100));
-                        window.location.href = 'login.html';
-                        return;
-                    }
-
-                    if (!res.ok) {
-                        this.loadError = 'No analysis results found. Please upload and analyse a document first.';
+                    let resultIds = [];
+                    try {
+                        resultIds = JSON.parse(batchIdsRaw);
+                    } catch {
+                        this.loadError = 'Batch result data is corrupted. Please re-run the analysis.';
                         this.isLoading = false;
                         return;
                     }
 
-                    const data = await res.json();
+                    try {
+                        const url = `${BASE}/api/analysis/org-comparison/?result_ids=${resultIds.join(',')}`;
+                        const res = await fetch(url, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
 
-                    // Pull the compliance details array out of the DB response —
-                    // same shape as what was previously stored in localStorage
-                    // under result.compliance.details
-                    this.allDetails = data.compliance?.details || [];
+                        if (res.status === 401 || res.status === 403) {
+                            sessionStorage.clear();
+                            window.location.href = 'login.html';
+                            return;
+                        }
 
-                } catch (e) {
-                    console.error('Failed to load compliance details:', e);
-                    this.loadError = 'Could not reach the server. Please check your connection.';
-                } finally {
-                    this.isLoading = false;
+                        if (!res.ok) {
+                            this.loadError = 'No analysis results found. Please re-run the analysis.';
+                            this.isLoading = false;
+                            return;
+                        }
+
+                        const data = await res.json();
+
+                        this.batchDocuments = (data.departments || []).map((dept, idx) => {
+                            // Normalise status strings so filter comparisons are consistent
+                            const allItems = (dept.all_recommendations || []).map(item => ({
+                                ...item,
+                                status: (item.status || '').toLowerCase().replace(/-/g, '_')
+                            }));
+
+                            const gaps = allItems
+                                .filter(d => d.status === 'non_compliant')
+                                .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
+
+                            const risks = allItems
+                                .filter(d => d.status === 'non_compliant' || d.status === 'partial')
+                                .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
+
+                            // General users have no dept — use the uploaded filename instead
+                            const displayName = (dept.dept_name === 'Unknown Department')
+                                ? (dept.file_name || dept.dept_name)
+                                : dept.dept_name;
+
+                            return {
+                                displayName,
+                                issueCount: allItems.length,
+                                gapsOpen:   false,      // sub-sections start collapsed
+                                risksOpen:  false,
+                                gaps,
+                                risks,
+                            };
+                        });
+
+                    } catch (e) {
+                        console.error('Failed to load batch compliance details:', e);
+                        this.loadError = 'Could not reach the server. Please check your connection.';
+                    } finally {
+                        this.isLoading = false;
+                    }
+
+                } else {
+                    // ── SINGLE FILE MODE ────────────────────────────────────
+                    // Reads result_id written by home.html after the analysis was saved.
+                    // Falls back to the /latest/ endpoint if no id is stored.
+                    const url = resultId
+                        ? `${BASE}/api/analysis/${encodeURIComponent(resultId)}/`
+                        : `${BASE}/api/analysis/latest/`;
+
+                    try {
+                        await new Promise(r => setTimeout(r, 50)); // Simulate loading delay
+                        const res = await fetch(url, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        if (res.status === 401 || res.status === 403) {
+                            sessionStorage.clear();
+                            await new Promise(r => setTimeout(r, 100));
+                            window.location.href = 'login.html';
+                            return;
+                        }
+
+                        if (!res.ok) {
+                            this.loadError = 'No analysis results found. Please upload and analyse a document first.';
+                            this.isLoading = false;
+                            return;
+                        }
+
+                        const data = await res.json();
+
+                        // Pull the compliance details array out of the DB response —
+                        // same shape as what was previously stored in localStorage
+                        // under result.compliance.details
+                        this.allDetails = data.compliance?.details || [];
+
+                    } catch (e) {
+                        console.error('Failed to load compliance details:', e);
+                        this.loadError = 'Could not reach the server. Please check your connection.';
+                    } finally {
+                        this.isLoading = false;
+                    }
                 }
             },
 
@@ -768,7 +1147,31 @@
                     }
                 },
                 goBack()   { window.history.back(); },
-                goToHome() { window.location.href = 'home.html'; }
+                goToHome() { window.location.href = 'home.html'; },
+
+                // ── Batch mode helpers ───────────────────────────────────────
+
+                // Returns filtered gaps for a single document box
+                gapsFor(doc) {
+                    if (!this.activeFilter) return doc.gaps;
+                    return doc.gaps.filter(d => d.risk_level === this.activeFilter);
+                },
+
+                // Returns filtered risks for a single document box
+                risksFor(doc) {
+                    if (!this.activeFilter) return doc.risks;
+                    return doc.risks.filter(d => d.risk_level === this.activeFilter);
+                },
+
+                // Toggle the Gaps sub-section inside a document box
+                toggleDocGaps(i) {
+                    this.batchDocuments[i].gapsOpen = !this.batchDocuments[i].gapsOpen;
+                },
+
+                // Toggle the Risk Assessment sub-section inside a document box
+                toggleDocRisks(i) {
+                    this.batchDocuments[i].risksOpen = !this.batchDocuments[i].risksOpen;
+                }
             }
         });
 

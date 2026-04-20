@@ -112,6 +112,7 @@
     <img src="img2.png" alt="Decorative Wave Right" class="right-wave">
 
     <script src="otp_component.js"></script>
+    <script src="session-manager.js"></script>
 
     <script>
         const { createApp, reactive, ref } = Vue;
@@ -119,6 +120,8 @@
         const app = createApp({
             setup() {
                 const email = ref(sessionStorage.getItem("userEmail") || "");
+                const token = sessionStorage.getItem("authToken");
+                const deleting = ref(false);
                 const message = reactive({ text: "", type: "" });
 
                 const initialDeleteMessage = sessionStorage.getItem("deleteAccountMessage");
@@ -134,26 +137,39 @@
                 };
 
                 // Protect page if user opened it directly without login
-                if (!email.value) {
+                if (!email.value || !token) {
                     setMessage("error", "Your session has expired. Redirecting to login...");
 
                     setTimeout(() => {
                         window.location.href = "login.html";
                     }, 1500);
 
-                    return;
+                    return {};
                 }
 
+                SessionManager.init({ timeoutMs: 1200000 });
+
                 const handleDeleteVerified = async (deleteToken) => {
+                    if (!deleteToken) {
+                        setMessage("error", "Invalid or expired verification. Please try again.");
+                        return;
+                    }
+
+                    if (deleting.value) return;
+                    deleting.value = true;
+
                     message.text = "";
 
                     try {
+                        const reasonRaw = sessionStorage.getItem('deleteAccountReason') || '';
+                        const reason = reasonRaw.trim().slice(0, 300);
+
                         const response = await fetch("http://127.0.0.1:8000/api/delete-account/", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
                                 delete_token: deleteToken,
-                                reason: sessionStorage.getItem('deleteAccountReason') || ''
+                                reason: reason
                             })
                         });
 
@@ -176,13 +192,16 @@
                     } catch (error) {
                         console.error('Error deleting account:', error);
                         setMessage('error', 'Something went wrong while deleting the account.');
+                    } finally {
+                        deleting.value = false;
                     }
                 };
 
                 return {
                     email,
                     message,
-                    handleDeleteVerified
+                    handleDeleteVerified,
+                    deleting
                 };
             }
         });

@@ -1079,6 +1079,76 @@ class AdminAccessRequestModelTest(TestCase):
         expected = f"{self.profile} — PENDING (admin.req@cybercomply.lk)"
         self.assertEqual(str(self.req1), expected)
 
+    # ── original_email field ──────────────────────────────────────────────
+
+    def test_admin_access_request_original_email_stored(self):
+        # Verify that original_email is stored and retrieved correctly
+        req = AdminAccessRequest.objects.create(
+            user=self.profile,
+            org_email="admin.req@cybercomply.lk",
+            original_email="general.user@gmail.com",
+            status=AdminAccessRequest.Status.PENDING,
+        )
+        self.assertEqual(req.original_email, "general.user@gmail.com")
+
+    def test_admin_access_request_original_email_default_blank(self):
+        # Verify that original_email defaults to empty string when not provided
+        req = AdminAccessRequest.objects.create(
+            user=self.profile,
+            org_email="admin.req@cybercomply.lk",
+            status=AdminAccessRequest.Status.PENDING,
+        )
+        self.assertEqual(req.original_email, "")
+
+    def test_admin_access_request_original_email_differs_from_org_email(self):
+        # Verify that original_email and org_email can hold different values
+        # reflecting the before/after of the email replacement
+        req = AdminAccessRequest.objects.create(
+            user=self.profile,
+            org_email="admin.req@cybercomply.lk",
+            original_email="general.user@gmail.com",
+            status=AdminAccessRequest.Status.PENDING,
+        )
+        self.assertNotEqual(req.original_email, req.org_email)
+
+    def test_admin_access_request_original_email_preserved_after_approval(self):
+        # Verify that original_email is not lost when the request status changes to APPROVED
+        req = AdminAccessRequest.objects.create(
+            user=self.profile,
+            org_email="admin.req@cybercomply.lk",
+            original_email="general.user@gmail.com",
+            status=AdminAccessRequest.Status.PENDING,
+        )
+        req.status = AdminAccessRequest.Status.APPROVED
+        req.verified_at = timezone.now()
+        req.save(update_fields=["status", "verified_at"])
+        req.refresh_from_db()
+        self.assertEqual(req.original_email, "general.user@gmail.com")
+
+    def test_admin_access_request_original_email_persists_after_auth_user_update(self):
+        # Verify that the audit trail (original_email) remains intact even after
+        # auth_user.email is updated to org_email — simulating the full upgrade flow
+        original_email = "general.user@gmail.com"  # ← clearly different from org_email
+        req = AdminAccessRequest.objects.create(
+            user=self.profile,
+            org_email="admin.req@cybercomply.lk",
+            original_email=original_email,
+            status=AdminAccessRequest.Status.APPROVED,
+            verified_at=timezone.now(),
+        )
+        # Simulate what verify_admin_access does to auth_user
+        self.profile.auth_user.username = req.org_email
+        self.profile.auth_user.email    = req.org_email
+        self.profile.auth_user.save(update_fields=["username", "email"])
+
+        req.refresh_from_db()
+        self.profile.auth_user.refresh_from_db()
+
+        # original_email in the request must still hold the old gmail address
+        self.assertEqual(req.original_email, "general.user@gmail.com")
+        # auth_user.email is now the org email — they must differ
+        self.assertNotEqual(req.original_email, self.profile.auth_user.email)
+
 # -----------------------------------------------------
 # ReportDownload tests
 # -----------------------------------------------------

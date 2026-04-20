@@ -7,6 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
     <style>
       * {
         margin: 0;
@@ -158,17 +159,18 @@
 
     /* Main Content */
     .report-viewer {
-        margin-left: auto; 
-        margin-right: auto;
-        padding: 30px 30px;
+        padding: 30px;
         min-height: calc(100vh - 60px);
-        max-width: 1100px;
+        width: min(1100px, calc(100vw - 60px));
+        margin: 0 auto;
         transition: margin 0.3s ease;
     }
 
     .report-viewer.shifted {
-        margin-left: calc(280px + (100% - 280px - 1100px)/2);
-        margin-right: auto;
+        width: min(1000px, calc(100vw - 280px - 80px));
+        margin-left: 50%;
+        margin-right: 0;
+        transform: translateX(calc(-50% + 140px));
     }
 
     /* 30-day notice banner */
@@ -182,42 +184,38 @@
 
     .report-viewer h2.report-title {
         text-align: center;
-        font-size: 28px;
-        font-weight: bold;
-        margin-bottom: 20px;
+        font-size: 34px;
+        font-weight: 800;
+        margin-bottom: 22px;
         color: #ffffff;
+        letter-spacing: -0.4px;
+        text-shadow: 0 10px 26px rgba(0, 0, 0, 0.25);
     }
 
     .pdf-container {
         width: 100%;
         height: 75vh;
-        background-color: #bfc2c9;
-        border: 8px solid #2a4a7c;
-        border-radius: 12px;
-        color: #05070a;
+        background: linear-gradient(180deg, #f8fbff 0%, #eef3f9 100%);
+        border: 1px solid rgba(74, 143, 231, 0.18);
+        border-radius: 22px;
+        color: #162033;
         overflow: auto;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        box-shadow:
+          0 24px 60px rgba(0, 0, 0, 0.28),
+          inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        padding: 28px;
     }
 
     /* Share & Download Buttons */
     .report-actions {
         position: fixed;
         bottom: 70px;
-        /* Center within remaining right-side space */
-        left: calc(50% + 550px + 70px);
+        right: 30px;
         display: flex;
         flex-direction: column;
         gap: 40px;
         z-index: 200;
         transition: left 0.3s ease;
-    }
-
-    .report-actions.shifted{
-        left: calc(
-        280px +                 /* sidebar width */
-        (100% - 280px) / 2 +    /* center of remaining page */
-        550px              /* half report width */
-        );
     }
 
     /* Button wrapper for locked state */
@@ -298,7 +296,7 @@
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
     }
 
-    /* Wavy Background-fix this */
+    /* Wavy Background */
     .wavy-background {
         position: fixed;
         bottom: 0;
@@ -314,14 +312,370 @@
         height: auto;
         display: block;
     }
+
+    .report-section {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 18px;
+        margin-bottom: 22px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+
+        /* animation */
+        opacity: 0;
+        transform: translateY(20px);
+        animation: fadeSlide 0.5s ease forwards;
+    }
+
+    @keyframes fadeSlide {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .section-title {
+        font-size: 20px;
+        font-weight: 800;
+        color: #14213a;
+        margin-bottom: 8px;
+    }
+
+    .section-subtitle {
+        font-size: 13px;
+        color: #6b7a99;
+        margin-bottom: 16px;
+        line-height: 1.2;
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 10px;
+        background: #e3e8f0;
+        border-radius: 20px;
+        overflow: hidden;
+        margin-top: 8px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4a8fe7, #6fb1ff);
+    }
+
+    .item-card {
+        display: flex;
+        gap: 12px;
+        padding: 14px;
+        border-radius: 14px;
+        background: #fffffffe;
+        border: 1px solid rgba(20, 33, 58, 0.08);
+        margin-bottom: 10px;
+        align-items: flex-start;
+        transition: all 0.2s ease;
+    }
+
+    .item-card:hover{
+       background: #eff1f2;
+       transform: translateY(-1px);
+    }
+
+    .item-index {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: #e8f1ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        color: #2e6ed3;
+    }
+
+    .comparison-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+    }
+
+    .comparison-card {
+        background: #1a2845;
+        color: white;
+        padding: 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(74, 143, 231, 0.18);
+    }   
     
+    .report-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+
+    /* Section header area */
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 16px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid rgba(42, 74, 124, 0.12);
+    }
+
+    /* Small uppercase section label */
+    .section-kicker {
+        font-size: 12px;
+        font-weight: 800;
+        color: #3f7fe0;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    /* Summary cards grid */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+    }
+
+    /* Summary card style */
+    .summary-card {
+        background: #1a2845;
+        border-radius: 14px;
+        padding: 14px;
+        border: 1px solid rgba(0,0,0,0.05);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.04);
+        min-height: 90px;
+    }
+
+    /* Summary label/value */
+    .summary-label {
+        font-size: 11px;
+        color: #9fb4da;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        font-weight: 700;
+        letter-spacing: 0.6px;
+    }
+
+    .summary-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: #ffffff;
+        line-height: 1.4;
+    }
+
+    /* Subsection block spacing */
+    .subsection-block {
+        margin-bottom: 24px;
+    }
+
+    .subsection-block:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Divider between subsections */
+    .subsection-divider {
+        height: 1px;
+        background: 1px solid rgba(255, 255, 255, 0.2);
+        margin: 4px 0 22px;
+    }
+
+    /* Content part of item card */
+    .item-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .item-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #162033;
+        line-height: 1.45;
+        margin-bottom: 4px;
+    }
+
+    .item-text {
+        font-size: 13px;
+        color: #5f6f8b;
+        margin-top: 4px;
+        line-height: 1.6;
+    }
+
+    /* meta/reference text */
+    .item-meta {
+        font-size: 12px;
+        color: #7d89a1;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(42, 74, 124, 0.08);
+        line-height: 1.5;
+    }
+
+    .empty-state {
+        font-size: 13px;
+        color: #6b7a99;
+        font-style: italic;
+        padding: 4px 0 2px;
+        line-height: 1.5;
+    }
+
+    /* List wrapper */
+    .list-block {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* Risk factor list */
+    .risk-factor-list {
+        margin-top: 10px;
+        padding-left: 18px;
+        color: #5f6f8b;
+    }
+
+    .risk-factor-list li {
+        margin-bottom: 6px;
+        line-height: 1.5;
+    }
+
+    /* Partial badge only */
+    .badge-partial {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 8px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.7px;
+        text-transform: uppercase;
+        background: rgba(231, 150, 74, 0.12);
+        color: #cf7b1e;
+        border: 1px solid rgba(231, 150, 74, 0.26);
+        vertical-align: middle;
+    }
+
+    .comparison-label {
+        font-size: 11px;
+        color: #91a5c9;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        font-weight: 700;
+    }
+
+    .comparison-value {
+        font-size: 15px;
+        font-weight: 700;
+        color: #ffffff;
+        line-height: 1.45;
+    }   
+
+    .section-dark{
+        background: #1a2845;
+    }
+
+    .section-dark .section-title{
+        color: #f0f3f8;
+    }
+
+    .section-dark .section-subtitle{
+        color: #dfe2e7;
+    }
+
+    .section-dark .summary-label{
+        color: #a9c4ff;
+    }
+
+    .section-dark .section-header{
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .section-dark .section-kicker{
+        color: #7fb3ff;
+    }
+
+    .overview-section{
+        background: #d5d8e2;
+    }
+
+    .overview-section .section-title {
+        color: #0f1a2b;
+    }
+
+    .overview-section .section-subtitle {
+        color: #4a5b75;
+    }
+
+    .overview-section .summary-label {
+        color: #6b7a99;
+    }
+
+    .overview-section .summary-value {
+        color: #ffffff;
+    }
+
+    .overview-section .summary-grid {
+        margin-bottom: 12px;
+    }
+
+    .overview-section .subsection-block {
+        margin-bottom: 16px;
+    }
+
+    .overview-section .summary-label,
+    .overview-section .section-kicker {
+        color: #5a6b85;
+    }
+
+    .overview-section .summary-value:not(.summary-card .summary-value) {
+        color: #0f1a2b;
+    }
+
+    .overview-section .subsection-block .summary-value {
+        color: #0f1a2b;
+        font-weight: 700;
+    }
+
+    .summary-card .summary-label {
+        color: #c4d2ef;
+    }
+
+    .summary-card .summary-value {
+        color: #f0eeee;
+    }
+
+    /* Inline error / success states */
+    .status-message {
+        margin: 0 0 18px 0;
+        padding: 14px 16px;
+        border-radius: 12px;
+        font-size: 14px;
+        line-height: 1.5;
+        border: 1px solid transparent;
+    }
+
+    .status-message.error {
+        background: rgba(231, 74, 74, 0.12);
+        border-color: rgba(231, 74, 74, 0.35);
+        color: #ffd2d2;
+    }
+
+    .status-message.info {
+        background: rgba(74, 143, 231, 0.12);
+        border-color: rgba(74, 143, 231, 0.35);
+        color: #d6e8ff;
+    }
+
     </style>
 </head>
 
 <body>
-<div id="app" :data-ready="ready ? 'true' : 'false'" >
+<div id="app">
 
-  <!-- Top Header -->
   <div class="top-header">
       <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
       <div class="user-profile" @click="showProfile">
@@ -331,77 +685,260 @@
       </div>
   </div>
 
-  <!-- Back Arrow -->
-   <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←
-   </div>
+  <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←</div>
 
-  <!-- Home Button -->
-   <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goHome">
+  <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goHome">
     <svg viewBox="0 0 24 24" width="30" height="30" fill="#8b9dc3">
         <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
     </svg>
   </div>
 
-  <!-- Sidebar -->
   <cybercomply-sidebar
       ref="sidebar"
       :sidebar-open="sidebarOpen"
       @toggle="sidebarOpen = !sidebarOpen"
   ></cybercomply-sidebar>
 
-    <!-- Main Content -->
     <div class="report-viewer" :class="{ shifted: sidebarOpen }">
         <h2 class="report-title">{{ currentReportName || 'Select a report' }}</h2>
-        <div class="pdf-container" style="padding: 24px; overflow-y: auto;">
+        
+        <div v-if="uiMessage" class="status-message" :class="uiMessageType">
+            {{ uiMessage }}
+        </div>
+
+        <div class="pdf-container">
             <div v-if="isGenerating" style="color:#6b7a99; text-align:center; margin-top:40px;">
                 Generating report…
             </div>
+
             <div v-else-if="!currentSnapshot" style="color:#6b7a99; text-align:center; margin-top:40px;">
                 Please select a report from the sidebar to view its content.
             </div>
-            <div v-else>
-                <div style="margin-bottom:16px;"><strong>File:</strong> {{ currentSnapshot.metadata?.file_analyzed || '—' }}</div>
-                <div style="margin-bottom:16px;"><strong>Company:</strong> {{ currentSnapshot.metadata?.company || '—' }}</div>
-                <div style="margin-bottom:16px;"><strong>Compliance Score:</strong> {{ currentSnapshot.compliance?.compliance_score ?? '—' }}%</div>
-                <div style="margin-bottom:16px;">
-                    <strong>Risk Level:</strong> 
-                    {{ currentSnapshot.risks?.status ? currentSnapshot.risks.status.charAt(0).toUpperCase() + currentSnapshot.risks.status.slice(1) : '—' }} </div>
-                <div v-if="currentSnapshot.risks?.factors?.length" style="margin-bottom:16px;">
-                    <strong>Risk Factors:</strong>
-                    <ul style="margin-top:8px; padding-left:20px;">
-                        <li v-for="(f, i) in currentSnapshot.risks.factors" :key="i">{{ f }}</li>
-                    </ul>
-                </div>
-                <div v-if="topRecommendation" style="margin-bottom:16px;">
-                    <strong>Top Recommendation:</strong> {{ topRecommendation }}
-                </div>
-                <div v-if="currentSnapshot.compliance?.details?.length" style="margin-top:20px;">
-                    <strong>Compliance Details:</strong>
-                    <div v-for="(d, i) in sortedDetails" :key="i"
-                         style="margin-top:12px; padding:12px; background:#1a2845; border-radius:8px;">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                            <strong style="color:#ffffff;">{{ d.clause }}</strong>
-                            <span style="flex-shrink:0; margin-left:12px;" :style="{ color: d.status === 'compliant' ? '#4caf50' : (d.status === 'partial' ? '#ff9800' : '#f44336') }">
-                                {{ d.status === 'compliant' ? 'Compliant' : d.status === 'non-compliant' || d.status === 'non_compliant' ? 'Non-Compliant' : d.status === 'partial' ? 'Partial' : d.status }}</span>
-                        </div>
-                        <div style="margin-top:4px; font-size:13px; color:#c5d0e6;">{{ d.reasoning }}</div>
-                        <div style="margin-top:4px; font-size:12px; color:#8b9dc3;">Risk: {{ d.risk_level ? d.risk_level.charAt(0).toUpperCase() + d.risk_level.slice(1) : '—' }} | Confidence: {{ d.confidence }}%</div>
-                    </div>
-                </div>
+
+            <div v-else class="report-shell">
+
+                <section class="report-section overview-section">
+                  <div class="section-header">
+                      <div>
+                          <div class="section-kicker">Overview</div>
+                          <div class="section-title">Document Analysis</div>
+                          <div class="section-subtitle">
+                              Key document details and overall compliance summary
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="summary-grid">
+                      <div class="summary-card">
+                          <div class="summary-label">File</div>
+                          <div class="summary-value">{{ currentSnapshot.metadata?.file_analyzed || '—' }}</div>
+                      </div>
+
+                      <div class="summary-card">
+                          <div class="summary-label">Company</div>
+                          <div class="summary-value">{{ currentSnapshot.metadata?.company || '—' }}</div>
+                      </div>
+
+                      <!-- ── NEW: Department card (only when present) ── -->
+                      <div v-if="currentSnapshot.metadata?.department" class="summary-card">
+                          <div class="summary-label">Department</div>
+                          <div class="summary-value">{{ currentSnapshot.metadata.department }}</div>
+                      </div>
+
+                      <div class="summary-card">
+                          <div class="summary-label">Risk Level</div>
+                          <div class="summary-value">
+                              {{ currentSnapshot.risks?.status ? currentSnapshot.risks.status.charAt(0).toUpperCase() + currentSnapshot.risks.status.slice(1) : '—' }}
+                          </div>
+                      </div>
+
+                      <div class="summary-card">
+                          <div class="summary-label">Top Recommendation</div>
+                          <div class="summary-value">{{ topRecommendation || '—' }}</div>
+                      </div>
+                  </div>
+
+                <div class="subsection-block">
+                      <div class="summary-label">Compliance Score</div>
+                      <div class="summary-value">{{ currentSnapshot.compliance?.compliance_score ?? '—' }}%</div>
+                      <div class="progress-bar">
+                          <div
+                              class="progress-fill"
+                              :style="{ width: Math.max(0, Math.min(100, Number(currentSnapshot.compliance?.compliance_score ?? 0))) + '%' }">
+                          </div>
+                      </div>
+                  </div>
+
+                  <div v-if="currentSnapshot.risks?.factors?.length" class="subsection-block">
+                      <div class="summary-label">Risk Factors</div>
+                      <ul class="risk-factor-list">
+                          <li v-for="(f, i) in currentSnapshot.risks.factors" :key="i">{{ f }}</li>
+                      </ul>
+                  </div>
+              </section>
+
+              <section class="report-section section-dark">
+                  <div class="section-header">
+                      <div>
+                          <div class="section-kicker">Assessment</div>
+                          <div class="section-title">Compliance Findings</div>
+                          <div class="section-subtitle">
+                              Gaps and risks identified from the uploaded policy
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="subsection-block">
+                      <div class="summary-label">Gap Identification</div>
+                      <div class="section-subtitle">
+                          Requirements completely absent from the policy — {{ gaps.length }} gap{{ gaps.length !== 1 ? 's' : '' }} identified
+                      </div>
+
+                      <div v-if="gaps.length === 0" class="empty-state">
+                          No compliance gaps detected. All requirements are at least partially addressed.
+                      </div>
+
+                      <div v-else class="list-block">
+                          <div v-for="(item, idx) in gaps" :key="'gap-'+item.requirement_id" class="item-card">
+                              <div class="item-index">{{ idx + 1 }}</div>
+                              <div class="item-body">
+                                  <div class="item-title">{{ item.clause }}</div>
+                                  <div class="item-text">{{ item.reasoning }}</div>
+                              </div>
+                              <span :style="riskBadgeStyle(item.risk_level)"
+                                  style="font-size:10px; font-weight:700; padding:6px 12px; border-radius:999px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; align-self: flex-start; display:inline-flex; align-items: center; justify-content: center; line-height: 1; min-width: 88px; text-align: center; letter-spacing: 0.8px;">
+                                  {{ item.risk_level || 'unknown' }}
+                              </span>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="subsection-divider"></div>
+
+                  <div class="subsection-block">
+                      <div class="summary-label">Risk Assessment</div>
+                      <div class="section-subtitle">
+                          All non-compliant and partially compliant requirements — {{ riskItems.length }} item{{ riskItems.length !== 1 ? 's' : '' }} flagged
+                      </div>
+
+                      <div v-if="riskItems.length === 0" class="empty-state">
+                          No risks identified. The document appears fully compliant.
+                      </div>
+
+                      <div v-else class="list-block">
+                          <div v-for="(item, idx) in riskItems" :key="'risk-'+item.requirement_id" class="item-card">
+                              <div class="item-index">{{ idx + 1 }}</div>
+                              <div class="item-body">
+                                  <div class="item-title">
+                                      {{ item.clause }}
+                                      <span v-if="item.status === 'partial'" class="badge-partial">Partial</span>
+                                  </div>
+                                  <div class="item-text">{{ item.reasoning }}</div>
+                              </div>
+                              <span :style="riskBadgeStyle(item.risk_level)"
+                                  style="font-size:10px; font-weight:700; padding:6px 12px; border-radius:999px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; align-self: flex-start; display:inline-flex; align-items: center; justify-content: center; line-height: 1; min-width: 88px; text-align: center; letter-spacing: 0.8px;">
+                                  {{ item.risk_level || 'unknown' }}
+                              </span>
+                          </div>
+                      </div>
+                  </div>
+              </section>   
+              
+              <section v-if="isAdmin" class="report-section section-dark">
+                  <div class="section-header">
+                      <div>
+                          <div class="section-kicker">Department View</div>
+                          <div class="section-title">Comparison</div>
+                          <div class="section-subtitle">
+                              Department-level summary and recommendation references
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="comparison-grid">
+                      <div class="comparison-card">
+                          <div class="comparison-label">Company</div>
+                          <div class="comparison-value">{{ currentSnapshot.metadata?.company || '—' }}</div>
+                      </div>
+
+                      <div v-if="departmentName" class="comparison-card">
+                          <div class="comparison-label">Department</div>
+                          <div class="comparison-value">{{ departmentName }}</div>
+                      </div>
+
+                      <div class="comparison-card">
+                          <div class="comparison-label">Score / Risk</div>
+                          <div class="comparison-value">
+                              {{ currentSnapshot.compliance?.compliance_score ?? '—' }}% — {{ overallRiskLevel }} Risk
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="subsection-block" style="margin-top: 20px;">
+                      <div class="summary-label">
+                          {{ departmentName || currentSnapshot.metadata?.company || 'Departmental' }} Recommendations
+                      </div>
+
+                      <div v-if="departmentRecs.length === 0" class="empty-state">
+                          No recommendations — this department is fully compliant.
+                      </div>
+
+                      <div v-else class="list-block">
+                          <div v-for="rec in departmentRecs" :key="rec.requirementId" class="item-card">
+                              <div class="item-body">
+                                  <div class="item-title">{{ rec.clauseTitle }}</div>
+                                  <div class="item-text">{{ rec.reference }}</div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </section>
+
+                <section v-if="isAdmin" class="report-section section-dark">
+                  <div class="section-header">
+                      <div>
+                          <div class="section-kicker">Action Plan</div>
+                          <div class="section-title">Recommendations</div>
+                          <div class="section-subtitle">
+                              {{ riskItems.length }} recommendation{{ riskItems.length !== 1 ? 's' : '' }} generated from flagged requirements
+                          </div>
+                      </div>
+                  </div>
+
+                  <div v-if="riskItems.length === 0" class="empty-state">
+                      No recommendations — the document is fully compliant.
+                  </div>
+
+                  <div v-else class="list-block">
+                      <div v-for="(item, idx) in riskItems" :key="'rec-'+item.requirement_id" class="item-card">
+                          <div class="item-index">{{ idx + 1 }}</div>
+                          <div class="item-body">
+                              <div class="item-title">{{ item.clause }}</div>
+                              <div class="item-text">{{ item.recommendation || item.reasoning }}</div>
+                              <div class="item-meta">
+                                  Personal Data Protection Act No. 9 of 2022 (Sri Lanka) — {{ buildReferenceFromId(item.requirement_id) }}
+                              </div>
+                          </div>
+                          <span :style="riskBadgeStyle(item.risk_level)"
+                              style="font-size:10px; font-weight:700; padding:6px 12px; border-radius:999px; text-transform:uppercase; white-space:nowrap; flex-shrink:0; align-self: flex-start; display:inline-flex; align-items: center; justify-content: center; line-height: 1; min-width: 88px; text-align: center; letter-spacing: 0.8px;">
+                              {{ item.risk_level || 'unknown' }}
+                          </span>
+                      </div>
+                  </div>
+              </section>
+
             </div>
         </div>
         <p class="report-notice">Note: Reports are automatically deleted after 30 days.</p>
     </div>
 
-    <!-- Share & Download Buttons -->
     <div class="report-actions" :class="{ shifted: sidebarOpen }">
 
-      <!-- Download Button -->
       <div class="action-btn-wrapper">
-        <button 
-          class="download-btn" 
+        <button
+          class="download-btn"
           :class="{ locked: !isAdmin }"
-          @click="isAdmin ? downloadReport() : null" 
+          @click="isAdmin ? downloadReport() : null"
           title="Download Report">
           <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
               <path d="M5 20h14v-2H5v2zm7-18v12l4-4h-3V2h-2v8H8l4 4z"/>
@@ -412,12 +949,11 @@
         </div>
       </div>
 
-      <!-- Share Button -->
       <div class="action-btn-wrapper">
-        <button 
-          class="share-btn" 
+        <button
+          class="share-btn"
           :class="{ locked: !isAdmin }"
-          @click="isAdmin ? shareReport() : null" 
+          @click="isAdmin ? shareReport() : null"
           title="Share Report">
           <svg viewBox="0 0 24 24" width="32" height="32" fill="#ffffff">
             <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11c.53.5 1.23.81 2.07.81 1.66 0 3-1.34 3-3S19.66 2 18 2s-3 1.34-3 3c0 .24.03.47.09.7l-7.02 4.11c-.53-.5-1.23-.81-2.07-.81-1.66 0-3 1.34-3 3s1.34 3 3 3c.84 0 1.54-.31 2.07-.81l7.13 4.16c-.06.21-.1.43-.1.65 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/>
@@ -430,10 +966,9 @@
 
     </div>
 
-    <!-- Wavy Background -->
-  <div class="wavy-background">
+    <div class="wavy-background">
       <img src="img1.png" alt="Wavy Design">
-  </div> 
+  </div>
 
 </div>
 
@@ -450,32 +985,61 @@ const app = createApp({
       isGenerating: false,
       currentReportName: '',
       currentSnapshot: null,
-      ready: false
+      resultId: null,
+      departmentName: '',
+      uiMessage: '',
+      uiMessageType: 'error',
     }
   },
 
   async mounted() {
     const token = sessionStorage.getItem('authToken');
     if (!token) {
+      this.showUiMessage('Your session has expired. Please log in again.');
       window.location.href = 'login.html';
       return;
     }
 
+    window.addEventListener('error', (event) => {
+        this.logClientError(
+            'window.error',
+            event.error || new Error(event.message),
+            {
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno
+            }
+        );
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+        this.logClientError(
+            'unhandledrejection',
+            event.reason || new Error('Unhandled promise rejection')
+        );
+    });
+
     // Resolve admin flag
     this.isAdmin = sessionStorage.getItem('userRole') === 'ADMINISTRATIVE_USER';
 
+    SessionManager.init({ timeoutMs: 1200000 });
+
     const params   = new URLSearchParams(window.location.search);
-    const reportId = params.get('report_id');
+    const reportId = (params.get('report_id') || '').trim();
     const generate = params.get('generate');  // 'true' when coming from document_analysis
 
     if (generate === 'true') {
-      // ── Generate a new report from the latest saved analysis result ──
       await this.generateReport(token);
-    } else if (reportId) {
-      // ── Load an existing report chosen from the sidebar ──
+      return;
+    }
+    
+    if (reportId) {
+      if (!this.isValidUuid(reportId)) {
+        this.showUiMessage('Invalid report ID.');
+        return;
+      }
       await this.loadReport(reportId, token);
     }
-    this.ready = true;
   },
 
   computed: {
@@ -497,317 +1061,725 @@ const app = createApp({
             if (statusDiff !== 0) return statusDiff;
             return (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4);
         });
+    },
+
+    gaps() {
+        const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+        return (this.currentSnapshot?.compliance?.details || [])
+            .filter(d => d.status === 'non_compliant' || d.status === 'non-compliant')
+            .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
+    },
+
+    riskItems() {
+        const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+        return (this.currentSnapshot?.compliance?.details || [])
+            .filter(d => d.status === 'non_compliant' || d.status === 'non-compliant' || d.status === 'partial')
+            .sort((a, b) => (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4));
+    },
+
+    overallRiskLevel() {
+        const score = this.currentSnapshot?.compliance?.compliance_score ?? 0;
+        if (score >= 75) return 'Low';
+        if (score >= 40) return 'Medium';
+        return 'High';
+    },
+
+    departmentRecs() {
+        return this.riskItems.map(d => ({
+            requirementId: d.requirement_id,
+            clauseTitle:   d.clause || d.requirement_id,
+            reference:     this.buildReferenceFromId(d.requirement_id)
+        }));
     }
   },
 
   methods: {
-    showProfile() { window.location.href = 'profile.html'; },
-    goBack()      { window.history.back(); },
-    goHome()      { window.location.href = 'home.html'; },
+    showUiMessage(message, type = 'error', fallback = 'Something went wrong. Please try again.') {
+        this.uiMessage = message || fallback;
+        this.uiMessageType = type;
+    },
 
-    // ── Called when arriving from "Generate Reports" on document_analysis.html ──
+    clearUiMessage() {
+        this.uiMessage = '';
+        this.uiMessageType = 'error';
+    },
+
+    async logClientError(source, error, extra = {}) {
+        const token = sessionStorage.getItem('authToken');
+
+        const payload = {
+            source,
+            message: error?.message || String(error) || 'Unknown client error',
+            stack: error?.stack || null,
+            page: window.location.pathname,
+            url: window.location.href,
+            report_id: this.resultId || new URLSearchParams(window.location.search).get('report_id') || null,
+            user_role: sessionStorage.getItem('userRole') || null,
+            timestamp: new Date().toISOString(),
+            extra
+        };
+
+        console.error(`[CLIENT ERROR] ${source}`, payload);
+
+        try {
+            await fetch(`${BASE}/api/client-error-log/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify(payload)
+            });
+        } catch (loggingError) {
+            console.error('Failed to send client error log:', loggingError);
+        }
+    },
+
+    async getErrorMessage(response, fallback = 'Something went wrong.') {
+      try {
+        const contentType = response.headers.get('content-type') || '';
+
+        if (contentType.includes('application/json')) {
+          const data = await response.json();
+          return data.detail || data.error || data.message || fallback;
+        }
+
+        const text = await response.text();
+        return text ? text : fallback;
+      } catch {
+        return fallback;
+      }
+    },
+
+    isValidUuid(value) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test((value || '').trim());
+    },
+
+    // ── Generate reports ──────────────────────────────────────────────────────
+    // Supports both single (latestResultId) and batch (batchResultIds) modes.
+    // In batch mode every result ID gets its own report; the last one is
+    // displayed while the rest become available in the sidebar.
     async generateReport(token) {
+      this.clearUiMessage();
       this.isGenerating = true;
 
-      const resultId = sessionStorage.getItem('latestResultId');
-      if (!resultId) {
+      // ── Detect batch vs single ──────────────────────────────────────────────
+      const batchIdsRaw = sessionStorage.getItem('batchResultIds');
+      const singleId    = (sessionStorage.getItem('latestResultId') || '').trim();
+
+      let resultIds = [];
+      if (batchIdsRaw) {
+        try {
+          const parsed = JSON.parse(batchIdsRaw);
+          resultIds = Array.isArray(parsed) ? parsed : [];
+        } catch {
+          resultIds = [];
+        }
+      }
+
+      // Fall back to single-ID mode when no batch list is present
+      if (resultIds.length === 0 && singleId) {
+        resultIds = [singleId];
+      }
+
+      if (resultIds.length === 0) {
+        this.showUiMessage('No analysis result found. Please analyse a document first.');
+        this.isGenerating = false;
+        return;
+      }
+
+      // Validate every ID up-front; drop invalid ones and warn
+      const validIds = resultIds.filter(id => {
+        if (!this.isValidUuid((id || '').trim())) {
+          console.warn('Skipping invalid result ID:', id);
+          return false;
+        }
+        return true;
+      });
+
+      if (validIds.length === 0) {
+        this.showUiMessage('Invalid analysis result ID.');
         this.isGenerating = false;
         return;
       }
 
       try {
-        const resAnalysis = await fetch(`${BASE}/api/analysis/${resultId}/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!resAnalysis.ok) {
-          this.isGenerating = false;
+        let lastGeneratedId = null;
+
+        for (const resultId of validIds) {
+          try {
+            // ── Fetch the analysis record ─────────────────────────────────
+            const resAnalysis = await fetch(`${BASE}/api/analysis/${resultId}/`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!resAnalysis.ok) {
+              if (resAnalysis.status === 401) {
+                this.showUiMessage(
+                  await this.getErrorMessage(resAnalysis, 'Session expired.'),
+                  'error',
+                  'Session expired.'
+                );
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+                return;
+              }
+              console.warn('Failed to fetch analysis for', resultId, resAnalysis.status);
+              continue;
+            }
+
+            const analysis = await resAnalysis.json();
+
+            if (!analysis || !analysis.result_id) {
+              console.warn('Invalid analysis data for', resultId);
+              continue;
+            }
+
+            if (!analysis.original_filename) {
+              console.warn('Missing original_filename for', resultId);
+              continue;
+            }
+
+            // ── Build snapshot — include department in metadata ────────────
+            const snapshot = { ...(analysis.raw_output || {}) };
+            snapshot.metadata = {
+              ...(snapshot.metadata || {}),
+              file_analyzed: analysis.original_filename || snapshot.metadata?.file_analyzed || '',
+              company:       analysis.company_name  || '',
+              // ── NEW: capture department from the analysis record ──────────
+              department:    analysis.department || analysis.dept_name || ''
+            };
+
+            const payload = {
+              result_id:       resultId,
+              report_snapshot: snapshot,
+              report_s3_key:   analysis.original_filename || resultId,
+              file_size:       JSON.stringify(snapshot).length,
+              expires_in_days: 30
+            };
+
+            // ── Generate the report on the backend ────────────────────────
+            const resGenerate = await fetch(`${BASE}/api/reports/generate/`, {
+              method:  'POST',
+              headers: {
+                'Content-Type':  'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify(payload)
+            });
+
+            if (!resGenerate.ok) {
+              if (resGenerate.status === 401) {
+                this.showUiMessage(
+                  await this.getErrorMessage(resGenerate, 'Session expired.'),
+                  'error',
+                  'Session expired.'
+                );
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+                return;
+              }
+              console.warn('Failed to generate report for', resultId, resGenerate.status);
+              continue;
+            }
+
+            const generated = await resGenerate.json();
+
+            if (!generated || !generated.report_id) {
+              console.warn('Report created but server returned invalid response for', resultId);
+              continue;
+            }
+
+            lastGeneratedId = generated.report_id;
+
+          } catch (innerErr) {
+            await this.logClientError('generateReport.loop', innerErr, { resultId });
+          }
+        }
+
+        if (!lastGeneratedId) {
+          this.showUiMessage('Report generation failed for all selected documents. Please try again.');
           return;
         }
-        const analysis = await resAnalysis.json();
 
-        // Build snapshot — use DB-sourced company name 
-        // For general users, company_name will be empty and display falls back to just the filename.
-        const snapshot = { ...(analysis.raw_output || {}) };
-        snapshot.metadata = {
-          ...(snapshot.metadata || {}),
-          file_analyzed: analysis.original_filename || snapshot.metadata?.file_analyzed || '',
-          company:       analysis.company_name || ''
-        };
-
-        // ← this is what was missing in the broken version
-        const payload = {
-          result_id:       resultId,
-          report_snapshot: snapshot,
-          report_s3_key:   analysis.original_filename || resultId,
-          file_size:       JSON.stringify(snapshot).length,
-          expires_in_days: 30
-        };
-
-        const resGenerate = await fetch(`${BASE}/api/reports/generate/`, {
-          method:  'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (!resGenerate.ok) {
-          console.error('Failed to generate report:', await resGenerate.text());
-          return;
-        }
-
-        const generated = await resGenerate.json();
-
-        // Replace URL so a refresh doesn't re-generate
+        // ── Display the last generated report; sidebar gets the rest ─────
         window.history.replaceState(
           {}, '',
-          `report_viewing.html?report_id=${generated.report_id}`
+          `report_viewing.html?report_id=${lastGeneratedId}`
         );
 
-        // Display the newly generated report
-        await this.loadReport(generated.report_id, token);
+        await this.loadReport(lastGeneratedId, token);
 
-        // Tell the sidebar to re-fetch so the new report appears immediately
         await this.$nextTick();
-        if (this.$refs.sidebar) {
+        if (this.$refs.sidebar && typeof this.$refs.sidebar.refreshReports === 'function') {
           this.$refs.sidebar.refreshReports();
         }
 
       } catch (e) {
-        console.error('generateReport error:', e);
+        await this.logClientError('generateReport', e, {
+            batchResultIds: batchIdsRaw,
+            latestResultId: singleId
+        });
+        this.showUiMessage(
+            'Unable to connect to the backend. Please check whether the server is running.',
+            'error',
+            'Unable to connect to backend'
+        );
       } finally {
-        this.isGenerating = false; // always runs regardless of success or failure
+        this.isGenerating = false;
       }
     },
 
-    // ── Load and display an existing report by ID ──
+    // ── Load and display an existing report by ID ─────────────────────────────
     async loadReport(reportId, token) {
+      this.clearUiMessage();
+      if (!reportId || !this.isValidUuid(reportId)) {
+        this.showUiMessage('Invalid report ID.');
+        return;
+      }
+
+      if (!token) {
+        this.showUiMessage('Your session has expired. Please log in again.');
+        window.location.href = 'login.html';
+        return;
+      }
+  
       try {
         const res = await fetch(`${BASE}/api/reports/${reportId}/`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!res.ok) return;
+        if (!res.ok){
+          const msg = await this.getErrorMessage(res, 'Failed to load report.');
+
+          if (res.status === 401) {
+            this.showUiMessage(msg, 'error', 'Failed to load report.')
+            sessionStorage.clear();
+            window.location.href = 'login.html';
+            return;
+          }
+
+          this.showUiMessage(msg, 'error', 'Failed to load report.');
+          return;
+        }
         const data = await res.json();
-        this.currentSnapshot  = data.report_snapshot;
-        // Build display name from snapshot metadata
+        if (!data || !data.report_snapshot) {
+          this.showUiMessage('Report data is missing or invalid.');
+          return;
+        }
+        this.currentSnapshot = data.report_snapshot;
+        this.clearUiMessage();
+        this.resultId = data.result_id || null;
+        
         const meta    = (data.report_snapshot || {}).metadata || {};
-        const company = (meta.company || '').trim();
+        const company = (meta.company    || '').trim();
+        const dept    = (meta.department || '').trim();
         const file    = (meta.file_analyzed || '').trim();
-        this.currentReportName = company ? `${company} — ${file}` : file || 'Report';
-        await this.$nextTick();
+
+        // ── NEW: include department in the displayed report name ───────────
+        const nameParts = [company, dept, file].filter(Boolean);
+        this.currentReportName = nameParts.join(' — ') || 'Report';
+
+        // ── Keep departmentName in sync for the Comparison section ────────
+        // Prefer the value already stored in snapshot metadata; fall back to
+        // a separate analysis API call (preserves database-branch behaviour
+        // for older reports that pre-date the department metadata field).
+        if (dept) {
+          this.departmentName = dept;
+        } else if (this.resultId) {
+          try {
+            const aRes = await fetch(`${BASE}/api/analysis/${this.resultId}/`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (aRes.ok) {
+              const aData = await aRes.json();
+              this.departmentName = aData.department || '';
+            }
+          } catch (_) {
+            this.departmentName = '';
+          }
+        } else {
+          this.departmentName = '';
+        }
+
       } catch (e) {
-        console.error('loadReport error:', e);
+        console.error('loadReport error:', e, { reportId });
+        this.showUiMessage('Something went wrong while loading the report.');
       }
     },
 
+    // ── Unified PDF generator (unchanged from database branch) ────────────────
+    generatePdfDoc() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+        const snap     = this.currentSnapshot;
+        const meta     = snap.metadata || {};
+        const pageW    = doc.internal.pageSize.getWidth();
+        const pageH    = doc.internal.pageSize.getHeight();
+        const margin   = 20;
+        const contentW = pageW - margin * 2;
+
+        const BRAND_COLOR = [26, 40, 69];
+        const TEXT_COLOR = [30, 30, 30];
+        const LIGHT_GRAY = [245, 246, 248];
+        const BORDER_COLOR = [200, 205, 215];
+        
+        const RED = [210, 60, 60];
+        const ORANGE = [220, 120, 0];
+        const YELLOW = [190, 150, 0];
+        const GREEN = [60, 160, 60];
+
+        const addHeader = () => {
+            doc.setFillColor(...BRAND_COLOR);
+            doc.rect(0, 0, pageW, 22, 'F');
+            doc.setFont('times', 'bold');
+            doc.setFontSize(16);
+            doc.setTextColor(255, 255, 255);
+            doc.text('CyberComply', margin, 14);
+            doc.setFontSize(10);
+            doc.setFont('times', 'normal');
+            doc.text('CONFIDENTIAL COMPLIANCE REPORT', pageW - margin, 14, { align: 'right' });
+            doc.setTextColor(...TEXT_COLOR);
+        };
+
+        const checkPage = (currentY, needed) => {
+            if (currentY + needed > pageH - 20) {
+                doc.addPage();
+                addHeader();
+                return 35;
+            }
+            return currentY;
+        };
+
+        const printSectionTitle = (title, currentY) => {
+            currentY = checkPage(currentY, 15);
+            doc.setFont('times', 'bold');
+            doc.setFontSize(14);
+            doc.setTextColor(...BRAND_COLOR);
+            doc.text(title, margin, currentY);
+            doc.setDrawColor(...BRAND_COLOR);
+            doc.setLineWidth(0.4);
+            doc.line(margin, currentY + 3, pageW - margin, currentY + 3);
+            doc.setTextColor(...TEXT_COLOR);
+            return currentY + 12;
+        };
+
+        addHeader();
+        let y = 35;
+
+        doc.setFont('times', 'bold');
+        doc.setFontSize(18);
+        const titleLines = doc.splitTextToSize(this.currentReportName || 'Compliance Analysis Report', contentW);
+        doc.text(titleLines, margin, y);
+        y += (titleLines.length * 8) + 5;
+
+        y = printSectionTitle('1. Executive Overview', y);
+        doc.setFontSize(11);
+        
+        const metaLeftX = margin;
+        const metaRightX = margin + 35;
+        
+        doc.setFont('times', 'bold'); doc.text('Company:', metaLeftX, y);
+        doc.setFont('times', 'normal'); doc.text(meta.company || '—', metaRightX, y); y += 7;
+
+        // ── NEW: include department in PDF overview when present ───────────
+        if (meta.department) {
+            doc.setFont('times', 'bold'); doc.text('Department:', metaLeftX, y);
+            doc.setFont('times', 'normal'); doc.text(meta.department, metaRightX, y); y += 7;
+        }
+
+        doc.setFont('times', 'bold'); doc.text('File Analyzed:', metaLeftX, y);
+        doc.setFont('times', 'normal'); doc.text(meta.file_analyzed || '—', metaRightX, y); y += 7;
+
+        doc.setFont('times', 'bold'); doc.text('Compliance Score:', metaLeftX, y);
+        doc.setFont('times', 'normal'); doc.text(`${snap.compliance?.compliance_score ?? '—'}%`, metaRightX, y); y += 7;
+
+        doc.setFont('times', 'bold'); doc.text('Overall Risk Level:', metaLeftX, y);
+        doc.setFont('times', 'normal'); doc.text(this.overallRiskLevel || '—', metaRightX, y); y += 10;
+
+        if (snap.risks?.factors?.length) {
+            y = checkPage(y, 10);
+            doc.setFont('times', 'bold'); doc.text('Key Risk Factors:', margin, y); y += 6;
+            doc.setFont('times', 'normal');
+            snap.risks.factors.forEach(f => {
+                doc.setFontSize(11);
+                const fLines = doc.splitTextToSize(`• ${f || 'Unknown factor'}`, contentW - 5);
+                y = checkPage(y, fLines.length * 5);
+                doc.text(fLines, margin + 5, y);
+                y += fLines.length * 5 + 2;
+            });
+            y += 5;
+        }
+
+        y = printSectionTitle('2. Compliance Findings', y);
+
+        y = checkPage(y, 15);
+        doc.setFont('times', 'bold'); doc.setFontSize(12); doc.text('2.1 Gap Identification', margin, y); y += 6;
+        doc.setFont('times', 'normal'); doc.setFontSize(10);
+        doc.text(`Requirements completely absent from the policy — ${this.gaps.length} gap(s) identified.`, margin, y); y += 8;
+
+        if (this.gaps.length === 0) {
+            doc.setFont('times', 'italic'); doc.text('No compliance gaps detected.', margin + 5, y); y += 10;
+        } else {
+            this.gaps.forEach((gap, idx) => {
+                const clauseStr = gap.clause || 'Unknown Requirement';
+                const riskStr   = (gap.risk_level || 'unknown').toUpperCase();
+                
+                doc.setFontSize(10);
+                const titleLines = doc.splitTextToSize(`${idx + 1}. ${clauseStr}`, contentW - 20);
+                const reasonLines = doc.splitTextToSize(`Reasoning: ${gap.reasoning || 'No reasoning provided.'}`, contentW - 20);
+                
+                const blockH = (titleLines.length * 5) + 6 + (reasonLines.length * 5) + 6;
+                y = checkPage(y, blockH);
+
+                doc.setFont('times', 'bold');
+                doc.setTextColor(...TEXT_COLOR);
+                doc.text(titleLines, margin + 5, y);
+                y += titleLines.length * 5;
+
+                let riskColor = TEXT_COLOR;
+                if (riskStr === 'CRITICAL') riskColor = RED;
+                else if (riskStr === 'HIGH') riskColor = ORANGE;
+                else if (riskStr === 'MEDIUM') riskColor = YELLOW;
+                
+                doc.setFontSize(9);
+                doc.setTextColor(120, 120, 120); doc.text('Risk Level:', margin + 5, y);
+                let offset = margin + 5 + doc.getTextWidth('Risk Level: ') + 1;
+                doc.setTextColor(...riskColor); doc.text(riskStr, offset, y);
+                
+                y += 6;
+
+                doc.setFontSize(10);
+                doc.setFont('times', 'normal');
+                doc.setTextColor(...TEXT_COLOR);
+                doc.text(reasonLines, margin + 5, y);
+                y += reasonLines.length * 5 + 4;
+            });
+        }
+
+        y = checkPage(y, 15);
+        doc.setFont('times', 'bold'); doc.setFontSize(12); doc.text('2.2 Risk Assessment', margin, y); y += 6;
+        doc.setFont('times', 'normal'); doc.setFontSize(10);
+        doc.text(`All non-compliant and partially compliant requirements — ${this.riskItems.length} item(s) flagged.`, margin, y); y += 8;
+
+        if (this.riskItems.length === 0) {
+            doc.setFont('times', 'italic'); doc.text('No risks identified.', margin + 5, y); y += 10;
+        } else {
+            this.riskItems.forEach((item, idx) => {
+                const clauseStr = item.clause || 'Unknown Requirement';
+                const statusStr = (item.status || 'unknown').toUpperCase();
+                const riskStr   = (item.risk_level || 'unknown').toUpperCase();
+                
+                doc.setFontSize(10);
+                const titleLines = doc.splitTextToSize(`${idx + 1}. ${clauseStr}`, contentW - 20);
+                const reasonLines = doc.splitTextToSize(`Reasoning: ${item.reasoning || 'No reasoning provided.'}`, contentW - 20);
+                
+                const blockH = (titleLines.length * 5) + 6 + (reasonLines.length * 5) + 6;
+                y = checkPage(y, blockH);
+
+                doc.setFont('times', 'bold');
+                doc.setTextColor(...TEXT_COLOR);
+                doc.text(titleLines, margin + 5, y);
+                y += titleLines.length * 5;
+
+                doc.setFontSize(9);
+                
+                let statusColor = TEXT_COLOR;
+                if (statusStr === 'NON_COMPLIANT' || statusStr === 'NON-COMPLIANT') statusColor = RED;
+                else if (statusStr === 'PARTIAL') statusColor = ORANGE;
+                
+                doc.setFont('times', 'bold'); doc.setTextColor(120, 120, 120); doc.text('Status:', margin + 5, y);
+                let offset = margin + 5 + doc.getTextWidth('Status: ') + 1;
+                doc.setTextColor(...statusColor); doc.text(statusStr, offset, y);
+                
+                offset += doc.getTextWidth(statusStr) + 8;
+                
+                let riskColor = TEXT_COLOR;
+                if (riskStr === 'CRITICAL') riskColor = RED;
+                else if (riskStr === 'HIGH') riskColor = ORANGE;
+                else if (riskStr === 'MEDIUM') riskColor = YELLOW;
+                
+                doc.setTextColor(120, 120, 120); doc.text('Risk Level:', offset, y);
+                offset += doc.getTextWidth('Risk Level: ') + 1;
+                doc.setTextColor(...riskColor); doc.text(riskStr, offset, y);
+                
+                y += 6;
+                
+                doc.setFontSize(10);
+                doc.setFont('times', 'normal');
+                doc.setTextColor(...TEXT_COLOR);
+                doc.text(reasonLines, margin + 5, y);
+                y += reasonLines.length * 5 + 4;
+            });
+        }
+
+        if (this.isAdmin) {
+            
+            y = printSectionTitle('3. Department Comparison', y);
+            doc.setFontSize(11);
+            doc.setFont('times', 'bold'); doc.text('Department:', margin, y);
+            doc.setFont('times', 'normal'); doc.text(this.departmentName || '—', margin + 30, y); y += 7;
+
+            if (this.departmentRecs.length === 0) {
+                y = checkPage(y, 10);
+                doc.setFont('times', 'italic'); doc.text('No departmental recommendations.', margin, y); y += 10;
+            } else {
+                y = checkPage(y, 10);
+                doc.setFont('times', 'bold'); doc.text('Departmental Recommendations:', margin, y); y += 6;
+                doc.setFont('times', 'normal'); doc.setFontSize(10);
+                this.departmentRecs.forEach(rec => {
+                    doc.setFontSize(10);
+                    const recLines = doc.splitTextToSize(`• ${rec.clauseTitle || 'Unknown'} - ${rec.reference || ''}`, contentW - 5);
+                    y = checkPage(y, recLines.length * 5);
+                    doc.text(recLines, margin + 5, y); y += recLines.length * 5 + 2;
+                });
+                y += 5;
+            }
+
+            y = printSectionTitle('4. Action Plan & Recommendations', y);
+            if (this.riskItems.length === 0) {
+                doc.setFontSize(10);
+                doc.setFont('times', 'italic'); doc.text('No recommendations needed. Document is fully compliant.', margin, y); y += 10;
+            } else {
+                this.riskItems.forEach((item, idx) => {
+                    
+                    doc.setFont('times', 'bold');
+                    doc.setFontSize(11);
+                    const titleLines = doc.splitTextToSize(`Rec ${idx + 1}: ${item.clause || 'Unknown Action'}`, contentW - 10);
+                    
+                    doc.setFont('times', 'normal');
+                    doc.setFontSize(10);
+                    const actionText = item.recommendation || item.reasoning || 'Review requirement gaps.';
+                    const actionLines = doc.splitTextToSize(actionText, contentW - 10);
+                    
+                    doc.setFont('times', 'italic');
+                    doc.setFontSize(9);
+                    const refLines = doc.splitTextToSize(`Ref: ${this.buildReferenceFromId(item.requirement_id)}`, contentW - 10);
+
+                    const blockH = (titleLines.length * 5) + (actionLines.length * 5) + (refLines.length * 5) + 6;
+                    y = checkPage(y, blockH);
+
+                    doc.setFillColor(...LIGHT_GRAY);
+                    doc.setDrawColor(...BORDER_COLOR);
+                    doc.setLineWidth(0.2);
+                    doc.rect(margin, y, contentW, blockH - 3, 'FD');
+
+                    let innerY = y + 6;
+                    
+                    doc.setFont('times', 'bold');
+                    doc.setFontSize(11);
+                    doc.text(titleLines, margin + 5, innerY);
+                    innerY += titleLines.length * 5;
+                    
+                    doc.setFont('times', 'normal');
+                    doc.setFontSize(10);
+                    doc.text(actionLines, margin + 5, innerY);
+                    innerY += actionLines.length * 5;
+                    
+                    doc.setFont('times', 'italic');
+                    doc.setFontSize(9);
+                    doc.setTextColor(100, 100, 100);
+                    doc.text(refLines, margin + 5, innerY);
+                    doc.setTextColor(...TEXT_COLOR);
+
+                    y += blockH;
+                });
+            }
+        }
+
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFont('times', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(150, 150, 150);
+            doc.text(`Page ${i} of ${pageCount}`, pageW / 2, pageH - 10, { align: 'center' });
+        }
+
+        return doc;
+    },
+
     async downloadReport() {
+      this.clearUiMessage();
+      if (!this.isAdmin) {
+        this.showUiMessage('Only administrative users can download reports.');
+        return;
+      }
+  
       if (!this.currentSnapshot) {
-          alert('Please select a report first.');
+          this.showUiMessage('Please select a report first.');
           return;
+      }
+
+      const token = sessionStorage.getItem('authToken');
+      if (!token) {
+        this.showUiMessage('Your session has expired. Please log in again.');
+        window.location.href = 'login.html';
+        return;
       }
 
       try {
           const params = new URLSearchParams(window.location.search);
           const report_id = params.get('report_id');
-          if (!report_id) { alert("Report ID missing."); return; }
+          if (!report_id) {
+            this.showUiMessage("Report ID missing.");
+            return;
+          }
 
-          const res = await fetch("http://127.0.0.1:8000/api/download-report/", {
+          if (!this.isValidUuid(report_id)) {
+            this.showUiMessage('Invalid report ID.');
+            return;
+          }
+
+          const res = await fetch(`${BASE}/api/download-report/`, {
               method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${sessionStorage.getItem('authToken')}` },
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
               body: JSON.stringify({ report_id })
           });
-          const data = await res.json();
-          if (!res.ok) { alert(data.error || "Failed to record download"); return; }
+          if (!res.ok) {
+            const msg = await this.getErrorMessage(res, 'Failed to record download.');
+            this.showUiMessage(msg, 'error', 'Failed to record download')
 
-          const { jsPDF } = window.jspdf;
-          const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-
-          const snap     = this.currentSnapshot;
-          const meta     = snap.metadata || {};
-          const pageW    = doc.internal.pageSize.getWidth();
-          const pageH    = doc.internal.pageSize.getHeight();
-          const margin   = 15;
-          const contentW = pageW - margin * 2;
-
-          const DARK_BG   = [16, 23, 38];
-          const HEADER_BG = [26, 40, 69];
-          const CARD_BG   = [20, 32, 56];
-          const ACCENT    = [74, 143, 231];
-          const WHITE     = [255, 255, 255];
-          const LIGHT     = [197, 208, 230];
-          const GREEN     = [76, 175, 80];
-          const RED       = [244, 67, 54];
-          const ORANGE    = [255, 152, 0];
-
-          // ── Helper: fill page background and draw header band ──
-          const initPage = () => {
-              doc.setFillColor(...DARK_BG);
-              doc.rect(0, 0, pageW, pageH, 'F');
-              doc.setFillColor(...HEADER_BG);
-              doc.rect(0, 0, pageW, 18, 'F');
-              doc.setFontSize(8);
-              doc.setTextColor(...LIGHT);
-              doc.setFont('helvetica', 'normal');
-              doc.text('CYBERCOMPLY — COMPLIANCE ANALYSIS REPORT', margin, 11);
-          };
-
-          // ── Helper: check remaining space, add new page if needed ──
-          const checkPage = (y, needed) => {
-              if (y + needed > pageH - 12) {
-                  doc.addPage();
-                  initPage();
-                  return 26;
-              }
-              return y;
-          };
-
-          // ── Page 1 ──
-          initPage();
-          let y = 26;
-
-          // Title
-          doc.setFontSize(14);
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(...ACCENT);
-          doc.text(this.currentReportName || 'Report', margin, y);
-          y += 8;
-
-          doc.setDrawColor(...ACCENT);
-          doc.line(margin, y, pageW - margin, y);
-          y += 8;
-
-          // Metadata
-          doc.setFontSize(9);
-          if (meta.company) {
-              doc.setTextColor(...LIGHT); doc.text('Company:', margin, y);
-              doc.setTextColor(...WHITE); doc.text(meta.company, margin + 26, y); y += 6;
-          }
-          if (meta.file_analyzed) {
-              doc.setTextColor(...LIGHT); doc.text('File:', margin, y);
-              doc.setTextColor(...WHITE); doc.text(meta.file_analyzed, margin + 26, y); y += 6;
+            if (res.status === 401) {
+              sessionStorage.clear();
+              window.location.href = 'login.html';
+            }
+            return;
           }
 
-          const score     = snap.compliance?.compliance_score ?? '—';
-          const riskStatus = snap.risks?.status
-              ? snap.risks.status.charAt(0).toUpperCase() + snap.risks.status.slice(1) : '—';
-
-          doc.setTextColor(...LIGHT); doc.text('Score:', margin, y);
-          doc.setTextColor(...ACCENT); doc.text(`${score}%`, margin + 26, y);
-          doc.setTextColor(...LIGHT); doc.text('Risk:', margin + 65, y);
-          doc.setTextColor(...WHITE); doc.text(riskStatus, margin + 80, y);
-          y += 10;
-
-          // Risk Factors
-          const factors = snap.risks?.factors || [];
-          if (factors.length) {
-              y = checkPage(y, 14);
-              doc.setFont('helvetica', 'bold'); doc.setTextColor(...ACCENT);
-              doc.text('Risk Factors', margin, y); y += 6;
-              doc.setFont('helvetica', 'normal'); doc.setTextColor(...LIGHT);
-              factors.forEach(f => {
-                  y = checkPage(y, 6);
-                  doc.text(`• ${f}`, margin + 2, y); y += 5;
-              });
-              y += 4;
-          }
-
-          // Top Recommendation
-          if (this.topRecommendation) {
-              y = checkPage(y, 16);
-              doc.setFont('helvetica', 'bold'); doc.setTextColor(...ACCENT);
-              doc.text('Top Recommendation', margin, y); y += 6;
-              doc.setFont('helvetica', 'normal'); doc.setTextColor(...LIGHT);
-              const lines = doc.splitTextToSize(this.topRecommendation, contentW);
-              lines.forEach(line => { y = checkPage(y, 6); doc.text(line, margin, y); y += 5; });
-              y += 6;
-          }
-
-          // Compliance Details — sorted: non-compliant → partial → compliant
-          const STATUS_ORDER = { 'non_compliant': 0, 'non-compliant': 0, 'partial': 1, 'compliant': 2 };
-          const RISK_ORDER   = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
-          const details = [...(snap.compliance?.details || [])].sort((a, b) => {
-              const s = (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3);
-              return s !== 0 ? s : (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4);
-          });
-
-          if (details.length) {
-              y = checkPage(y, 14);
-              doc.setFont('helvetica', 'bold'); doc.setTextColor(...ACCENT);
-              doc.text('Compliance Details', margin, y); y += 8;
-
-              details.forEach(d => {
-                const clauseLines = doc.splitTextToSize(d.clause || '', contentW - 60);
-                const textLines   = doc.splitTextToSize(d.reasoning || '', contentW - 6);
-
-                // Calculate card height accurately based on actual wrapped line counts
-                const clauseH  = clauseLines.length * 5;
-                const metaH    = 5;
-                const reasonH  = textLines.length * 4.5;
-                const cardPad  = 12; // top + bottom padding inside card
-                const cardHeight = clauseH + metaH + reasonH + cardPad;
-
-                y = checkPage(y, cardHeight + 6);
-
-                doc.setFillColor(...CARD_BG);
-                doc.roundedRect(margin, y, contentW, cardHeight, 3, 3, 'F');
-
-                let innerY = y + 5;
-
-                // Clause title
-                doc.setFontSize(9);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...WHITE);
-                doc.text(clauseLines, margin + 3, innerY);
-
-                // Status badge (right-aligned, anchored to first line of clause)
-                let statusColor = RED;
-                let statusLabel = 'Non-Compliant';
-                if (d.status === 'compliant')      { statusColor = GREEN;  statusLabel = 'Compliant'; }
-                else if (d.status === 'partial')   { statusColor = ORANGE; statusLabel = 'Partial'; }
-                doc.setTextColor(...statusColor);
-                doc.text(statusLabel, pageW - margin - 3, innerY, { align: 'right' });
-
-                innerY += clauseH + 1;
-
-                // Risk + Confidence
-                doc.setFontSize(8);
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(...LIGHT);
-                doc.text(
-                    `Risk: ${d.risk_level ? d.risk_level.charAt(0).toUpperCase() + d.risk_level.slice(1) : '—'}   Confidence: ${d.confidence ?? '—'}%`,
-                    margin + 3, innerY
-                );
-                innerY += metaH;
-
-                // Reasoning
-                textLines.forEach(line => {
-                    doc.text(line, margin + 3, innerY);
-                    innerY += 4.5;
-                });
-
-                y = y + cardHeight + 4; // consistent gap between cards
-            });
-          }
-
+          const doc = this.generatePdfDoc();
           doc.save(`${this.currentReportName || 'report'}.pdf`);
 
       } catch (err) {
-          console.error(err);
-          alert("Something went wrong.");
+          await this.logClientError('downloadReport', err, {
+            currentReportName: this.currentReportName
+          });
+          this.showUiMessage("Something went wrong while downloading the report.");
       }
   },
+
+    buildReferenceFromId(id) {
+      const stripped = (id || '').replace(/^SL-PDPA-S/, '');
+      const parts = stripped.split('-');
+      let ref = `Section ${parts[0]}`;
+      if (parts[1]) ref += `(${parts[1]})`;
+      return `${ref} of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)`;
+    },
+
+    riskBadgeStyle(level) {
+      const map = {
+        critical: 'background:rgba(231,74,74,0.15);color:#e74a4a;border:1px solid rgba(231,74,74,0.4)',
+        high:     'background:rgba(231,150,74,0.15);color:#e7964a;border:1px solid rgba(231,150,74,0.4)',
+        medium:   'background:rgba(231,210,74,0.15);color:#d4bf2e;border:1px solid rgba(231,210,74,0.4)',
+        low:      'background:rgba(144,238,144,0.15);color:#66cc66;border:1px solid rgba(144,238,144,0.4)',
+      };
+      return map[level] || 'background:rgba(139,157,195,0.15);color:#8b9dc3;border:1px solid rgba(139,157,195,0.3)';
+    },
 
     toggleSidebar() {
       this.sidebarOpen = !this.sidebarOpen;
     },
-    toggleSearch() {
-      this.searchActive = !this.searchActive;
-      if (!this.searchActive) {
-          this.searchQuery = '';
-          this.filterReports();
-      }
-    },
+    
     showProfile() {
       window.location.href = 'profile.html';
     },
@@ -817,89 +1789,171 @@ const app = createApp({
     goHome() {
       window.location.href = 'home.html';
     },
-    filterReports() {
-      const query = this.searchQuery.toLowerCase();
-      if (query === '') {
-          this.filteredLast7Days = [...this.last7Days];
-          this.filteredLast30Days = [...this.last30Days];
-      } else {
-          this.filteredLast7Days = this.last7Days.filter(r => r.display_name.toLowerCase().includes(query));
-          this.filteredLast30Days = this.last30Days.filter(r => r.display_name.toLowerCase().includes(query));
-      }
-    },
+    
     async openReport(report) {
-      this.currentReport = report.display_name;
-      this.currentSnapshot = null;
-      try {
-        const res = await fetch(`http://127.0.0.1:8000/api/reports/${report.report_id}/`, {
-          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('authToken')}` }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        this.currentSnapshot = data.report_snapshot;
-      } catch (e) {
-        console.error('Failed to load report:', e);
-      }
-    },
- 
-    //share
-    async shareReport() {
-      if (!this.currentSnapshot) {
-        alert('Please select a report first.');
+      this.clearUiMessage();
+      const token = sessionStorage.getItem('authToken');
+      if (!token) {
+        this.showUiMessage('Your session has expired. Please log in again.');
+        window.location.href = 'login.html';
         return;
       }
 
+      if (!report || !report.report_id) {
+        this.showUiMessage('Invalid report selected.');
+        return;
+      }
+
+      if (!this.isValidUuid(report.report_id)) {
+        this.showUiMessage('Invalid report ID.');
+        return;
+      }
+
+      this.currentSnapshot = null;
+      this.currentReportName = report.display_name || 'Report';
+      this.departmentName = '';
+      
       try {
+        const res = await fetch(`${BASE}/api/reports/${report.report_id}/`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+          const msg = await this.getErrorMessage(res, 'Failed to load report.');
 
-        // 🔹 Get report_id from URL
-        const params = new URLSearchParams(window.location.search);
-        const reportId = params.get('report_id');
+          if (res.status === 401) {
+            this.showUiMessage(msg, 'error', 'Failed to load report.');
+            sessionStorage.clear();
+            window.location.href = 'login.html';
+            return;
+          }
 
-        if (!reportId) {
-          alert("Report ID not found.");
+          this.showUiMessage(msg, 'error', 'Failed to load report.');
           return;
         }
-
-        // 🔥 CALL BACKEND
-        const res = await fetch("http://127.0.0.1:8000/api/share-report/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${sessionStorage.getItem('authToken')}`
-          },
-          body: JSON.stringify({
-            report_id: reportId
-          })
-        });
-
         const data = await res.json();
 
-        if (!res.ok) {
-          alert(data.error || "Failed to share report");
+        if (!data || !data.report_snapshot) {
+          this.showUiMessage('Report data is missing or invalid.');
           return;
         }
+    
+        this.currentSnapshot = data.report_snapshot;
+        this.clearUiMessage();
+        this.resultId = data.result_id || null;
 
-        console.log("Share recorded:", data);
+        const meta    = (data.report_snapshot || {}).metadata || {};
+        const company = (meta.company    || '').trim();
+        const dept    = (meta.department || '').trim();
+        const file    = (meta.file_analyzed || '').trim();
 
-        // 🔹 Build secure share URL using token
-        const shareUrl = `${window.location.origin}/report_viewing.html?token=${data.token}`;
+        // ── NEW: include department in report name ─────────────────────────
+        const nameParts = [company, dept, file].filter(Boolean);
+        this.currentReportName = nameParts.join(' — ') || report.display_name || 'Report';
 
-        // 🔹 Share
+        // ── Sync departmentName for Comparison section ─────────────────────
+        if (dept) {
+          this.departmentName = dept;
+        } else if (this.resultId) {
+          try {
+            const aRes = await fetch(`${BASE}/api/analysis/${this.resultId}/`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (aRes.ok) {
+              const aData = await aRes.json();
+              this.departmentName = aData.department || '';
+            }
+          } catch (_) {
+            this.departmentName = '';
+          }
+        }
+
+        window.history.replaceState({}, '', `report_viewing.html?report_id=${report.report_id}`);
+      } catch (e) {
+        await this.logClientError('openReport', e, {
+            selectedReportId: report?.report_id || null
+        });
+        this.showUiMessage('Something went wrong while loading the report.');
+      }
+    },
+
+    async shareReport() {
+      this.clearUiMessage();
+      if (!this.isAdmin) {
+        this.showUiMessage('Only administrative users can share reports.');
+        return;
+      }
+  
+      if (!this.currentSnapshot) {
+        this.showUiMessage('Please select a report first.');
+        return;
+      }
+
+      const token = sessionStorage.getItem('authToken');
+      if (!token) {
+        this.showUiMessage('Your session has expired. Please log in again.');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const reportId = params.get('report_id');
+      if (!reportId) {
+          this.showUiMessage("Report ID not found.");
+          return;
+      }
+
+      if (!this.isValidUuid(reportId)) {
+          this.showUiMessage('Invalid report ID.');
+          return;
+      }
+
+      try {
+        const doc = this.generatePdfDoc();
+        const pdfBlob = doc.output('blob');
+
+        const formData = new FormData();
+        formData.append('report_id', reportId);
+        formData.append('pdf', pdfBlob, `${this.currentReportName || 'report'}.pdf`);
+
+        const res = await fetch(`${BASE}/api/share-report/`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+
+        if (!res.ok) {
+            const msg = await this.getErrorMessage(res, 'Failed to share report.');
+            this.showUiMessage(msg, 'error', 'Failed to share report');
+            if (res.status === 401) {
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+            }
+            return;
+        }
+
+        const data = await res.json();
+        if (!data.share_url) {
+            this.showUiMessage('Share link was not returned by the server.');
+            return;
+        }
+
         if (navigator.share) {
           navigator.share({
             title: this.currentReportName,
             text: 'Check out this compliance report!',
-            url: shareUrl
+            url: data.share_url
           }).catch(err => console.error('Share failed', err));
         } else {
-          navigator.clipboard.writeText(shareUrl)
-            .then(() => alert('Secure share link copied to clipboard!'))
-            .catch(() => alert('Unable to copy link'));
+          navigator.clipboard.writeText(data.share_url)
+            .then(() => this.showUiMessage('Secure share link copied to clipboard!', 'info'))
+            .catch(() => this.showUiMessage('Unable to copy link', 'error', 'Unable to copy link.'));
         }
 
       } catch (error) {
-        console.error("Share error:", error);
-        alert("Something went wrong.");
+        await this.logClientError('shareReport', error, {
+            currentReportName: this.currentReportName
+        });
+        this.showUiMessage("Something went wrong while sharing the report.");
       }
     }
   }
