@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +7,7 @@
     <title>CyberComply - Document Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
     <style>
         * {
             margin: 0;
@@ -533,6 +535,7 @@
             gap: 10px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.45);
             white-space: nowrap;
+            will-change: opacity, transform;
         }
 
         .access-toast.visible {
@@ -676,7 +679,7 @@
     </style>
 </head>
 <body>
-    <div id="app">
+    <div id="app" :data-ready="ready ? 'true' : 'false'">
         <!-- Top Header -->
         <div class="top-header">
             <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
@@ -717,7 +720,7 @@
                     {{ analysedCompany }} — COMPLIANCE ANALYSIS REPORT
                 </div>
                 <div class="document-subtitle" v-if="isBatchMode">
-                    {{ analysedCompany }} — COMBINED COMPLIANCE ANALYSIS REPORT
+                    {{ analysedCompany ? analysedCompany + ' — ' : '' }}COMBINED COMPLIANCE ANALYSIS REPORT
                 </div>
 
                 <!-- Badge showing number of departments — batch mode only -->
@@ -728,6 +731,23 @@
 
             <!-- Content Container -->
             <div class="content-container">
+
+                <!-- Error banner -->
+                <div v-if="loadError" style="
+                    max-width: 900px;
+                    margin: 0 auto 28px;
+                    background: rgba(231,74,74,0.08);
+                    border: 1px solid rgba(231,74,74,0.25);
+                    border-radius: 10px;
+                    padding: 18px 24px;
+                    font-size: 14px;
+                    color: #e74a4a;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                ">
+                    ⚠ {{ loadError }}
+                </div>
 
                 <!-- Compliance Score Section -->
                 <div class="compliance-section">
@@ -758,7 +778,7 @@
                         <template v-if="isBatchMode">
                             <div class="compliance-item">{{ complianceScore }}% &nbsp;—&nbsp; {{ complianceLabel }}</div>
                             <div class="compliance-bar-wrapper">
-                                <div class="compliance-bar-label">AVERAGE COMPLIANCE SCORE ACROSS ALL DEPARTMENTS</div>
+                                <div class="compliance-bar-label">AVERAGE COMPLIANCE SCORE ACROSS ALL {{ isAdmin ? 'DEPARTMENTS' : 'DOCUMENTS' }}</div>
                                 <div class="compliance-bar-track">
                                     <div class="compliance-bar-fill" :style="{ width: barWidth }"></div>
                                 </div>
@@ -770,7 +790,7 @@
                                     v-for="dept in batchDepartments"
                                     :key="dept.id"
                                 >
-                                    {{ dept.dept_name }} — <strong>{{ dept.compliance_score }}%</strong>
+                                    {{ dept.dept_name === 'Unknown Department' ? dept.file_name : dept.dept_name }} — <strong>{{ dept.compliance_score }}%</strong>
                                 </div>
                             </div>
                         </template>
@@ -821,7 +841,7 @@
                             >
                                 <!-- Sub-box header — click to expand/collapse -->
                                 <div class="dept-rec-header" @click="toggleDept(index)">
-                                    <span class="dept-rec-name">{{ dept.dept_name }}</span>
+                                    <span class="dept-rec-name">{{ dept.dept_name === 'Unknown Department' ? dept.file_name : dept.dept_name }}</span>
                                     <span class="dept-rec-chevron" :class="{ open: dept.expanded }">&#8964;</span>
                                 </div>
 
@@ -833,7 +853,7 @@
                                         v-if="dept.all_recommendations.length === 0"
                                         class="recommendation-item"
                                     >
-                                        This department is fully compliant — no recommendations at this time.
+                                        This {{ isAdmin ? 'department' : 'document' }} is fully compliant — no recommendations at this time.
                                     </div>
 
                                     <!-- Non-compliant / partial findings -->
@@ -903,6 +923,11 @@
         // Resolved at runtime from sessionStorage (set by login flow).
         // The mounted() hook overwrites this with the server-confirmed
         // role so the hardcoded default below is only a safe fallback.
+        //
+        // Example (once backend exists):
+        //   const isAdminUser = await fetch('/api/auth/me')
+        //                         .then(r => r.json())
+        //                         .then(u => u.role === 'admin');
         const isAdminUser = true;  // fallback — overridden in mounted()
         // ─────────────────────────────────────────────────────────────
 
@@ -936,15 +961,11 @@
                     topRecommendation: '',
                     complianceDetails: [],   // single-file mode only
 
-                    // ── Sidebar History ──
-                    last7Days: [],
-                    last30Days: [],
-                    filteredLast7Days: [],
-                    filteredLast30Days: [],
-
                     // Loading / error state
                     isLoading: true,
-                    loadError: ''
+                    loadError: '',
+
+                    ready: false
                 }
             },
 
@@ -959,6 +980,9 @@
                 const roleRaw = sessionStorage.getItem('userRole');
                 this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
 
+                // Session timeout — 30 min because analysis can take ~20 min
+                SessionManager.init({ timeoutMs: 1800000 });
+
                 // ── Detect which mode to use ──────────────────────────────
                 // batchResultIds written by home.html on batch_complete takes priority.
                 // latestResultId is the single-file path (unchanged behaviour).
@@ -970,12 +994,8 @@
                     await this.loadBatchResults(token, batchIdsRaw);
                 } else {
                     // ── SINGLE FILE MODE ──────────────────────────────────
-                    // Identical to the original flow — no changes.
                     await this.loadSingleResult(token, singleId);
                 }
-
-                // ── Populate sidebar history ──────────────────────────────
-                await this.fetchHistory(token);
             },
 
             methods: {
@@ -1017,12 +1037,10 @@
 
                         const data = await res.json();
 
-                        this.isBatchMode    = true;
-                        this.analysedCompany = data.org_name || 'Unknown Organisation';
+                        this.isBatchMode     = true;
+                        this.analysedCompany = data.org_name || '';
 
                         // Each dept gets an `expanded: false` flag for the collapsible sub-box.
-                        // Upload order is preserved — get_org_comparison returns depts in the
-                        // order result_ids were passed, which matches the batch submission order.
                         this.batchDepartments = (data.departments || []).map(d => ({
                             ...d,
                             expanded: false
@@ -1052,10 +1070,11 @@
                         this.loadError = 'Could not reach the server. Please check your connection.';
                     } finally {
                         this.isLoading = false;
+                        this.ready = true;
                     }
                 },
 
-                // ── Single file result loader (original logic, unchanged) ──
+                // ── Single file result loader ────────────────────────────
                 async loadSingleResult(token, resultId) {
                     const url = resultId
                         ? `${BASE}/api/analysis/${resultId}/`
@@ -1109,13 +1128,15 @@
                         }
 
                         // Animate progress bar
-                        setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 300);
+                        await Vue.nextTick();
+                        setTimeout(() => { this.barWidth = `${this.complianceScore}%`; }, 100);
 
                     } catch (e) {
                         console.error('Failed to load analysis result:', e);
                         this.loadError = 'Could not reach the server. Please check your connection.';
                     } finally {
                         this.isLoading = false;
+                        this.ready = true;
                     }
                 },
 
@@ -1135,33 +1156,6 @@
                 },
                 goBack() {
                     window.location.href = 'home.html';
-                },
-
-                // ── Sidebar history navigation ──
-                openReport(report) {
-                    const resultId = report.resultId || null;
-                    if (resultId) {
-                        sessionStorage.setItem('latestResultId', resultId);
-                        window.location.href = 'document_analysis.html';
-                    } else {
-                        window.location.href = `report_viewing.html?report=${encodeURIComponent(report.label || report)}`;
-                    }
-                },
-
-                async fetchHistory(token) {
-                    try {
-                        const res = await fetch(`${BASE}/api/analysis/history/`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        if (!res.ok) return;
-                        const data = await res.json();
-                        this.last7Days  = (data.last_7_days  || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
-                        this.last30Days = (data.last_30_days || []).map(r => ({ resultId: r.result_id, label: r.display_name, score: r.compliance_score }));
-                        this.filteredLast7Days  = [...this.last7Days];
-                        this.filteredLast30Days = [...this.last30Days];
-                    } catch (e) {
-                        console.warn('Could not load analysis history:', e);
-                    }
                 },
 
                 // ── Compliance Score: open to all ──

@@ -6,6 +6,7 @@
     <title>CyberComply - Comparison Dashboard Graphical</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
 
     <style>
       /* Global Reset and Base Theme */
@@ -491,7 +492,7 @@
         border-color: #4a8fe7;
       }
 
-      /* Drill-Down Model */
+      /* Drill-Down Modal */
       .modal-backdrop {
         position: fixed;
         inset: 0;
@@ -505,7 +506,7 @@
 
       .modal {
         width: 100%;
-        max-width: 760px;
+        max-width: 1000px;
         border-radius: 18px;
         background: rgba(13, 20, 32, 0.92);
         border: 1px solid rgba(96, 122, 146, 0.4);
@@ -886,6 +887,7 @@
         data() {
           return {
             sidebarOpen: true,
+            isAdmin: false,
 
             companyLabel: "Unknown Organisation",
 
@@ -984,6 +986,9 @@
           },
         },
 
+        // ── Single merged mounted() ───────────────────────────────────────
+        // Combines feature/database additions (isAdmin flag, SessionManager)
+        // with the sprint-3 full data-loading logic.
         async mounted() {
           // ── Auth guard ──────────────────────────────────────────────────
           const token = sessionStorage.getItem('authToken');
@@ -992,14 +997,20 @@
             return;
           }
 
-          // ── Admin guard ─────────────────────────────────────────────────
+          // ── Set RBAC flag + session timeout (from feature/database) ─────
           const roleRaw = sessionStorage.getItem('userRole');
+          this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
+          SessionManager.init({ timeoutMs: 1200000 });
+
+          // ── Admin guard ─────────────────────────────────────────────────
+          // This page is only for admins — redirect general users back to
+          // comparison.html which shows the single-result view.
           if (roleRaw !== 'ADMINISTRATIVE_USER') {
             window.location.href = 'comparison.html';
             return;
           }
 
-          // ── Read batch result IDs from sessionStorage ────────────────────
+          // ── Read batch result IDs from sessionStorage ───────────────────
           const batchIdsRaw = sessionStorage.getItem('batchResultIds');
 
           if (!batchIdsRaw) {
@@ -1023,7 +1034,7 @@
             return;
           }
 
-          // ── Load clause summary map ───────────────────────────────────────
+          // ── Load clause summary map ─────────────────────────────────────
           // clause_summaries.json maps requirement_id → short one-line action.
           // Sits alongside the HTML files in the frontend directory.
           try {
@@ -1038,7 +1049,7 @@
             console.warn('[WARN] Could not load clause summaries:', e.message);
           }
 
-          // ── Fetch org comparison data ─────────────────────────────────────
+          // ── Fetch org comparison data ───────────────────────────────────
           try {
             const url = `${BASE}/api/analysis/org-comparison/?result_ids=${resultIds.join(',')}`;
             const res = await fetch(url, {
@@ -1066,10 +1077,10 @@
             // backend returns plain strings or { clause, requirement_id } objects,
             // ensuring the Summary card and modal always render clean strings.
             this.departments = (data.departments || []).map(d => ({
-              id:          d.id,
-              name:        d.dept_name,
-              compliance:  d.compliance_score,
-              risk:        d.risk,
+              id:           d.id,
+              name:         d.dept_name,
+              compliance:   d.compliance_score,
+              risk:         d.risk,
               improvements: d.improvements,
 
               // top_gap: extract .clause if the backend returned an object,

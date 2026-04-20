@@ -86,6 +86,16 @@ const CyberComplySidebar = {
           >
         </div>
 
+        <!-- Department filter (admin only) -->
+        <div v-if="isAdmin && departments.length" class="sidebar-dept-filter">
+          <select v-model="selectedDeptName" @change="onDeptChange" class="dept-select">
+            <option :value="null">All Departments</option>
+            <option v-for="dept in departments" :key="dept.dept_name" :value="dept.dept_name">
+              {{ dept.dept_name }}
+            </option>
+          </select>
+        </div>
+
         <!-- Last 7 Days -->
         <div class="sidebar-section">
           <div class="sidebar-header">
@@ -178,6 +188,10 @@ const CyberComplySidebar = {
       last30Days:         [],
       filteredLast7Days:  [],
       filteredLast30Days: [],
+      isAdmin:            false,
+      departments:        [],   // [{ dept_id, dept_name }, ...] — populated for admins only
+      selectedDeptName:   null,   // what the dropdown shows
+      selectedDeptIds:    [],     // all dept_ids that share that name
       deleteModal: {
         visible: false,
         report:  null,
@@ -186,12 +200,19 @@ const CyberComplySidebar = {
     };
   },
 
-  mounted() {
+   mounted() {
+    // Set isAdmin immediately from sessionStorage so the dropdown renders
+    // without waiting for the loadDepartments() API response to complete.
+    this.isAdmin = sessionStorage.getItem('userRole') === 'ADMINISTRATIVE_USER';
+
+    this.loadDepartments();
     this.loadReports();
 
     // Re-fetch reports when user navigates back to this page via browser history.
     window.addEventListener('pageshow', (event) => {
         if (event.persisted) {
+            this.isAdmin = sessionStorage.getItem('userRole') === 'ADMINISTRATIVE_USER';
+            this.loadDepartments();
             this.loadReports();
         }
     });
@@ -200,16 +221,36 @@ const CyberComplySidebar = {
   methods: {
     // ── Data loading ──────────────────────────────────────────────────────────
 
+    async loadDepartments() {
+      const token = sessionStorage.getItem('authToken');
+      if (!token) return;
+      try {
+        const res = await fetch('http://127.0.0.1:8000/ai/api/departments/', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;  // non-admins receive 403 — silently skip, isAdmin stays false
+        const data = await res.json();
+        this.isAdmin     = true;
+        // departments is now [{ dept_name, dept_ids: [...] }]
+        this.departments = data.departments || [];
+      } catch (e) {
+        console.warn('Sidebar: could not load departments:', e);
+      }
+    },
+
     async loadReports() {
       const token = sessionStorage.getItem('authToken');
       if (!token) return;
       try {
-        const res = await fetch('http://127.0.0.1:8000/ai/api/reports/', {
+        const url = this.selectedDeptIds && this.selectedDeptIds.length
+          ? `http://127.0.0.1:8000/ai/api/reports/?dept_ids=${encodeURIComponent(this.selectedDeptIds.join(','))}`
+          : 'http://127.0.0.1:8000/ai/api/reports/';
+        const res = await fetch(url, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) return;
         const data = await res.json();
-        // Each item: { report_id, display_name, generated_at, expires_at }
+        // Each item: { report_id, display_name, dept_id, generated_at, expires_at }
         this.last7Days  = data.last_7_days  || [];
         this.last30Days = data.last_30_days || [];
         this.filteredLast7Days  = [...this.last7Days];
@@ -217,6 +258,18 @@ const CyberComplySidebar = {
       } catch (e) {
         console.warn('Sidebar: could not load reports:', e);
       }
+    },
+
+    async onDeptChange() {
+      // Resolve the selected name to all matching dept_ids
+      if (this.selectedDeptName) {
+        const match = this.departments.find(d => d.dept_name === this.selectedDeptName);
+        this.selectedDeptIds = match ? match.dept_ids : [];
+      } else {
+        this.selectedDeptIds = [];
+      }
+      await this.loadReports();
+      this.filterReports();
     },
 
     // ── Public: called by the parent page after a new report is generated ────
@@ -475,6 +528,25 @@ const CyberComplySidebar = {
     .sidebar::-webkit-scrollbar-track { background: #0d1420; }
     .sidebar::-webkit-scrollbar-thumb { background: #2a4a7c; border-radius: 3px; }
     .sidebar::-webkit-scrollbar-thumb:hover { background: #4a8fe7; }
+
+    /* ── Department filter dropdown (admin only) ── */
+    .sidebar-dept-filter {
+      padding: 0 20px 16px;
+    }
+    .dept-select {
+      width: 100%;
+      padding: 8px 12px;
+      background-color: #1a2845;
+      border: 2px solid #2a4a7c;
+      border-radius: 8px;
+      color: #c5d0e6;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.3s;
+      appearance: none;
+    }
+    .dept-select:focus  { outline: none; border-color: #4a8fe7; }
+    .dept-select option { background-color: #1a2845; color: #c5d0e6; }
 
     /* ── Responsive: sidebar overlays on small screens ── */
     @media screen and (max-width: 1200px) {

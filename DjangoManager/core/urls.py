@@ -60,15 +60,28 @@ urlpatterns = [
 
     # ── Reports ───────────────────────────────────────────────────────────
     path("api/reports/", views.list_reports, name="list_reports"),
+    path("api/departments/", views.list_departments, name="list_departments"),
+    path("api/debug-reports-dept/", views.debug_reports_dept, name="debug_reports_dept"),
     path("api/reports/generate/", views.generate_report, name="generate_report"),
     path("api/reports/<uuid:report_id>/", views.get_report, name="get_report"),
     path("api/reports/<uuid:report_id>/delete/", views.delete_report, name="delete_report"),
     path("api/download-report/", views.download_report, name="download_report"),
     path("api/share-report/", views.share_report, name="share_report"),
+    path("api/client-error-log/", views.log_client_error, name="log_client_error"),
 
     # ── Admin Access ──────────────────────────────────────────────────────
     path("api/admin-access/request/", views.request_admin_access, name="request_admin_access"),
     path("api/admin-access/verify/", views.verify_admin_access, name="verify_admin_access"),
     path("api/admin-access/status/", views.get_admin_access_status, name="get_admin_access_status"),
+
+    # ── Notifications ─────────────────────────────────────────────────────
+    path("api/notifications/unread/", views.get_unread_notifications, name="get_unread_notifications"),
+    path("api/notifications/mark-read/", views.mark_notifications_read, name="mark_notifications_read"),
+
+    # ── Auth ──────────────────────────────────────────────────────────────
+    path("api/logout/", views.logout, name="logout"),
+
+    # ── Cloud Health ──────────────────────────────────────────────────────
+    path("api/cloud-health/", views.cloud_health, name="cloud_health"),
 
 ]

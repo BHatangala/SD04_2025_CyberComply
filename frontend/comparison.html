@@ -7,6 +7,7 @@
     <title>CyberComply - Comparison Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -416,7 +417,7 @@
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-        /* --- NO DATA / ERROR / LOADING BANNERS (ai-development) --- */
+        /* --- NO DATA / ERROR / LOADING BANNERS --- */
         .no-data-banner {
             background: rgba(231,74,74,0.08);
             border: 1px solid rgba(231,74,74,0.25);
@@ -556,8 +557,6 @@
                         <!--
                             Graphical View column — only rendered when the admin
                             has multiple departments, preserving the original gate.
-                            The two-column layout (Score + Risk) remains clean and
-                            centred when the button is absent.
                         -->
                         <template v-if="isAdmin && hasMultipleDepartments">
                             <div class="metrics-divider-v"></div>
@@ -671,6 +670,8 @@
             const roleRaw = sessionStorage.getItem('userRole');
             this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
 
+            SessionManager.init({ timeoutMs: 1200000 });
+
             // ── Decide which fetch path to use ────────────────────────────
             // batchResultIds  → multi-dept batch just completed → org-comparison endpoint
             // latestResultId  → single file analysis → existing single-result endpoint
@@ -770,6 +771,8 @@
                     const risk     = score >= 75 ? 'Low' : score >= 40 ? 'Medium' : 'High';
                     const deptName = data.department || data.dept_name || 'General';
 
+                    // Build a synthetic dept object matching the batch shape so all
+                    // computed properties work identically regardless of mode.
                     this.departments = [{
                         id:                  singleId,
                         dept_name:           deptName,
