@@ -1428,17 +1428,17 @@ const app = createApp({
         const today = new Date().toLocaleDateString();
 
         const BRAND = [26, 40, 69]; // #1a2845
-        const ACCENT = [74, 143, 231];       // #4a8fe7
+        const ACCENT = [45, 85, 145];   
         const TEXT = [33, 37, 41];
         const MUTED = [108, 117, 125];
-        const LIGHT_BG = [245, 247, 250];
+        const LIGHT_BG = [238, 240, 244];
         const PANEL = [237, 241, 247];
-        const BORDER = [210, 218, 230];
+        const BORDER = [200, 205, 215];
         const WHITE = [255, 255, 255];
         
         const CRITICAL = [183, 28, 28];
         const HIGH = [217, 119, 6];
-        const MEDIUM = [161, 98, 7];
+        const MEDIUM = [184, 134, 11];
         const LOW = [21, 128, 61];
 
         const riskColor = (level) => {
@@ -1473,19 +1473,18 @@ const app = createApp({
             doc.text('Compliance Assessment Report', pageW - margin, 9, { align: 'right' });
             doc.text('Confidential', pageW - margin, 14, { align: 'right' });
             
-            doc.setTextColor(...TEXT_COLOR);
+            doc.setTextColor(...TEXT);
         };
 
         const addFooter = (pageNo, totalPages) => {
-            doc.setDrawColor(...BORDER);
-            doc.setLineWidth(0.3);
-            doc.line(margin, pageH - 14, pageW - margin, pageH - 14);
-        
+            doc.setFillColor(...BRAND);
+            doc.rect(0, pageH - 16, pageW, 16, 'F');
+
             doc.setFont('times', 'italic');
             doc.setFontSize(8.5);
-            doc.setTextColor(...MUTED);
-            doc.text('CyberComply Confidential', margin, pageH - 8);
-            doc.text(`Page ${pageNo} of ${totalPages}`, pageW - margin, pageH - 8, { align: 'right' });
+            doc.setTextColor(...WHITE);
+            doc.text('CyberComply Confidential', margin, pageH - 6);
+            doc.text(`Page ${pageNo} of ${totalPages}`, pageW - margin, pageH - 6, { align: 'right' });
             
             doc.setTextColor(...TEXT);
         };
@@ -1500,15 +1499,21 @@ const app = createApp({
         }
 
         const drawSectionTitle = (title, y, subtitle = '') => {
-            y = ensurePage(y, 18);
+            y += 3; 
 
-            doc.setFillColor(...PANEL);
-            doc.roundedRect(margin, y - 5, contentW, 10, 2.5, 2.5, 'F');
+            y = ensurePage(y, 20);
+
+            const HEADING_BG = [225, 232, 240];
+            const boxHeight = 10;
+
+            doc.setFillColor(...HEADING_BG);
+            doc.roundedRect(margin, y - 4, contentW, boxHeight, 2.2, 2.2, 'F');
 
             doc.setFont('times', 'bold');
             doc.setFontSize(14);
-            doc.setTextColor(...BRAND);
-            doc.text(title, margin + 4, y + 1);
+            doc.setTextColor(30, 45, 70);
+            const textY = (y - 4) + (boxHeight / 2) + 1.5;
+            doc.text(title, margin + 4, textY);
 
             y += 11;
 
@@ -1518,7 +1523,7 @@ const app = createApp({
                 doc.setTextColor(...MUTED);
                 const lines = doc.splitTextToSize(subtitle, contentW);
                 doc.text(lines, margin, y);
-                y += lines.length * 4.8 + 3;
+                y += lines.length * 4.8 + 4;
             }
             
             doc.setTextColor(...TEXT);
@@ -1571,182 +1576,90 @@ const app = createApp({
 
         const drawFindingBlock = (item, idx, y, type = 'finding') => {
             const title = item.clause || 'Untitled clause';
-            const reasoning = item.reasoning || 'No reasoning provided.';
-            const recommendation = item.recommendation || item.reasoning || 'Review and update the policy to address this requirement.';
+            const contentText =
+                type === 'recommendation'
+                    ? (item.recommendation || item.reasoning || 'Review and update the policy to address this requirement.')
+                    : (item.reasoning || 'No assessment available.');
             const status = item.status || 'unknown';
             const risk = item.risk_level || 'unknown';
-            const reference = this.buildReferenceFromId(item.requirement_id);
+            const legalRef = this.buildReferenceFromId(item.requirement_id);
+            
+            const titleLines = doc.splitTextToSize(`${idx + 1}. ${title}`, contentW);
+
+            y = ensurePage(y, 32);
 
             doc.setFont('times', 'bold');
             doc.setFontSize(11);
-            const titleLines = doc.splitTextToSize(`${idx + 1}. ${title}`, contentW - 16);
+            doc.setTextColor(...TEXT);
+            doc.text(titleLines, margin, y);
+            y += titleLines.length * 5 + 2;
+            
+            if (type !== 'recommendation') {
+                doc.setFont('times', 'bold');
+                doc.setFontSize(10);
+                doc.setTextColor(...MUTED);
+                doc.text('Status:', margin, y);
+
+                let xCursor = margin + doc.getTextWidth('Status: ') + 1;
+                doc.setTextColor(...statusColor(status));
+                doc.text(String(status).replaceAll('_', ' ').toUpperCase(), xCursor, y);
+
+                xCursor += doc.getTextWidth(String(status).replaceAll('_', ' ').toUpperCase()) + 10;
+
+                doc.setTextColor(...MUTED);
+                doc.text('Risk Level:', xCursor, y);
+
+                xCursor += doc.getTextWidth('Risk Level: ') + 1;
+                doc.setTextColor(...riskColor(risk));
+                doc.text(String(risk).toUpperCase(), xCursor, y);
+
+                y += 7;
+            }
+
+            const label = type === 'recommendation' ? 'Recommendation' : 'Assessment';
 
             doc.setFont('times', 'normal');
             doc.setFontSize(10);
-            const reasoningLines = doc.splitTextToSize(`Assessment: ${reasoning}`, contentW - 16);
+            doc.setTextColor(...TEXT);
 
-            let recommendationLines = [];
-            if (type === 'recommendation') {
-                recommendationLines = doc.splitTextToSize(`Recommended Action: ${recommendation}`, contentW - 16);
+            const contentLines = doc.splitTextToSize(
+                `${label}: ${contentText}`,
+                contentW
+            );
+
+            doc.text(contentLines, margin, y);
+            y += contentLines.length * 5;
+            
+            // Legal Reference
+            if (legalRef) {
+                y += 2;
+                doc.setFont('times', 'italic');
+                doc.setFontSize(9);
+                doc.setTextColor(...MUTED);
+
+                const refLines = doc.splitTextToSize(
+                    `Legal Reference: ${legalRef}`,
+                    contentW
+                );
+
+                doc.text(refLines, margin, y);
+                y += refLines.length * 4;
             }
 
-            doc.setFont('times', 'italic');
-            doc.setFontSize(9);
-            const referenceLines = doc.splitTextToSize(`Legal Reference: ${reference}`, contentW - 16);
-
-            const blockHeight =
-                8 +
-                (titleLines.length * 5) +
-                5 +
-                (reasoningLines.length * 5) +
-                (type === 'recommendation' ? (5 + recommendationLines.length * 5) : 0) +
-                5 +
-                (referenceLines.length * 4.5) +
-                6;
-
-            y = ensurePage(y, blockHeight + 2);
-
-            doc.setFillColor(...WHITE);
+            // Divider line
+            y += 3;
             doc.setDrawColor(...BORDER);
-            doc.setLineWidth(0.3);
-            doc.roundedRect(margin, y, contentW, blockHeight, 2.5, 2.5, 'FD');
+            doc.setLineWidth(0.25);
+            doc.line(margin, y, margin + contentW, y);
 
-            let innerY = y + 7;
-
-            doc.setFont('times', 'bold');
-            doc.setFontSize(11);
-            doc.setTextColor(...TEXT);
-            doc.text(titleLines, margin + 5, innerY);
-            innerY += titleLines.length * 5 + 2;
-
-            doc.setFont('times', 'bold');
-            doc.setFontSize(9);
-            doc.setTextColor(...MUTED);
-            doc.text('Status:', margin + 5, innerY);
-
-            let xCursor = margin + 5 + doc.getTextWidth('Status: ') + 1;
-            doc.setTextColor(...statusColor(status));
-            doc.text(String(status).replaceAll('_', ' ').toUpperCase(), xCursor, innerY);
-
-            xCursor += doc.getTextWidth(String(status).replaceAll('_', ' ').toUpperCase()) + 8;
-            doc.setTextColor(...MUTED);
-            doc.text('Risk Level:', xCursor, innerY);
-
-            xCursor += doc.getTextWidth('Risk Level: ') + 1;
-            doc.setTextColor(...riskColor(risk));
-            doc.text(String(risk).toUpperCase(), xCursor, innerY);
-
-            innerY += 6;
-
-            doc.setFont('times', 'normal');
-            doc.setFontSize(10);
-            doc.setTextColor(...TEXT);
-            doc.text(reasoningLines, margin + 5, innerY);
-            innerY += reasoningLines.length * 5;
-
-            if (type === 'recommendation') {
-                innerY += 2;
-                doc.text(recommendationLines, margin + 5, innerY);
-                innerY += recommendationLines.length * 5;
-            }
-
-            innerY += 3;
-            doc.setFont('times', 'italic');
-            doc.setFontSize(9);
-            doc.setTextColor(...MUTED);
-            doc.text(referenceLines, margin + 5, innerY);
+            y += 6;
 
             doc.setTextColor(...TEXT);
-            return y + blockHeight + 6;
+            return y;
         };
-   
-        doc.setFillColor(...BRAND);
-        doc.rect(0, 0, pageW, 58, 'F');
 
-        doc.setFont('times', 'bold');
-        doc.setFontSize(24);
-        doc.setTextColor(...WHITE);
-        doc.text('CyberComply', margin, 22);
-
-        doc.setFont('times', 'normal');
-        doc.setFontSize(11);
-        doc.text('Enterprise Compliance Intelligence', margin, 30);
-
-        doc.setDrawColor(...WHITE);
-        doc.setLineWidth(0.4);
-        doc.line(margin, 38, pageW - margin, 38);
-
-        doc.setFont('times', 'bold');
-        doc.setFontSize(22);
-        doc.text('Compliance Assessment Report', margin, 55);
-
-        doc.setTextColor(...TEXT);
-    
-        let y = 76;
-
-        doc.setFont('times', 'bold');
-        doc.setFontSize(16);
-        const coverTitle = this.currentReportName || 'Document Compliance Report';
-        const coverTitleLines = doc.splitTextToSize(coverTitle, contentW);
-        doc.text(coverTitleLines, margin, y);
-        y += coverTitleLines.length * 7 + 8;
-
-        doc.setFillColor(...LIGHT_BG);
-        doc.setDrawColor(...BORDER);
-        doc.setLineWidth(0.3);
-        doc.roundedRect(margin, y, contentW, 52, 3, 3, 'FD');
-
-        doc.setFont('times', 'bold');
-        doc.setFontSize(10);
-        doc.setTextColor(...ACCENT);
-        doc.text('REPORT DETAILS', margin + 5, y + 8);
-
-        doc.setFont('times', 'normal');
-        doc.setFontSize(11);
-        doc.setTextColor(...TEXT);
-
-        doc.text(`Company: ${companyName}`, margin + 5, y + 16);
-        doc.text(`File Analyzed: ${fileAnalyzed}`, margin + 5, y + 24);
-        doc.text(`Generated On: ${today}`, margin + 5, y + 32);
-        doc.text(`Compliance Score: ${complianceScore}%`, margin + 5, y + 40);
-
-        doc.text(`Overall Risk Level: ${overallRisk}`, margin + 100, y + 16);
-        doc.text(`Department: ${this.departmentName || '—'}`, margin + 100, y + 24);
-        doc.text(`Prepared By: CyberComply`, margin + 100, y + 32);
-
-        y += 64;
-
-        doc.setFillColor(...PANEL);
-        doc.roundedRect(margin, y, contentW, 28, 3, 3, 'F');
-
-        doc.setFont('times', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(...BRAND);
-        doc.text('Regulatory Basis of Assessment', margin + 5, y + 8);
-
-        doc.setFont('times', 'normal');
-        doc.setFontSize(10.5);
-        doc.setTextColor(...TEXT);
-        const legalBasis = doc.splitTextToSize(
-            'This report evaluates the uploaded document against the requirements of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka). All identified findings, risk indications, and recommendations are based on the extent to which the document aligns with the obligations and provisions of the Act.',
-            contentW - 10
-        );
-        doc.text(legalBasis, margin + 5, y + 15);
-
-        y += 45;
-
-        doc.setFont('times', 'italic');
-        doc.setFontSize(9.5);
-        doc.setTextColor(...MUTED);
-        const disclaimer = doc.splitTextToSize(
-            'This report is generated for compliance assessment and decision-support purposes. It is intended to support governance and risk review activities and does not constitute formal legal advice.',
-            contentW
-        );
-        doc.text(disclaimer, margin, y);
-
-        doc.addPage();
         addTopHeader();
-        y = 30;
+        let y = 30;
 
         y = drawSectionTitle(
             '1. Executive Summary',
@@ -1843,7 +1756,50 @@ const app = createApp({
         }
 
         y = drawSectionTitle(
-            '7. Recommendations and Corrective Actions',
+            '7. Departmental Summary',
+            y,
+            'Key areas where the department does not meet regulatory requirements.'
+        );
+
+        const departmentName = meta.department || 'N/A';
+
+        doc.setFont('times', 'bold');
+        doc.setFontSize(10);
+        doc.text('Department:', margin, y);
+
+        doc.setFont('times', 'normal');
+        doc.text(` ${departmentName}`, margin + 28, y);
+
+        y += 8;
+
+        doc.setFont('times', 'bold');
+        doc.text('Department-Level Non-Compliance Findings', margin, y);
+        y += 6;
+
+        const deptRecommendations = this.riskItems;
+
+        doc.setFont('times', 'normal');
+
+        if (deptRecommendations.length === 0) {
+            y = drawParagraph('No recommendations — this department is fully compliant.', y);
+        } else {
+            deptRecommendations.forEach((item) => {
+                const text = `${item.clause || 'Requirement'} - ${this.buildReferenceFromId(item.requirement_id) || ''}`;
+
+                const lines = doc.splitTextToSize(text, contentW - 5);
+
+                doc.text('•', margin, y);
+                doc.text(lines, margin + 5, y);
+
+                y += lines.length * 5 + 2;
+                y = ensurePage(y, 20);
+            });
+        }
+
+        y += 6;
+
+        y = drawSectionTitle(
+            '8. Recommendations and Corrective Actions',
             y,
             'Targeted actions proposed to improve compliance alignment with the Personal Data Protection Act No. 9 of 2022 (Sri Lanka).'
         );
@@ -1859,63 +1815,10 @@ const app = createApp({
             });
         }
 
-        if (this.isAdmin) {
-            y = drawSectionTitle(
-                '8. Departmental Perspective',
-                y,
-                'Administrative view of department-level context and recommendation references.'
-            );
-
-            y = drawParagraph(
-                `Department: ${this.departmentName || '—'}`,
-                y
-            );
-
-            if (this.departmentRecs.length === 0) {
-                y = drawParagraph(
-                    'No department-specific recommendations were generated because the document does not currently contain flagged compliance items requiring action.',
-                    y
-                );
-
-            } else {
-                const departmentItems = this.departmentRecs.map(rec =>
-                    `${rec.clauseTitle} — ${rec.reference}`
-                );
-                y = drawBulletList(departmentItems, y);
-            }
-        }
-
-        y = drawSectionTitle(
-            this.isAdmin ? '9. Referenced Legal Provisions' : '8. Referenced Legal Provisions',
-            y,
-            'References used throughout the report for traceability and compliance justification.'
-        );
-
-        const uniqueReferences = [...new Set(
-            (this.riskItems || []).map(item => this.buildReferenceFromId(item.requirement_id))
-        )];
-
-        if (uniqueReferences.length === 0) {
-            y = drawParagraph(
-                'No specific legal provisions were referenced because no flagged findings were identified in the report.',
-                y
-            );
-        } else {
-            y = drawBulletList(uniqueReferences, y);
-        }
-
         const totalPages = doc.internal.getNumberOfPages();
         for (let i = 1; i <= totalPages; i++) {
             doc.setPage(i);
-            if (i !== 1) {
-                addFooter(i, totalPages);
-            } else {
-                doc.setFont('times', 'italic');
-                doc.setFontSize(8.5);
-                doc.setTextColor(...MUTED);
-                doc.text(`Page ${i} of ${totalPages}`, pageW - margin, pageH - 8, { align: 'right' });
-                doc.text('CyberComply Confidential', margin, pageH - 8);
-            }
+            addFooter(i, totalPages);
         }
         return doc;
     },
