@@ -447,6 +447,7 @@
         border: 1px solid rgba(0,0,0,0.05);
         box-shadow: 0 6px 16px rgba(0,0,0,0.04);
         min-height: 90px;
+        overflow: hidden;
     }
 
     /* Summary label/value */
@@ -464,6 +465,9 @@
         font-weight: 700;
         color: #ffffff;
         line-height: 1.4;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
     }
 
     /* Subsection block spacing */
@@ -748,7 +752,7 @@
                       <div class="summary-card">
                           <div class="summary-label">Risk Level</div>
                           <div class="summary-value">
-                              {{ currentSnapshot.risks?.status ? currentSnapshot.risks.status.charAt(0).toUpperCase() + currentSnapshot.risks.status.slice(1) : '—' }}
+                              {{ overallRiskLevel || '—' }}
                           </div>
                       </div>
 
