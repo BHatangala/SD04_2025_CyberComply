@@ -658,6 +658,116 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes popIn  { from { transform: scale(0.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
+        .profile-alert {
+            font-size: 14px;
+            padding: 12px 14px;
+            margin-bottom: 22px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+            border: 1px solid;
+            transition: all 0.3s ease;
+        }
+
+        .profile-alert-error {
+            background: #e5e7eb;
+            color: #dc2626;
+            border-color: #f87171;
+        }
+
+        .profile-alert-success {
+            background: #16a34a;
+            color: #ffffff;
+            border-color: #4ade80;
+        }
+
+        .fade-enter-active,
+        .fade-leave-active {
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+
+        .fade-enter-from,
+        .fade-leave-to {
+            opacity: 0;
+            transform: translateY(-6px);
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            animation: fadeIn 0.25s ease;
+            z-index: 500;
+        }
+
+        .success-modal-content {
+            line-height: 1.6;
+            background: #234561;
+            color: #f0f4ff;
+            padding: 24px 20px;
+            width: 100%;
+            max-width: 360px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #90a0b5;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+            animation: popIn 0.25s ease;
+        }
+
+        .success-modal-content h3 {
+            margin: 0 0 10px;
+            font-size: 22px;
+            color: #ffffff;
+        }
+
+        .success-modal-content p {
+            margin: 0 0 18px;
+            font-size: 14px;
+            color: #e6eef7;
+            line-height: 1.5;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .modal-btn {
+            min-width: 110px;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modal-btn.confirm {
+            background: #a2b8c8;
+            color: #123456;
+        }
+
+        .modal-btn.cancel {
+            background: transparent;
+            color: #e2e8f0;
+            border: 1px solid #90a0b5;
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+
         /* === RESPONSIVE DESIGN === */
         @media screen and (max-width: 1200px) {
             .sidebar {
@@ -701,6 +811,18 @@
 
             <!-- Profile Information Container -->
             <div class="profile-container">
+                <transition name="fade">
+                    <div
+                        v-if="profileMessage.text"
+                        :class="[
+                            'profile-alert',
+                            profileMessage.type === 'error' ? 'profile-alert-error' : 'profile-alert-success'
+                        ]"
+                    >
+                        {{ profileMessage.text }}
+                    </div>
+                </transition>
+
                 <!-- Name -->
                 <div class="profile-field">
                     <label>Name</label>
@@ -853,6 +975,22 @@
             </svg>
             This feature is only available for General Users.
         </div>
+
+        <!-- Save Changes Confirmation Modal -->
+        <div v-if="confirmSaveModal" class="modal">
+            <div class="success-modal-content">
+                <h3>{{ pendingSaveAction === 'email' ? 'Change Email' : 'Save Changes' }}</h3>
+                <p>
+                    {{ pendingSaveAction === 'email'
+                        ? 'A verification code will be sent to your new email address.'
+                        : 'Are you sure you want to save your profile changes?' }}
+                </p>
+                <div class="modal-actions">
+                    <button class="modal-btn cancel" @click="confirmSaveModal = false; pendingSavePayload = null; pendingSaveAction = null">Cancel</button>
+                    <button class="modal-btn confirm" @click="proceedSave">Yes</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -888,6 +1026,15 @@
                     // Toast for access denied (Admin Access button)
                     toastVisible: false,
                     toastTimer: null,
+
+                    profileMessage: {
+                        text: '',
+                        type: ''
+                    },
+
+                    confirmSaveModal: false,
+                    pendingSaveAction: null,
+                    pendingSavePayload: null,
 
                     // Admin access lock state
                     isAdmin: false
@@ -925,16 +1072,20 @@
                     this.sidebarOpen = !this.sidebarOpen;
                 },
 
+                setProfileMessage(type, text) {
+                    this.profileMessage.type = type;
+                    this.profileMessage.text = text;
+                },
+
+                clearProfileMessage() {
+                    this.profileMessage.type = '';
+                    this.profileMessage.text = '';
+                },
+
                 async loadUserProfile() {
                     const email = sessionStorage.getItem('userEmail');
                     if (!email) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Not logged in',
-                            text: 'Redirecting to login...',
-                            timer: 2000,
-                            showConfirmButton: false
-                        });
+                        this.setProfileMessage('error', 'Not logged in. Redirecting to login...');
                         setTimeout(() => window.location.href = 'login.html', 2000);
                         return;
                     }
@@ -962,14 +1113,9 @@
                         await this.$nextTick();
                     } catch (err) {
                         console.error('Profile load failed:', err);
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Failed to load profile',
-                            text: 'Please try again or contact support.',
-                            timer: 4000,
-                            showConfirmButton: false
-                        });
+                        this.setProfileMessage('error', 'Failed to load profile. Please try again or contact support.');
                     }
+                
                 },
 
                 saveField(field) {
@@ -977,6 +1123,8 @@
                 },
 
                 async confirmSave() {
+                    this.clearProfileMessage();
+
                     const cleanedName = this.editedFullName.trim().replace(/\s+/g, ' ');
                     const trimmedEditedEmail = this.editedEmail.trim().toLowerCase();
                     
@@ -988,102 +1136,93 @@
 
                     // Validate name if changed
                     if (nameChanged && cleanedName.length < 3) {
-                        return Swal.fire({
-                            icon: 'error',
-                            title: 'Invalid Name',
-                            text: 'Please enter your full name'
-                        });
+                        this.setProfileMessage('error', 'Please enter your full name.');
+                        return;
                     }
 
                     // Validate email if changed
                     if (emailChanged && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEditedEmail)) {
-                        return Swal.fire({
-                            icon: 'error',
-                            title: 'Invalid Email',
-                            text: 'Please enter a valid email address'
-                        });
+                        this.setProfileMessage('error', 'Please enter a valid email address.');
+                        return;
                     }
 
-                    const result = await Swal.fire({
-                        title: emailChanged ? 'Change Email?' : 'Save Changes?',
-                        text: emailChanged 
-                            ? 'A verification code will be sent to the new email address.' 
-                            : 'Save profile changes?',
-                        icon: 'question',
-                        showCancelButton: true,
-                        confirmButtonColor: '#4a8fe7',
-                        confirmButtonText: 'Yes'
-                    });
+                    this.pendingSaveAction = emailChanged ? 'email' : 'profile';
+                    this.pendingSavePayload = {
+                        cleanedName,
+                        trimmedEditedEmail,
+                        nameChanged,
+                        emailChanged
+                    };
+                    this.confirmSaveModal = true;   
+                },
 
-                    if (!result.isConfirmed) return;
+                async proceedSave() {
+                    if (!this.pendingSavePayload) return;
 
+                    this.confirmSaveModal = false;
                     this.isSaving = true;
 
+                    const {
+                        cleanedName,
+                        trimmedEditedEmail,
+                        nameChanged,
+                        emailChanged
+                    } = this.pendingSavePayload;
+
                     try {
-                        // Step 1: If name changed → save it immediately (PATCH)
                         if (nameChanged) {
                             const res = await fetch('http://127.0.0.1:8000/api/profile/update/', {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ 
-                                    email: this.email,  // Add this line - your backend needs the email
-                                    full_name: cleanedName 
+                                body: JSON.stringify({
+                                    email: this.email,
+                                    full_name: cleanedName
                                 })
                             });
+
                             if (!res.ok) {
                                 const err = await res.json();
                                 throw new Error(err.detail || 'Name update failed');
                             }
+
                             const data = await res.json();
                             this.fullName = this.originalFullName = data.full_name;
                             sessionStorage.setItem('userFullName', data.full_name);
-
-                            // Reset temp values after successful name save
                             this.tempFullName = '';
                         }
 
-                        // Step 2: If email changed → redirect to OTP page
                         if (emailChanged) {
                             sessionStorage.setItem('pendingNewEmail', trimmedEditedEmail);
-                            // Reset temp values before redirect
                             this.tempEmail = '';
-                            // Show a brief loading message before redirect
-                            Swal.fire({
-                                title: 'Redirecting...',
-                                text: 'Taking you to email verification',
-                                timer: 1000,
-                                showConfirmButton: false,
-                                didOpen: () => Swal.showLoading()
-                            }).then(() => {
+                            this.setProfileMessage('success', 'A verification code will be sent to your new email address.');
+
+                            setTimeout(() => {
                                 window.location.href = 'email_change_verify.html';
-                            });
+                            }, 1000);
+
+                            this.pendingSavePayload = null;
                             return;
                         }
 
-                        // If only name changed (or both but name first)
                         this.hasChanges = false;
                         this.editingField = null;
                         this.tempFullName = '';
                         this.tempEmail = '';
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Saved!',
-                            timer: 1500,
-                            showConfirmButton: false
-                        });
+                        this.setProfileMessage('success', 'Profile details updated successfully.');
                     } catch (err) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Failed',
-                            text: err.message || 'Could not save changes'
-                        });
+                        this.setProfileMessage('error', err.message || 'Could not save changes.');
                     } finally {
                         this.isSaving = false;
+                        this.pendingSavePayload = null;
                     }
                 },
 
                 async saveNameOnly() {
+                    this.clearProfileMessage();
                     this.isSaving = true;
+
+                    const cleanedName = this.editedFullName.trim().replace(/\s+/g, ' ');
+
                     try {
                         const res = await fetch('http://127.0.0.1:8000/api/profile/update/', {
                             method: 'PATCH',
@@ -1100,13 +1239,9 @@
                         sessionStorage.setItem('userFullName', data.full_name);
                         this.hasChanges = false;
                         this.editingField = null;
-                        Swal.fire({ icon: 'success', title: 'Saved!', timer: 1500, showConfirmButton: false });
+                        this.setProfileMessage('success', 'Profile details updated successfully.');
                     } catch (err) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Failed',
-                            text: err.message || 'Could not save changes'
-                        });
+                        this.setProfileMessage('error', err.message || 'Could not save changes.');
                     } finally {
                         this.isSaving = false;
                     }
@@ -1158,15 +1293,15 @@
                         const data = await response.json();
 
                         if (!response.ok) {
-                            alert(data.detail || 'Failed to update two-factor authentication setting.');
+                            this.setProfileMessage('error', data.detail || 'Failed to update two-factor authentication setting.');
                             this.enableTwoFactor = !this.enableTwoFactor;
                             return;
                         }
 
-                        console.log(data.detail);
+                        this.setProfileMessage('success', data.detail || 'Two-factor authentication setting updated successfully.');
                     } catch (error) {
                         console.error('Error updating 2FA setting:', error);
-                        alert('Something went wrong while updating two-factor authentication.');
+                        this.setProfileMessage('error', 'Something went wrong while updating two-factor authentication.');
                         this.enableTwoFactor = !this.enableTwoFactor;
                     }
                 },
