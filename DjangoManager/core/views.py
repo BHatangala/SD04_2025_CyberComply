@@ -1129,10 +1129,14 @@ def upload_from_drive(request):
             _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
+        upload_start = time.time()
         s3_key, s3_url = upload_to_s3(temp_path, file_name)
+        upload_duration = time.time() - upload_start
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", file_name, profile.user_id)
             _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
+            push_upload_metric('UploadFailureCount', 1, unit='Count')
+            push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
             return JsonResponse({'error': 'Failed to upload file to S3. Please try again in a few minutes.'}, status=500)
 
         with open(temp_path, 'rb') as f:
@@ -1150,6 +1154,8 @@ def upload_from_drive(request):
             status=Document.Status.UPLOADED,
         )
 
+        push_upload_metric('UploadSuccessCount', 1, unit='Count')
+        push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
         _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request, AuditLog.Severity.LOW)
 
         def event_stream():
@@ -1291,10 +1297,14 @@ def upload_from_onedrive(request):
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
         # ── Upload to S3 ──────────────────────────────────────────────────────
+        upload_start = time.time()
         s3_key, s3_url = upload_to_s3(temp_path, file_name)
+        upload_duration = time.time() - upload_start
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", file_name, profile.user_id)
             _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
+            push_upload_metric('UploadFailureCount', 1, unit='Count')
+            push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
             return JsonResponse({'error': 'S3 upload failed. Please try again in a few minutes.'}, status=500)
 
         # ── Cache file bytes for analysis ─────────────────────────────────────
@@ -1313,6 +1323,8 @@ def upload_from_onedrive(request):
             status=Document.Status.UPLOADED,
         )
 
+        push_upload_metric('UploadSuccessCount', 1, unit='Count')
+        push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
         _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request, AuditLog.Severity.LOW)
 
         return JsonResponse({
