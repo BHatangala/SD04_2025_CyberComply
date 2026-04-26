@@ -258,7 +258,8 @@ SELECT rp.report_id,
        rp.report_s3_key,
        rp.file_size,
        rp.generated_at,
-       rp.expires_at
+       rp.expires_at,
+       rp.view_token
 FROM reports rp
 JOIN analysis_result ar ON rp.result_id = ar.result_id
 JOIN document d ON ar.document_id = d.document_id

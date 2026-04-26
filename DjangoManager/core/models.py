@@ -309,6 +309,7 @@ class Report(models.Model):
         choices=EmailStatus.choices,
         default=EmailStatus.PENDING,
     )
+    view_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
 
     class Meta:
         db_table = "reports"

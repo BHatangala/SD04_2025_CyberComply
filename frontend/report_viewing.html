@@ -990,6 +990,7 @@ const app = createApp({
       currentReportName: '',
       currentSnapshot: null,
       resultId: null,
+      currentReportId: null,
       departmentName: '',
       uiMessage: '',
       uiMessageType: 'error',
@@ -1029,12 +1030,18 @@ const app = createApp({
     SessionManager.init({ timeoutMs: 1200000 });
 
     const params   = new URLSearchParams(window.location.search);
+    const tokenParam = (params.get('token') || '').trim();
     const reportId = (params.get('report_id') || '').trim();
     const generate = params.get('generate');  // 'true' when coming from document_analysis
 
     if (generate === 'true') {
       await this.generateReport(token);
       return;
+    }
+
+    if (tokenParam) {
+        await this.loadReportByToken(tokenParam, token);
+        return;
     }
     
     if (reportId) {
@@ -1209,6 +1216,7 @@ const app = createApp({
 
       try {
         let lastGeneratedId = null;
+        let lastGeneratedToken = null;
 
         for (const resultId of validIds) {
           try {
@@ -1295,13 +1303,14 @@ const app = createApp({
             }
 
             lastGeneratedId = generated.report_id;
+            lastGeneratedToken = generated.view_token || null;
 
           } catch (innerErr) {
             await this.logClientError('generateReport.loop', innerErr, { resultId });
           }
         }
 
-        if (!lastGeneratedId) {
+        if (!lastGeneratedId || !lastGeneratedToken) {
           this.showUiMessage('Report generation failed for all selected documents. Please try again.');
           return;
         }
@@ -1309,10 +1318,10 @@ const app = createApp({
         // ── Display the last generated report; sidebar gets the rest ─────
         window.history.replaceState(
           {}, '',
-          `report_viewing.html?report_id=${lastGeneratedId}`
+          `report_viewing.html?token=${lastGeneratedToken}`
         );
 
-        await this.loadReport(lastGeneratedId, token);
+        await this.loadReportByToken(lastGeneratedToken, token);
 
         await this.$nextTick();
         if (this.$refs.sidebar && typeof this.$refs.sidebar.refreshReports === 'function') {
@@ -1409,6 +1418,76 @@ const app = createApp({
         console.error('loadReport error:', e, { reportId });
         this.showUiMessage('Something went wrong while loading the report.');
       }
+    },
+
+    // ── Load and display a report by secure view token ────────────────────────────
+    async loadReportByToken(tokenParam, authToken) {
+        this.clearUiMessage();
+
+        if (!tokenParam) {
+            this.showUiMessage('Invalid report link.');
+            window.location.href = 'login.html';
+            return;
+        }
+
+        try {
+            const res = await fetch(`${BASE}/api/reports/resolve-token/?token=${encodeURIComponent(tokenParam)}`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+
+            if (!res.ok) {
+                if (res.status === 401) {
+                    sessionStorage.clear();
+                    window.location.href = 'login.html';
+                    return;
+                }
+                const msg = await this.getErrorMessage(res, 'Invalid or expired report link.');
+                this.showUiMessage(msg);
+                setTimeout(() => { window.location.href = 'home.html'; }, 3000);
+                return;
+            }
+
+            const data = await res.json();
+            if (!data || !data.report_snapshot) {
+                this.showUiMessage('Report data is missing or invalid.');
+                return;
+            }
+
+            this.currentSnapshot = data.report_snapshot;
+            this.clearUiMessage();
+            this.resultId = data.result_id || null;
+            this.currentReportId = data.report_id || null;
+
+            const meta    = (data.report_snapshot || {}).metadata || {};
+            const company = (meta.company    || '').trim();
+            const dept    = (meta.department || '').trim();
+            const file    = (meta.file_analyzed || '').trim();
+
+            const nameParts = [company, dept, file].filter(Boolean);
+            this.currentReportName = nameParts.join(' — ') || 'Report';
+
+            if (dept) {
+                this.departmentName = dept;
+            } else if (this.resultId) {
+                try {
+                    const aRes = await fetch(`${BASE}/api/analysis/${this.resultId}/`, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    if (aRes.ok) {
+                        const aData = await aRes.json();
+                        this.departmentName = aData.department || '';
+                    }
+                } catch (_) {
+                    this.departmentName = '';
+                }
+            } else {
+                this.departmentName = '';
+            }
+
+        } catch (e) {
+            await this.logClientError('loadReportByToken', e, { tokenParam });
+            this.showUiMessage('Something went wrong while loading the report.');
+        }
     },
 
     // ── Unified PDF generator (unchanged from database branch) ────────────────
@@ -1847,8 +1926,8 @@ const app = createApp({
       }
 
       try {
-          const params = new URLSearchParams(window.location.search);
-          const report_id = params.get('report_id');
+          //const params = new URLSearchParams(window.location.search);
+          const report_id = this.currentReportId;
           if (!report_id) {
             this.showUiMessage("Report ID missing.");
             return;
@@ -1968,6 +2047,7 @@ const app = createApp({
         this.currentSnapshot = data.report_snapshot;
         this.clearUiMessage();
         this.resultId = data.result_id || null;
+        this.currentReportId = data.report_id || null;
 
         const meta    = (data.report_snapshot || {}).metadata || {};
         const company = (meta.company    || '').trim();
@@ -1995,7 +2075,7 @@ const app = createApp({
           }
         }
 
-        window.history.replaceState({}, '', `report_viewing.html?report_id=${report.report_id}`);
+        window.history.replaceState({}, '', `report_viewing.html?token=${report.view_token}`);
       } catch (e) {
         await this.logClientError('openReport', e, {
             selectedReportId: report?.report_id || null
@@ -2023,8 +2103,8 @@ const app = createApp({
         return;
       }
 
-      const params = new URLSearchParams(window.location.search);
-      const reportId = params.get('report_id');
+      //const params = new URLSearchParams(window.location.search);
+      const reportId = this.currentReportId;
       if (!reportId) {
           this.showUiMessage("Report ID not found.");
           return;
