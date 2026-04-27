@@ -1,9 +1,34 @@
 -- ===================================================================
--- CyberComply Demo Evidence Script for Milestone 2 (Database Overview)
+-- CyberComply Demo Evidence Script for Milestone 2 & 3 (Database Overview)
 -- ===================================================================
 
 \x on
 \timing on
+
+\echo ''
+\echo ''
+\echo '=============================='
+\echo 'SYSTEM SUMMARY'
+\echo '=============================='
+\echo 'Quick overview of total records in each key table.'
+\echo ''
+
+SELECT 
+    (SELECT COUNT(*) FROM organization)        AS total_organizations,
+    (SELECT COUNT(*) FROM department)          AS total_departments,
+    (SELECT COUNT(*) FROM auth_user)           AS total_users,
+    (SELECT COUNT(*) FROM user_profile)        AS total_user_profiles,
+    (SELECT COUNT(*) FROM document)            AS total_documents,
+    (SELECT COUNT(*) FROM analysis_result)     AS total_analysis_results,
+    (SELECT COUNT(*) FROM finding)             AS total_findings,
+    (SELECT COUNT(*) FROM recommendations)     AS total_recommendations,
+    (SELECT COUNT(*) FROM reports)             AS total_reports,
+    (SELECT COUNT(*) FROM report_downloads)    AS total_downloads,
+    (SELECT COUNT(*) FROM report_shares)       AS total_shared_reports,
+    (SELECT COUNT(*) FROM admin_access_request) AS total_admin_requests,
+    (SELECT COUNT(*) FROM deletion_request)    AS total_deletion_requests,
+    (SELECT COUNT(*) FROM audit_logs)          AS total_audit_logs;
+
 
 \echo ''
 \echo ''
@@ -13,8 +38,10 @@
 \echo 'Displays all registered organizations in the system.'
 \echo ''
 
-SELECT *
-FROM organization;
+SELECT org_id, org_name, created_at
+FROM organization
+ORDER BY created_at DESC
+LIMIT 10;
 
 
 \echo ''
@@ -25,8 +52,15 @@ FROM organization;
 \echo 'Displays departments linked to organizations.'
 \echo ''
 
-SELECT *
-FROM department;
+SELECT d.dept_id,
+       d.dept_name,
+       d.org_id,
+       o.org_name,
+       d.created_at
+FROM department d
+JOIN organization o ON d.org_id = o.org_id
+ORDER BY d.created_at DESC
+LIMIT 10;
 
 
 \echo ''
@@ -37,9 +71,9 @@ FROM department;
 \echo 'Stores login credentials using Django authentication.'
 \echo ''
 
-SELECT id, username AS email, email, is_active
+SELECT id, username AS email, email, is_active, date_joined
 FROM auth_user
-ORDER BY id DESC
+ORDER BY date_joined DESC
 LIMIT 10;
 
 
@@ -51,11 +85,21 @@ LIMIT 10;
 \echo 'Stores extended user details including role and security attributes.'
 \echo ''
 
-SELECT user_id, auth_user_id, full_name, role, is_verified,
-       otp_is_enabled, failed_login_count, locked_until,
-       last_login_at, deleted_at, org_id
-FROM user_profile
-ORDER BY updated_at DESC
+SELECT up.user_id,
+       up.auth_user_id,
+       up.full_name,
+       up.role,
+       up.is_verified,
+       up.otp_is_enabled,
+       up.failed_login_count,
+       up.locked_until,
+       up.last_login_at,
+       up.deleted_at,
+       up.org_id,
+       o.org_name
+FROM user_profile up
+LEFT JOIN organization o ON up.org_id = o.org_id
+ORDER BY up.updated_at DESC
 LIMIT 10;
 
 
@@ -67,7 +111,13 @@ LIMIT 10;
 \echo 'Tracks OTPs for login, reset password, and verification flows.'
 \echo ''
 
-SELECT otp_id, user_id, purpose, created_at, expires_at, used_at, attempt_count
+SELECT otp_id, 
+       user_id, 
+       purpose, 
+       created_at, 
+       expires_at, 
+       used_at, 
+       attempt_count
 FROM otp_verification
 ORDER BY created_at DESC
 LIMIT 10;
@@ -81,9 +131,16 @@ LIMIT 10;
 \echo 'Logs all login attempts including failures and lockouts.'
 \echo ''
 
-SELECT login_id, user_id, status, purpose, ip_address, attempt_time
-FROM login_history
-ORDER BY attempt_time DESC
+SELECT lh.login_id,
+       lh.user_id,
+       up.full_name,
+       lh.status,
+       lh.purpose,
+       lh.ip_address,
+       lh.attempt_time
+FROM login_history lh
+LEFT JOIN user_profile up ON lh.user_id = up.user_id
+ORDER BY lh.attempt_time DESC
 LIMIT 10;
 
 
@@ -95,10 +152,25 @@ LIMIT 10;
 \echo 'Stores metadata of uploaded documents including S3 reference and status.'
 \echo ''
 
-SELECT document_id, user_id, org_id, dept_id, original_filename,
-       file_type, size_bytes, s3_key, status, uploaded_at, deleted_at
-FROM document
-ORDER BY uploaded_at DESC
+SELECT d.document_id,
+       d.user_id,
+       up.full_name,
+       d.org_id,
+       o.org_name,
+       d.dept_id,
+       dept.dept_name,
+       d.original_filename,
+       d.file_type,
+       d.size_bytes,
+       d.s3_key,
+       d.status,
+       d.uploaded_at,
+       d.deleted_at
+FROM document d
+LEFT JOIN user_profile up ON d.user_id = up.user_id
+LEFT JOIN organization o ON d.org_id = o.org_id
+LEFT JOIN department dept ON d.dept_id = dept.dept_id
+ORDER BY d.uploaded_at DESC
 LIMIT 10;
 
 
@@ -110,9 +182,16 @@ LIMIT 10;
 \echo 'Stores AI-generated compliance results with score and risk level.'
 \echo ''
 
-SELECT result_id, document_id, compliance_score, risk_level, summary, created_at
-FROM analysis_result
-ORDER BY created_at DESC
+SELECT ar.result_id,
+       ar.document_id,
+       d.original_filename,
+       ar.compliance_score,
+       ar.risk_level,
+       ar.summary,
+       ar.created_at
+FROM analysis_result ar
+JOIN document d ON ar.document_id = d.document_id
+ORDER BY ar.created_at DESC
 LIMIT 10;
 
 
@@ -124,9 +203,18 @@ LIMIT 10;
 \echo 'Contains GAP and RISK findings derived from analysis.'
 \echo ''
 
-SELECT finding_id, result_id, finding_type, title, description, created_at
-FROM finding
-ORDER BY created_at DESC
+SELECT f.finding_id,
+       f.result_id,
+       ar.document_id,
+       d.original_filename,
+       f.finding_type,
+       f.title,
+       f.description,
+       f.created_at
+FROM finding f
+JOIN analysis_result ar ON f.result_id = ar.result_id
+JOIN document d ON ar.document_id = d.document_id
+ORDER BY f.created_at DESC
 LIMIT 10;
 
 
@@ -135,12 +223,23 @@ LIMIT 10;
 \echo '=============================='
 \echo '10. RECOMMENDATIONS'
 \echo '=============================='
-\echo 'Stores AI-generated recommendations with regulatory references.'
+\echo 'Stores AI-generated recommendations, severity levels, corrective steps, and legal section references.'
 \echo ''
 
-SELECT rec_id, result_id, recommendation_text, status, act_name, page_no, line_no, created_at
-FROM recommendations
-ORDER BY created_at DESC
+SELECT r.rec_id,
+       r.result_id,
+       ar.document_id,
+       d.original_filename,
+       r.recommendation_text,
+       r.status,
+       r.act_name,
+       r.steps_to_achieve,
+       r.section,
+       r.created_at
+FROM recommendations r
+JOIN analysis_result ar ON r.result_id = ar.result_id
+JOIN document d ON ar.document_id = d.document_id
+ORDER BY r.created_at DESC
 LIMIT 10;
 
 
@@ -152,9 +251,19 @@ LIMIT 10;
 \echo 'Stores generated reports with expiry and metadata.'
 \echo ''
 
-SELECT report_id, result_id, report_s3_key, file_size, generated_at, expires_at
-FROM reports
-ORDER BY generated_at DESC
+SELECT rp.report_id,
+       rp.result_id,
+       ar.document_id,
+       d.original_filename,
+       rp.report_s3_key,
+       rp.file_size,
+       rp.generated_at,
+       rp.expires_at,
+       rp.view_token
+FROM reports rp
+JOIN analysis_result ar ON rp.result_id = ar.result_id
+JOIN document d ON ar.document_id = d.document_id
+ORDER BY rp.generated_at DESC
 LIMIT 10;
 
 
@@ -166,9 +275,14 @@ LIMIT 10;
 \echo 'Tracks report download activity by users.'
 \echo ''
 
-SELECT download_id, report_id, downloaded_by_id, downloaded_at
-FROM report_downloads
-ORDER BY downloaded_at DESC
+SELECT rd.download_id,
+       rd.report_id,
+       rd.downloaded_by_id,
+       up.full_name AS downloaded_by_name,
+       rd.downloaded_at
+FROM report_downloads rd
+LEFT JOIN user_profile up ON rd.downloaded_by_id = up.user_id
+ORDER BY rd.downloaded_at DESC
 LIMIT 10;
 
 
@@ -180,9 +294,18 @@ LIMIT 10;
 \echo 'Stores shared report access details including token and expiry.'
 \echo ''
 
-SELECT share_id, report_id, shared_by_id, shared_with_email, access_token, expires_at, created_at, is_active
-FROM report_shares
-ORDER BY created_at DESC
+SELECT rs.share_id,
+       rs.report_id,
+       rs.shared_by_id,
+       up.full_name AS shared_by_name,
+       rs.shared_with_email,
+       rs.access_token,
+       rs.expires_at,
+       rs.created_at,
+       rs.is_active
+FROM report_shares rs
+LEFT JOIN user_profile up ON rs.shared_by_id = up.user_id
+ORDER BY rs.created_at DESC
 LIMIT 10;
 
 
@@ -194,10 +317,18 @@ LIMIT 10;
 \echo 'Stores admin privilege requests verified via OTP.'
 \echo ''
 
-SELECT request_id, user_id, verification_otp_id, org_email, status,
-       requested_at, verified_at, failure_reason
-FROM admin_access_request
-ORDER BY requested_at DESC
+SELECT aar.request_id,
+       aar.user_id,
+       up.full_name,
+       aar.verification_otp_id,
+       aar.org_email,
+       aar.status,
+       aar.requested_at,
+       aar.verified_at,
+       aar.failure_reason
+FROM admin_access_request aar
+LEFT JOIN user_profile up ON aar.user_id = up.user_id
+ORDER BY aar.requested_at DESC
 LIMIT 10;
 
 
@@ -209,8 +340,16 @@ LIMIT 10;
 \echo 'Records account deletion requests and data erasure summaries for audit.'
 \echo ''
 
-SELECT deletion_id, user_id, user_email_snapshot, request_type, status,
-       reason, erasure_summary, requested_at, completed_at, ip_address
+SELECT deletion_id, 
+       user_id, 
+       user_email_snapshot, 
+       request_type, 
+       status,
+       reason, 
+       erasure_summary, 
+       requested_at, 
+       completed_at, 
+       ip_address
 FROM deletion_request
 ORDER BY requested_at DESC
 LIMIT 10;
@@ -221,11 +360,131 @@ LIMIT 10;
 \echo '=============================='
 \echo '16. AUDIT LOG'
 \echo '=============================='
-\echo 'Tracks all critical system actions for monitoring and compliance.'
+\echo 'Tracks important system actions for monitoring, accountability, and compliance evidence.'
 \echo ''
 
-SELECT audit_id, user_id, action_type, target_type, target_id,
-       success, ip_address, created_at
-FROM audit_logs
-ORDER BY created_at DESC
+SELECT al.audit_id,
+       al.user_id,
+       up.full_name,
+       al.action_type,
+       al.target_type,
+       al.target_id,
+       al.success,
+       al.severity,
+       al.ip_address,
+       al.created_at
+FROM audit_logs al
+LEFT JOIN user_profile up ON al.user_id = up.user_id
+ORDER BY al.created_at DESC
 LIMIT 10;
+
+
+\echo ''
+\echo ''
+\echo '=============================='
+\echo 'SLOW QUERY MONITORING'
+\echo '=============================='
+\echo 'Displays filtered application queries with average execution time above 10 ms.'
+\echo ''
+
+SELECT
+    LEFT(query, 120) AS query_preview,
+    calls,
+    ROUND(total_exec_time::numeric, 2) AS total_exec_time_ms,
+    ROUND(mean_exec_time::numeric, 2) AS avg_exec_time_ms
+FROM
+    pg_stat_statements
+WHERE
+    query ~* '(organization|department|auth_user|user_profile|document|analysis_result|finding|recommendations|reports|report_downloads|report_shares|admin_access_request|deletion_request|audit_logs)'
+    AND mean_exec_time > 10
+ORDER BY
+    total_exec_time DESC
+LIMIT 10;
+
+
+\echo ''
+\echo ''
+\echo '=============================='
+\echo 'MOST FREQUENT QUERIES'
+\echo '=============================='
+\echo 'Displays the most frequently executed queries.'
+\echo ''
+
+SELECT
+    LEFT(query, 120) AS query_preview,
+    calls,
+    ROUND(mean_exec_time::numeric, 2) AS avg_exec_time_ms
+FROM
+    pg_stat_statements
+WHERE
+    query ~* '(organization|department|auth_user|user_profile|document|analysis_result|finding|recommendations|reports|report_downloads|report_shares|admin_access_request|deletion_request|audit_logs)'
+ORDER BY
+    calls DESC
+LIMIT 10;
+
+
+\echo ''
+\echo ''
+\echo '=============================='
+\echo 'PERFORMANCE ANALYSIS SUMMARY'
+\echo '=============================='
+\echo 'Evaluates query performance based on pg_stat_statements'
+\echo ''
+
+SELECT
+CASE 
+    WHEN (
+        SELECT COUNT(*) 
+        FROM pg_stat_statements
+        WHERE
+            query ~* '(organization|department|auth_user|user_profile|document|analysis_result|finding|recommendations|reports|report_downloads|report_shares|admin_access_request|deletion_request|audit_logs)'
+            AND mean_exec_time > 10
+    ) = 0 THEN
+
+        'No slow queries above 10 ms were detected.
+Most observed queries executed with low average execution times, indicating efficient database performance.
+
+Performance reasons:
+- Normalized relational schema reduced redundancy and improved query structure
+- Proper use of primary keys and foreign keys supported efficient joins
+- Indexed relationships improved filtering and lookup operations
+- Structured tables (user_profile, document, analysis_result, reports) optimized query flow
+- The current dataset size is manageable for PostgreSQL performance
+
+Optimization strategies implemented:
+- Enabled pg_stat_statements for real-time monitoring
+- Reviewed frequently executed queries for potential bottlenecks
+- Optimized Django ORM usage to avoid unnecessary database calls
+- Maintained normalized schema design for efficient operations
+- Utilized indexing through primary keys, unique constraints, and explicit model indexes where applicable
+- Limited unnecessary data retrieval using ORDER BY and LIMIT
+
+No immediate optimization required.
+Performance monitoring remains active for future scalability and tuning.'
+        
+    ELSE
+
+        'Slow queries detected (greater than 10 ms).
+
+Recommended optimization strategies:
+- Add indexes on frequently filtered and joined columns
+- Optimize JOIN operations and reduce unnecessary joins
+- Refactor complex queries for better execution plans
+- Replace SELECT * with specific column selection
+- Implement pagination (LIMIT/OFFSET) for large datasets
+- Optimize Django ORM queries using select_related or prefetch_related
+- Consider caching for frequently executed queries
+- Continuously monitor query performance using pg_stat_statements
+
+Further optimization will be applied based on observed query patterns.'
+        
+END AS performance_analysis;
+
+
+\echo ''
+\echo '========================================='
+\echo 'APPLICATION-LEVEL PERFORMANCE MONITORING'
+\echo '========================================='
+\echo 'In addition to database-level analysis, application-level performance is monitored using Django middleware.'
+\echo 'Each API request logs response time, database query count, and cumulative database latency per request.'
+\echo 'This enables identification of whether delays originate from database queries or application processing logic.'

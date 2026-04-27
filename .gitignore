@@ -64,6 +64,10 @@ __pycache__/
 db.sqlite3
 **/db.sqlite3
 
+# Backups
+backups/dumps/
+*.dump
+
 # Playwright
 node_modules/
 /frontend/test-results/

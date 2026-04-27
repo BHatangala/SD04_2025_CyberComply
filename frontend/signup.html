@@ -838,7 +838,7 @@
       methods: {
         validateEmail(email) {
           const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          return regex.test(email);
+          return regex.test((email || "").trim());
         },
 
         // Full name validation matching backend expectations
@@ -905,7 +905,9 @@
           this.showSuccessPopup = false;
           this.submitted = true;
 
+          const cleanedName = this.form.name.trim().replace(/\s+/g, ' ');
           const trimmedEmail = this.form.email.trim().toLowerCase();
+          const cleanedPassword = this.form.password;
 
           // Full name validation
           const nameError = this.validateFullName(this.form.name);
@@ -913,10 +915,12 @@
             this.errors.name = nameError;
           }
 
+          // Email validation
           if (!this.validateEmail(trimmedEmail)) {
             this.errors.email = "Please enter a valid email address.";
           }
 
+          // Password validation
           if (!this.form.password) {
             this.errors.password = "Password is required.";
           } else if (
@@ -957,9 +961,9 @@
                   "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                  name: this.form.name.trim().replace(/\s+/g, ' '),
+                  name: cleanedName,
                   email: trimmedEmail,
-                  password: this.form.password,
+                  password: cleanedPassword,
                   role: this.form.role
                 })
               });

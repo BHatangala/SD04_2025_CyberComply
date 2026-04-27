@@ -6,6 +6,7 @@
     <title>CyberComply - Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
 
     <!-- Google Identity Services (OAuth 2.0) + Google API client (Picker) -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -266,6 +267,30 @@
             color: #8b9dc3;
             letter-spacing: 1.5px;
             text-transform: uppercase;
+        }
+
+        /* ── PDPA Compliance Statement ── */
+        .pdpa-statement {
+            max-width: 800px;
+            margin: 12px auto 0;
+            background: rgba(74, 143, 231, 0.08);
+            border: 1px solid rgba(74, 143, 231, 0.3);
+            border-radius: 10px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .pdpa-statement-text {
+            font-size: 12px;
+            color: #8bb8f0;
+            line-height: 1.55;
+        }
+
+        .pdpa-statement-text strong {
+            color: #a9c7ff;
+            font-weight: 600;
         }
 
         /* ── Temporary Storage Info Banner ── */
@@ -864,6 +889,8 @@
                 type="text"
                 v-model="companyName"
                 placeholder="Enter organisation name…"
+                maxlength="200"
+                required
                 @blur="orgNameTouched = true"
             >
         </div>
@@ -936,6 +963,16 @@
                 accept=".pdf,.docx,.txt"
                 @change="handleFileSelect"
             >
+
+            <!-- ── PDPA Compliance Statement ── -->
+            <div class="pdpa-statement">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4a8fe7" stroke-width="2" style="flex-shrink:0; margin-top:2px;">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span class="pdpa-statement-text">
+                    Documents are analysed against the <strong>Personal Data Protection Act No. 9 of 2022</strong> (Sri Lanka).
+                </span>
+            </div>
 
             <!-- ── Temporary Storage Info Banner ── -->
             <div class="upload-info-block" v-if="showStorageNotice">
@@ -1168,7 +1205,7 @@
                 uploadEndpoint: 'http://127.0.0.1:8000/ai/upload/',
                 // Phase 2a (single file): SSE stream → AI → result.
                 analyzeEndpoint: 'http://127.0.0.1:8000/ai/analyze/',
-                // Phase 2b (multiple files): batch JSON → AI → result.
+                // Phase 2b (multiple files): batch SSE stream → AI → result per file.
                 analyzeBatchEndpoint: 'http://127.0.0.1:8000/ai/analyze-batch/',
                 // S3 file deletion + DB soft-delete (called by × button).
                 deleteEndpoint: 'http://127.0.0.1:8000/api/delete-file/',
@@ -1230,6 +1267,14 @@
             }
         },
 
+        watch: {
+            companyName() {
+                this.errorMessages = this.errorMessages.filter(
+                    msg => !msg.includes('Organisation')
+                );
+            }
+        },
+
         async mounted() {
             // Restore org name if we're returning from a OneDrive OAuth redirect
             const pendingOrg = sessionStorage.getItem('pendingOrgName');
@@ -1273,6 +1318,10 @@
             this.sessionToken = token;
             this.userEmail    = email;
             this.userRole     = roleRaw;
+
+            // Session timeout — 30 min because analysis can take ~20 min
+            // (from feature/database branch)
+            SessionManager.init({ timeoutMs: 1800000 });
 
             // Populate sidebar with real analysis history from the database
             await this.fetchHistory();
@@ -1367,6 +1416,15 @@
                 }
 
                 for (const file of files) {
+
+                    // Duplicate check — from feature/database branch
+                    if (this.uploadedFiles.some(f =>
+                        f.name === file.name && f.size === file.size
+                    )) {
+                        this.errorMessages.push(`"${file.name}" is already uploaded.`);
+                        continue;
+                    }
+
                     if (file.size > 50 * 1024 * 1024) {
                         this.errorMessages.push(`"${file.name}" exceeds the 50 MB limit.`);
                         continue;
@@ -1491,9 +1549,9 @@
             },
 
             // ── Phase 2a: Single file — SSE stream ──
-            // Replaces the feature/ai-development approach of writing the result to
-            // localStorage. Result is now persisted to PostgreSQL via saveAnalysisEndpoint,
-            // and only the result_id is kept in sessionStorage for the report page.
+            // Sprint-3 SSE logic with Authorization header from feature/database.
+            // Result is persisted to PostgreSQL via saveAnalysisEndpoint;
+            // only the result_id is kept in sessionStorage for the report page.
             async analyseSingle(fileObj) {
                 const getIndex     = () => this.uploadedFiles.indexOf(fileObj);
                 const updateStatus = (newStatus) => {
@@ -1514,8 +1572,17 @@
                 try {
                     const response = await fetch(this.analyzeEndpoint, {
                         method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${this.sessionToken}`
+                        },
                         body: formData
                     });
+
+                    if (response.status === 401 || response.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
 
                     if (!response.ok) {
                         throw new Error(`Server returned HTTP ${response.status}`);
@@ -1554,10 +1621,8 @@
                                         updateStatus('analysed');
                                         this.analysisProgressText = 'Analysis complete. Redirecting…';
 
-                                        // ── Persist result to PostgreSQL (replaces localStorage) ──
-                                        // feature/ai-development stored the full result object in
-                                        // localStorage under 'latestAnalysisResult'. The merged flow
-                                        // instead POSTs to the DB and stores only the result_id in
+                                        // ── Persist result to PostgreSQL ──
+                                        // POSTs to the DB and stores only the result_id in
                                         // sessionStorage, which document_analysis.html reads to fetch
                                         // the full result from the backend.
                                         try {
@@ -1619,14 +1684,11 @@
                 }
             },
 
-            // ── Phase 2b: Multiple files — batch JSON request ──
+            // ── Phase 2b: Multiple files — batch SSE stream ──
+            // Sprint-3 SSE implementation with Authorization header from feature/database.
+            // Events arrive one per file as the backend processes them sequentially.
             async analyseBatch(files) {
-                this.analysisProgressText = `Sending ${files.length} files to AI for batch analysis…`;
-
-                files.forEach(fileObj => {
-                    const i = this.uploadedFiles.indexOf(fileObj);
-                    if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'analysing' });
-                });
+                this.analysisProgressText = `Preparing ${files.length} files for analysis…`;
 
                 const payload = {
                     company_name: this.companyName || '',
@@ -1636,67 +1698,132 @@
                     }))
                 };
 
-                console.log(`Analysing (batch): ${files.map(f => f.name).join(', ')}`);
+                console.log(`Analysing (batch SSE): ${files.map(f => f.name).join(', ')}`);
 
                 try {
                     const response = await fetch(this.analyzeBatchEndpoint, {
                         method:  'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body:    JSON.stringify(payload)
+                        headers: {
+                            'Content-Type':  'application/json',
+                            'Authorization': `Bearer ${this.sessionToken}`
+                        },
+                        body: JSON.stringify(payload)
                     });
 
-                    const data = await response.json();
+                    if (response.status === 401 || response.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
 
                     if (!response.ok) {
-                        throw new Error(data.error || `Server returned HTTP ${response.status}`);
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.error || `Server returned HTTP ${response.status}`);
                     }
 
-                    files.forEach(fileObj => {
-                        const i = this.uploadedFiles.indexOf(fileObj);
-                        if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'analysed' });
-                    });
+                    // ── Read the SSE stream ──
+                    // Identical reader pattern to analyseSingle.
+                    // Events arrive one per file as the backend processes them sequentially.
+                    const reader  = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let   buffer  = '';
 
-                    this.analysisProgressText = 'Batch analysis complete. Redirecting…';
+                    // Tracks result_ids collected from 'analysed' events.
+                    // batch_complete also carries the full list, but we collect here
+                    // as a safety net in case the final event is malformed.
+                    const collectedResultIds = [];
 
-                    // Persist batch result to PostgreSQL
-                    try {
-                        const firstFile = files[0];
-                        const saveRes = await fetch(this.saveAnalysisEndpoint, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type':  'application/json',
-                                'Authorization': `Bearer ${this.sessionToken}`
-                            },
-                            body: JSON.stringify({
-                                result:      data.result,
-                                document_id: firstFile.documentId || '',
-                                filename:    files.map(f => f.name).join(', '),
-                                company:     this.companyName || ''
-                            })
-                        });
-                        if (saveRes.ok) {
-                            const saved = await saveRes.json();
-                            if (saved.result_id) {
-                                sessionStorage.setItem('latestResultId', saved.result_id);
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const events = buffer.split('\n\n');
+                        buffer = events.pop();
+
+                        for (const event of events) {
+                            const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+                            if (!dataLine) continue;
+
+                            try {
+                                const payload = JSON.parse(dataLine.slice(6));
+                                console.log(`📡 [batch] SSE:`, payload.status, payload.file_name || '');
+
+                                switch (payload.status) {
+
+                                    case 'analysing': {
+                                        // Mark the specific file card as analysing
+                                        const idx = this.uploadedFiles.findIndex(f => f.name === payload.file_name);
+                                        if (idx !== -1) Object.assign(this.uploadedFiles[idx], { status: 'analysing' });
+                                        this.analysisProgressText = `Analysing "${payload.file_name}"…`;
+                                        break;
+                                    }
+
+                                    case 'analysed': {
+                                        // Mark the specific file card as analysed
+                                        const idx = this.uploadedFiles.findIndex(f => f.name === payload.file_name);
+                                        if (idx !== -1) Object.assign(this.uploadedFiles[idx], { status: 'analysed' });
+                                        // Collect result_id if the backend saved it successfully
+                                        if (payload.result_id) collectedResultIds.push(payload.result_id);
+                                        this.analysisProgressText = `"${payload.file_name}" analysed…`;
+                                        break;
+                                    }
+
+                                    case 'error': {
+                                        // Mark only the failed file — batch continues for remaining files
+                                        const idx = this.uploadedFiles.findIndex(f => f.name === payload.file_name);
+                                        if (idx !== -1) Object.assign(this.uploadedFiles[idx], { status: 'error' });
+                                        const msg = payload.message || '';
+                                        const friendly = msg.includes('not running') || msg.includes('connect')
+                                            ? `Analysis unavailable for "${payload.file_name}". The AI service is not responding.`
+                                            : `Error processing "${payload.file_name}". Please try again.`;
+                                        this.errorMessages.push(friendly);
+                                        break;
+                                    }
+
+                                    case 'batch_complete': {
+                                        // Use the server's list as the authoritative set of result IDs.
+                                        // Fall back to what we collected from individual 'analysed' events
+                                        // if the server list is missing or empty.
+                                        const resultIds = (payload.result_ids && payload.result_ids.length > 0)
+                                            ? payload.result_ids
+                                            : collectedResultIds;
+
+                                        this.analysisProgressText = 'Batch analysis complete. Redirecting…';
+
+                                        // Store batch result IDs for comparison pages.
+                                        // Clear any stale single-file result ID so comparison.html
+                                        // doesn't fall back to the old single-result fetch path.
+                                        sessionStorage.removeItem('latestResultId');
+                                        sessionStorage.setItem('batchResultIds', JSON.stringify(resultIds));
+
+                                        console.log(`Batch complete — ${resultIds.length} result(s) stored:`, resultIds);
+
+                                        // Brief pause so the user sees all cards reach ✓ ANALYSED
+                                        setTimeout(() => {
+                                            window.location.href = 'document_analysis.html';
+                                        }, 1500);
+                                        break;
+                                    }
+                                }
+
+                            } catch (parseError) {
+                                console.warn('Could not parse batch SSE line:', dataLine);
                             }
-                        } else {
-                            console.warn('Batch analysis save returned HTTP', saveRes.status);
                         }
-                    } catch (saveErr) {
-                        console.warn('Could not persist batch analysis result:', saveErr);
                     }
-
-                    setTimeout(() => {
-                        window.location.href = 'document_analysis.html';
-                    }, 1500);
 
                 } catch (error) {
                     console.error('Batch analysis failed:', error);
+                    // Mark any file still in 'uploaded' state as error —
+                    // files already marked 'analysed' keep their status
                     files.forEach(fileObj => {
                         const i = this.uploadedFiles.indexOf(fileObj);
-                        if (i !== -1) Object.assign(this.uploadedFiles[i], { status: 'error' });
+                        if (i !== -1 && this.uploadedFiles[i].status === 'uploaded') {
+                            Object.assign(this.uploadedFiles[i], { status: 'error' });
+                        }
                     });
-                    this.errorMessages.push(`Batch analysis is temporarily unavailable. The AI service is not responding — please wait a moment and try again.`);
+                    this.errorMessages.push('Batch analysis is temporarily unavailable. The AI service is not responding — please wait a moment and try again.');
                     this.isAnalysing = false;
                 }
             },
@@ -1708,6 +1835,11 @@
             //   - keeps sessionStorage tracking list in sync
             async removeFile(index) {
                 const file = this.uploadedFiles[index];
+
+                // Clear any "already uploaded" error for this file — from feature/database branch
+                this.errorMessages = this.errorMessages.filter(
+                    msg => msg !== `"${file.name}" is already uploaded.`
+                );
 
                 this.uploadedFiles.splice(index, 1);
 
@@ -1757,6 +1889,18 @@
                     fileObj.status = 'uploading';
 
                     if (fileObj.source === 'google' && fileObj._driveFileId) {
+
+                        // Duplicate guard before triggering deferred Drive upload
+                        if (this.uploadedFiles.some((f, i) =>
+                            i !== index &&
+                            f.name === fileObj.name &&
+                            f.size === fileObj.size
+                        )) {
+                            this.errorMessages.push(`"${fileObj.name}" is already uploaded.`);
+                            this.uploadedFiles.splice(index, 1);
+                            return;
+                        }
+
                         const driveFileId = fileObj._driveFileId;
                         const driveToken  = fileObj._driveToken;
                         fileObj._driveFileId = null;
@@ -1764,6 +1908,18 @@
                         this.uploadFromDrive(fileObj, driveFileId, driveToken);
 
                     } else if (fileObj.source === 'onedrive' && fileObj._oneDriveFileId) {
+
+                        // Duplicate guard before triggering deferred OneDrive upload
+                        if (this.uploadedFiles.some((f, i) =>
+                            i !== index &&
+                            f.name === fileObj.name &&
+                            f.size === fileObj.size
+                        )) {
+                            this.errorMessages.push(`"${fileObj.name}" is already uploaded.`);
+                            this.uploadedFiles.splice(index, 1);
+                            return;
+                        }
+
                         const oneDriveFileId    = fileObj._oneDriveFileId;
                         const oneDriveToken     = fileObj._oneDriveToken;
                         fileObj._oneDriveFileId = null;
@@ -1900,6 +2056,15 @@
                     this.errorMessages.push('Maximum 10 files allowed.');
                     return;
                 }
+
+                // Duplicate check — from feature/database branch
+                if (this.uploadedFiles.some(f =>
+                    f.name === fileName && f.size === fileSize
+                )) {
+                    this.errorMessages.push(`"${fileName}" is already uploaded.`);
+                    return;
+                }
+
                 if (this.isAdmin && !this.validateOrgName()) return;
                 this.showStorageNotice = true;
 
@@ -2067,11 +2232,39 @@
                     txt:  { bg: '#f3f3f3', color: '#555555', label: 'TXT' },
                 };
 
-                function fileIcon(type) {
-                    const ic = icons[type] || icons.txt;
-                    return `<div style="width:44px;height:52px;background:${ic.bg};border-radius:4px;display:flex;align-items:center;justify-content:center;border:0.5px solid ${ic.color}44;">
-                                <span style="font-size:10px;font-weight:600;color:${ic.color};">${ic.label}</span>
-                            </div>`;
+                function fileIconElement(type) {
+                    const icon = document.createElement('div');
+
+                    const styles = {
+                        pdf:  { bg: '#fce4e4', color: '#c0392b', label: 'PDF' },
+                        docx: { bg: '#e3f0fb', color: '#1565c0', label: 'DOC' },
+                        txt:  { bg: '#f3f3f3', color: '#555555', label: 'TXT' }
+                    };
+
+                    const ic = styles[type] || styles.txt;
+
+                    icon.style.cssText = `
+                        width:44px;
+                        height:52px;
+                        background:${ic.bg};
+                        border-radius:4px;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        border:0.5px solid ${ic.color}44;
+                    `;
+
+                    const label = document.createElement('span');
+                    label.textContent = ic.label;
+                    label.style.cssText = `
+                        font-size:10px;
+                        font-weight:600;
+                        color:${ic.color};
+                    `;
+
+                    icon.appendChild(label);
+
+                    return icon;
                 }
 
                 function getFileType(name) {
@@ -2247,37 +2440,122 @@
                         }
 
                         const gridView = overlay.querySelector('#od-grid-view');
-                        gridView.innerHTML = allFiles.map((f, i) => `
-                            <div class="od-file-item" data-index="${i}"
-                                style="padding:10px 8px; border-radius:6px; cursor:pointer;
-                                    display:flex; flex-direction:column; align-items:center;
-                                    gap:8px; border:1.5px solid transparent; text-align:center;">
-                                ${fileIcon(getFileType(f.name))}
-                                <span style="font-size:11px; color:#333; line-height:1.3; word-break:break-word;">${f.name}</span>
-                                ${f._folder ? `<span style="font-size:10px; color:#999;">${f._folder}</span>` : ''}
-                            </div>
-                        `).join('');
+                        gridView.innerHTML = '';
+
+                        allFiles.forEach((f, i) => {
+                            const item = document.createElement('div');
+                            item.className = 'od-file-item';
+                            item.dataset.index = i;
+
+                            item.style.cssText = `
+                                padding:10px 8px;
+                                border-radius:6px;
+                                cursor:pointer;
+                                display:flex;
+                                flex-direction:column;
+                                align-items:center;
+                                gap:8px;
+                                border:1.5px solid transparent;
+                                text-align:center;
+                            `;
+
+                            const iconWrapper = document.createElement('div');
+                            iconWrapper.appendChild(
+                                fileIconElement(getFileType(f.name))
+                            );
+                            item.appendChild(iconWrapper);
+
+                            const nameSpan = document.createElement('span');
+                            nameSpan.textContent = f.name;
+                            nameSpan.style.cssText = `
+                                font-size:11px;
+                                color:#333;
+                                line-height:1.3;
+                                word-break:break-word;
+                            `;
+                            item.appendChild(nameSpan);
+
+                            if (f._folder) {
+                                const folderSpan = document.createElement('span');
+                                folderSpan.textContent = f._folder;
+                                folderSpan.style.cssText = `
+                                    font-size:10px;
+                                    color:#999;
+                                `;
+                                item.appendChild(folderSpan);
+                            }
+
+                            gridView.appendChild(item);
+                        });
 
                         const listView = overlay.querySelector('#od-list-view');
                         allFiles.forEach((f, i) => {
                             const row = document.createElement('div');
-                            row.className     = 'od-file-item';
+                            row.className = 'od-file-item';
                             row.dataset.index = i;
-                            row.style.cssText = `display:grid; grid-template-columns:1fr 80px 100px;
-                                padding:8px 10px; border-radius:6px; cursor:pointer;
-                                align-items:center; gap:8px; border:1.5px solid transparent;`;
-                            row.innerHTML = `
-                                <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
-                                    ${fileIcon(getFileType(f.name))}
-                                    <div style="overflow:hidden;">
-                                        <div style="font-size:13px; color:#333; white-space:nowrap;
-                                                    overflow:hidden; text-overflow:ellipsis;">${f.name}</div>
-                                        ${f._folder ? `<div style="font-size:11px; color:#999;">${f._folder}</div>` : ''}
-                                    </div>
-                                </div>
-                                <span style="font-size:12px; color:#888; text-align:right;">${formatSize(f.size)}</span>
-                                <span style="font-size:12px; color:#888; text-align:right;">${formatDate(f.lastModifiedDateTime)}</span>
+
+                            row.style.cssText = `
+                                display:grid;
+                                grid-template-columns:1fr 80px 100px;
+                                padding:8px 10px;
+                                border-radius:6px;
+                                cursor:pointer;
+                                align-items:center;
+                                gap:8px;
+                                border:1.5px solid transparent;
                             `;
+
+                            const left = document.createElement('div');
+                            left.style.cssText = `
+                                display:flex;
+                                align-items:center;
+                                gap:10px;
+                                overflow:hidden;
+                            `;
+
+                            const iconWrapper = document.createElement('div');
+                            iconWrapper.appendChild(
+                                fileIconElement(getFileType(f.name))
+                            );
+                            left.appendChild(iconWrapper);
+
+                            const textContainer = document.createElement('div');
+                            textContainer.style.overflow = 'hidden';
+
+                            const nameDiv = document.createElement('div');
+                            nameDiv.textContent = f.name;
+                            nameDiv.style.cssText = `
+                                font-size:13px;
+                                color:#333;
+                                white-space:nowrap;
+                                overflow:hidden;
+                                text-overflow:ellipsis;
+                            `;
+                            textContainer.appendChild(nameDiv);
+
+                            if (f._folder) {
+                                const folderDiv = document.createElement('div');
+                                folderDiv.textContent = f._folder;
+                                folderDiv.style.cssText = `
+                                    font-size:11px;
+                                    color:#999;
+                                `;
+                                textContainer.appendChild(folderDiv);
+                            }
+
+                            left.appendChild(textContainer);
+                            row.appendChild(left);
+
+                            const sizeSpan = document.createElement('span');
+                            sizeSpan.textContent = formatSize(f.size);
+                            sizeSpan.style.cssText = 'font-size:12px;color:#888;text-align:right;';
+                            row.appendChild(sizeSpan);
+
+                            const dateSpan = document.createElement('span');
+                            dateSpan.textContent = formatDate(f.lastModifiedDateTime);
+                            dateSpan.style.cssText = 'font-size:12px;color:#888;text-align:right;';
+                            row.appendChild(dateSpan);
+
                             listView.appendChild(row);
                         });
 
@@ -2318,6 +2596,14 @@
             async uploadFromOneDrive(file) {
                 if (this.isAdmin && !this.validateOrgName()) return;
                 this.showStorageNotice = true;
+
+                // Duplicate check — from feature/database branch
+                if (this.uploadedFiles.some(f =>
+                    f.name === file.name && f.size === file.size
+                )) {
+                    this.errorMessages.push(`"${file.name}" is already uploaded.`);
+                    return;
+                }
 
                 const fileObj = {
                     name:            file.name,

@@ -7,6 +7,7 @@
     <title>CyberComply - Comparison Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
@@ -184,9 +185,9 @@
             text-transform: uppercase;
         }
 
-        /* Comparison Dashboard Content */
+        /* Comparison Dashboard Content — full width within padding */
         .dashboard-container {
-            max-width: 900px;
+            max-width: 1010px;
             margin: 0 auto;
         }
 
@@ -196,63 +197,142 @@
             letter-spacing: 2px;
             margin-bottom: 30px;
             text-transform: uppercase;
-            padding-left: 20px;
+            padding-left: 15px;
         }
 
-        /*
-         * metrics-row: uses sprint-2's gap:20px + flex-wrap:wrap for
-         * better responsiveness, while keeping ai-development's layout intent
-         */
-        .metrics-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 50px;
-            gap: 20px;
-            flex-wrap: wrap;
+        /* ── Unified metrics card replacing the old floating boxes ── */
+        .metrics-card {
+            background: #1a2845;
+            border-radius: 14px;
+            border: 1px solid rgba(74, 143, 231, 0.2);
+            padding: 22px 28px;
+            margin-bottom: 40px;
         }
 
-        /*
-         * metric-box: sprint-2's min-width:200px + width:auto so boxes
-         * expand naturally for longer department names
-         */
-        .metric-box {
-            background-color: white;
-            color: black;
-            padding: 15px 20px;
-            min-width: 200px;
-            width: auto;
-            height: 70px;
+        /* Row 1: department dropdown full width */
+        .metrics-dept-row {
+            margin-bottom: 18px;
+        }
+
+        .metrics-col-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            color: #4a8fe7;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        /* Horizontal divider between rows */
+        .metrics-divider-h {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.08);
+            margin-bottom: 18px;
+        }
+
+        /* Row 2: three equal columns */
+        .metrics-bottom-row {
             display: flex;
             align-items: center;
-            justify-content: center;
-            text-align: center;
+        }
+
+        .metrics-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Vertical divider between columns */
+        .metrics-divider-v {
+            width: 1px;
+            height: 52px;
+            background: rgba(255, 255, 255, 0.1);
+            flex-shrink: 0;
+        }
+
+        /* Compliance score value */
+        .metrics-score-value {
+            font-size: 1.7rem;
             font-weight: 800;
-            font-size: 1rem;
-            text-transform: capitalize;
-            border-radius: 12px;
-            line-height: 1.2;
+            color: #ffffff;
+            line-height: 1;
         }
 
-        .custom-select {
+        /* Risk level pill */
+        .risk-pill {
+            border-radius: 20px;
+            padding: 5px 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .risk-pill.low {
+            background: rgba(76, 175, 80, 0.15);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.35);
+        }
+
+        .risk-pill.medium {
+            background: rgba(255, 193, 7, 0.13);
+            color: #ffc107;
+            border: 1px solid rgba(255, 193, 7, 0.35);
+        }
+
+        .risk-pill.high {
+            background: rgba(231, 74, 74, 0.15);
+            color: #e74a4a;
+            border: 1px solid rgba(231, 74, 74, 0.35);
+        }
+
+        /* Graphical View button inside the card */
+        .graphical-view-btn {
+            background: #ffffff;
+            color: #1a2845;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 26px;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, transform 0.2s;
+            white-space: nowrap;
+        }
+
+        .graphical-view-btn:hover {
+            background: #4a8fe7;
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+
+        /* Department select styling — inside the card */
+        .metrics-card .dept-select {
             appearance: none;
             -webkit-appearance: none;
             -moz-appearance: none;
+            width: 100%;
+            background: #ffffff;
+            color: #1a2845;
             border: none;
+            border-radius: 8px;
+            padding: 12px 44px 12px 18px;
+            font-size: 0.95rem;
+            font-weight: 800;
             cursor: pointer;
-            background-image: url('data:image/svg+xml;utf8,<svg fill="black" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%231a2845" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
             background-repeat: no-repeat;
-            background-position-x: calc(100% - 15px);
+            background-position-x: calc(100% - 14px);
             background-position-y: center;
-            padding-right: 45px;
         }
 
-        .custom-select:focus {
+        .dept-select:focus {
             outline: none;
         }
 
-        /* Disabled option hint style (ai-development) */
-        .custom-select option[disabled] {
+        .dept-select option[disabled] {
             color: #8b9dc3;
             font-style: italic;
             font-size: 0.85rem;
@@ -265,26 +345,8 @@
             border-left: 5px solid #4a8fe7;
         }
 
-        /* sprint-2's min-width keeps stat box from collapsing on smaller screens */
-        .stat-box {
-            text-align: left;
-            font-size: 1.1rem;
-            letter-spacing: 1px;
-            font-weight: 400;
-            min-width: 200px;
-            padding: 15px 20px;
-        }
-
-        .stat-box div {
-            margin-bottom: 8px;
-        }
-
-        .stat-box div:last-child {
-            margin-bottom: 0;
-        }
-
         .recommendations-section {
-            margin-top: 40px;
+            margin-top: 0;
         }
 
         .rec-title {
@@ -355,7 +417,7 @@
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-        /* --- NO DATA / ERROR / LOADING BANNERS (ai-development) --- */
+        /* --- NO DATA / ERROR / LOADING BANNERS --- */
         .no-data-banner {
             background: rgba(231,74,74,0.08);
             border: 1px solid rgba(231,74,74,0.25);
@@ -382,7 +444,8 @@
 
         @media screen and (max-width: 768px) {
             .main-content { padding: 40px 30px; }
-            .metrics-row { flex-direction: column; align-items: stretch; }
+            .metrics-bottom-row { flex-direction: column; gap: 20px; }
+            .metrics-divider-v { display: none; }
             .back-arrow { left: 20px; }
             .back-arrow.shifted { left: 310px; }
         }
@@ -429,67 +492,91 @@
                     ⏳ Loading analysis results…
                 </div>
 
-                <!-- No data / error state (ai-development) -->
+                <!-- No data / error state -->
                 <div class="no-data-banner" v-if="!isLoading && (loadError || !hasData)">
                     ⚠ {{ loadError || 'No analysis result found. Please run a document analysis first from the home page.' }}
                 </div>
 
-                <!-- Company name from DB (ai-development logic, DB source) -->
+                <!-- Company name -->
                 <div class="company-name" v-if="!isLoading && hasData">
                     Company Name : {{ companyName }}
                 </div>
 
-                <div class="metrics-row" v-if="!isLoading && hasData">
+                <!-- ── Unified metrics card ── -->
+                <div class="metrics-card" v-if="!isLoading && hasData">
 
-                    <!--
-                        Department dropdown (ai-development).
-                        Currently shows the single department linked to the analysed document.
-                        The Document model has a FK to Department (dept -> dept_name).
-                        When multi-department comparison is implemented in a future sprint,
-                        populate this select from the org's full department list via the API.
-                    -->
-                    <select class="metric-box custom-select" v-model="selectedDepartment">
-                        <option
-                            v-if="departmentName"
-                            :value="departmentName">
-                            {{ departmentName }} Department
-                        </option>
-                        <!-- Hint shown when only one department is available -->
-                        <option disabled value="" v-if="departmentName">
-                            — Only one department analysed —
-                        </option>
-                        <option disabled value="" v-if="!departmentName">
-                            No department assigned
-                        </option>
-                    </select>
-
-                    <!-- Score and risk level from DB (ai-development logic, DB source) -->
-                    <div class="info-box stat-box">
-                        <div>Score : {{ complianceScore }}%</div>
-                        <div>Risk Level : {{ overallRiskLevel }}</div>
+                    <!-- Row 1: Department dropdown spanning full width -->
+                    <div class="metrics-dept-row">
+                        <div class="metrics-col-label">Department</div>
+                        <select class="dept-select" v-model="selectedDepartment">
+                            <option
+                                v-for="dept in departments"
+                                :key="dept.id"
+                                :value="dept.dept_name"
+                            >
+                                {{ dept.dept_name }} Department
+                            </option>
+                            <option disabled value="" v-if="departments.length === 1">
+                                — Only one department analysed —
+                            </option>
+                            <option disabled value="" v-if="departments.length === 0">
+                                No department assigned
+                            </option>
+                        </select>
                     </div>
 
-                    <!--
-                        Graphical View button — only shown to admins when multiple
-                        departments have been analysed (ai-development logic preserved).
-                        userRole is derived from sessionStorage 'userRole' in mounted().
-                    -->
-                    <div
-                        class="metric-box"
-                        style="cursor: pointer;"
-                        @click="showGraphic"
-                        v-if="isAdmin && hasMultipleDepartments"
-                    >
-                        Graphical View
+                    <!-- Horizontal divider between rows -->
+                    <div class="metrics-divider-h"></div>
+
+                    <!-- Row 2: Compliance Score | Risk Level | Graphical View -->
+                    <div class="metrics-bottom-row">
+
+                        <!-- Compliance Score -->
+                        <div class="metrics-col">
+                            <div class="metrics-col-label">Compliance Score</div>
+                            <div class="metrics-score-value">{{ complianceScore }}%</div>
+                        </div>
+
+                        <div class="metrics-divider-v"></div>
+
+                        <!-- Risk Level -->
+                        <div class="metrics-col">
+                            <div class="metrics-col-label">Risk Level</div>
+                            <div
+                                class="risk-pill"
+                                :class="{
+                                    low:    overallRiskLevel === 'Low',
+                                    medium: overallRiskLevel === 'Medium',
+                                    high:   overallRiskLevel === 'High'
+                                }"
+                            >
+                                {{ overallRiskLevel.toUpperCase() }}
+                            </div>
+                        </div>
+
+                        <!--
+                            Graphical View column — only rendered when the admin
+                            has multiple departments, preserving the original gate.
+                        -->
+                        <template v-if="isAdmin && hasMultipleDepartments">
+                            <div class="metrics-divider-v"></div>
+                            <div class="metrics-col">
+                                <div class="metrics-col-label">Actions</div>
+                                <button class="graphical-view-btn" @click="showGraphic">
+                                    Graphical View
+                                </button>
+                            </div>
+                        </template>
+
                     </div>
                 </div>
 
-                <!-- Departmental recommendations (ai-development) -->
+                <!-- Departmental recommendations -->
                 <div class="info-box recommendations-section" v-if="!isLoading && hasData">
-                    <h2 class="rec-title">{{ selectedDepartment || departmentName }} DEPARTMENTAL RECOMMENDATIONS :</h2>
+                    <h2 class="rec-title">Department Specific Recommendation Summary:</h2>
                     <ul class="rec-list">
-                        <li v-for="rec in departmentRecommendations" :key="rec.requirementId">
-                            {{ rec.clauseTitle }}
+                        <li v-for="(rec, index) in departmentRecommendations" :key="index">
+                            {{ rec.clause }}
                             <ul class="sub-rec-list">
                                 <li>{{ rec.reference }}</li>
                             </ul>
@@ -510,94 +597,136 @@
     </div>
 
     <script>
-        const { createApp } = Vue;
+    const { createApp } = Vue;
 
-        const BASE = 'http://127.0.0.1:8000/ai';
+    const BASE = 'http://127.0.0.1:8000/ai';
 
-        const app = createApp({
-            data() {
-                return {
-                    sidebarOpen: true,
+    const app = createApp({
+        data() {
+            return {
+                sidebarOpen: true,
 
-                    // RBAC — overwritten from sessionStorage in mounted()
-                    isAdmin: false,
+                // RBAC — overwritten from sessionStorage in mounted()
+                isAdmin: false,
 
-                    selectedDepartment: '',
+                // ── Selected department name (drives all computed properties) ──
+                selectedDepartment: '',
 
-                    // ── Populated from DB fetch ──
-                    hasData:          false,
-                    companyName:      'Unknown Organisation',
-                    departmentName:   '',
-                    complianceScore:  0,
-                    allDetails:       [],   // data.compliance.details array from API
-                    departments:      [],   // future: full list of org departments
+                // ── Populated from DB fetch ──
+                // Each entry shape (from get_org_comparison):
+                // { id, dept_name, compliance_score, risk, improvements, top_gap,
+                //   improvement_list, recommended_actions, all_recommendations }
+                departments: [],
+                companyName: 'Unknown Organisation',
+                hasData:     false,
 
-                    // Loading / error state
-                    isLoading: true,
-                    loadError: ''
-                };
+                // Loading / error state
+                isLoading: true,
+                loadError: ''
+            };
+        },
+
+        computed: {
+            // The full department object for the currently selected dept name.
+            // All other computed properties derive from this one.
+            selectedDeptObj() {
+                if (!this.selectedDepartment || this.departments.length === 0) return null;
+                return this.departments.find(d => d.dept_name === this.selectedDepartment) || null;
             },
 
-            computed: {
-                // Derive plain-English risk level from score (ai-development).
-                // Uses the same thresholds as document_analysis.html.
-                overallRiskLevel() {
-                    if (this.complianceScore >= 75) return 'Low';
-                    if (this.complianceScore >= 40) return 'Medium';
-                    return 'High';
-                },
+            // Compliance score for the selected department
+            complianceScore() {
+                return this.selectedDeptObj ? this.selectedDeptObj.compliance_score : 0;
+            },
 
-                // True only when the org has more than one department analysed.
-                // Currently always false because we store one document per analysis.
-                // Gates the Graphical View button — future sprint will populate
-                // this.departments from a separate API call.
-                hasMultipleDepartments() {
-                    if (this.departments && this.departments.length > 0) {
-                        return this.departments.length > 1;
+            // Risk level for the selected department — already a string from the backend
+            overallRiskLevel() {
+                return this.selectedDeptObj ? this.selectedDeptObj.risk : '—';
+            },
+
+            // Gates the Graphical View column — only meaningful for admins with 2+ depts
+            hasMultipleDepartments() {
+                return this.departments.length > 1;
+            },
+
+            // Full recommendations list for the selected department.
+            // Each item: { clause, reference, status, risk_level, reasoning }
+            // Pre-built by the backend from all non_compliant + partial findings.
+            departmentRecommendations() {
+                if (!this.selectedDeptObj) return [];
+                return this.selectedDeptObj.all_recommendations || [];
+            }
+        },
+
+        async mounted() {
+            // ── Auth guard ────────────────────────────────────────────────
+            const token = sessionStorage.getItem('authToken');
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // ── RBAC flag ─────────────────────────────────────────────────
+            const roleRaw = sessionStorage.getItem('userRole');
+            this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
+
+            SessionManager.init({ timeoutMs: 1200000 });
+
+            // ── Decide which fetch path to use ────────────────────────────
+            // batchResultIds  → multi-dept batch just completed → org-comparison endpoint
+            // latestResultId  → single file analysis → existing single-result endpoint
+            const batchIdsRaw = sessionStorage.getItem('batchResultIds');
+            const singleId    = sessionStorage.getItem('latestResultId');
+
+            try {
+                if (batchIdsRaw) {
+                    // ── BATCH PATH ────────────────────────────────────────
+                    let resultIds = [];
+                    try {
+                        resultIds = JSON.parse(batchIdsRaw);
+                    } catch {
+                        this.loadError = 'Batch result data is corrupted. Please re-run the analysis.';
+                        this.isLoading = false;
+                        return;
                     }
-                    return false;
-                },
 
-                // Non-compliant + partial clauses for the selected department.
-                // Since the current flow analyses one document at a time, this
-                // always reflects that document's department. When multi-dept
-                // comparison is added, filter by selectedDepartment here.
-                departmentRecommendations() {
-                    return this.allDetails
-                        .filter(d => d.status === 'non_compliant' || d.status === 'partial')
-                        .map(d => ({
-                            requirementId: d.requirement_id,
-                            clauseTitle:   d.clause || d.requirement_id,
-                            // Builds a concise PDPA reference from the requirement_id.
-                            // e.g. "SL-PDPA-S6-1" → "Section 6(1) of the Personal Data
-                            // Protection Act No. 9 of 2022 (Sri Lanka)"
-                            reference: this.buildReferenceFromId(d.requirement_id)
-                        }));
-                }
-            },
+                    if (!Array.isArray(resultIds) || resultIds.length === 0) {
+                        this.loadError = 'No batch results found. Please re-run the analysis.';
+                        this.isLoading = false;
+                        return;
+                    }
 
-            async mounted() {
-                // ── Auth guard ──────────────────────────────────────────────
-                const token = sessionStorage.getItem('authToken');
-                if (!token) {
-                    window.location.href = 'login.html';
-                    return;
-                }
-
-                // ── RBAC flag from session ───────────────────────────────────
-                const roleRaw = sessionStorage.getItem('userRole');
-                this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
-
-                // ── Fetch analysis result from DB ────────────────────────────
-                // Reads the result_id written by home.html after saving the analysis.
-                // Falls back to /latest/ if none is stored.
-                const resultId = sessionStorage.getItem('latestResultId');
-                const url = resultId
-                    ? `${BASE}/api/analysis/${resultId}/`
-                    : `${BASE}/api/analysis/latest/`;
-
-                try {
+                    const url = `${BASE}/api/analysis/org-comparison/?result_ids=${resultIds.join(',')}`;
                     const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (res.status === 401 || res.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (!res.ok) {
+                        this.loadError = 'Could not load comparison data. Please re-run the analysis.';
+                        this.isLoading = false;
+                        return;
+                    }
+
+                    const data = await res.json();
+
+                    this.companyName  = data.org_name || 'Unknown Organisation';
+                    this.departments  = data.departments || [];
+                    this.hasData      = this.departments.length > 0;
+
+                    // Auto-select first department on load
+                    if (this.departments.length > 0) {
+                        this.selectedDepartment = this.departments[0].dept_name;
+                    }
+
+                } else if (singleId) {
+                    // ── SINGLE FILE PATH ──────────────────────────────────
+                    const res = await fetch(`${BASE}/api/analysis/${singleId}/`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
 
@@ -615,64 +744,73 @@
 
                     const data = await res.json();
 
-                    // ── Map DB response fields ───────────────────────────────
-                    this.hasData = true;
+                    this.companyName = data.company_name || 'Unknown Organisation';
 
-                    // data.org — serialised from Document.org.org_name
-                    this.companyName    = data.company_name || 'Unknown Organisation';
+                    const details   = data.compliance?.details || [];
+                    const allIssues = details.filter(d =>
+                        ['non_compliant', 'partial'].includes((d.status || '').toLowerCase().replace('-', '_'))
+                    );
 
-                    // data.department — serialised from Document.dept.dept_name
-                    // NOTE TO BACKEND: confirm the serialiser exposes this field as
-                    // 'department'. Fallback to 'dept_name' covers either convention.
-                    this.departmentName = data.department || data.dept_name || '';
-                    this.selectedDepartment = this.departmentName;
+                    const allRecommendations = allIssues.map(d => {
+                        const reqId    = d.requirement_id || '';
+                        const stripped = reqId.replace(/^SL-PDPA-S/, '');
+                        const parts    = stripped.split('-');
+                        let ref        = `Section ${parts[0]}`;
+                        if (parts[1]) ref += `(${parts[1]})`;
+                        ref += ' of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)';
+                        return {
+                            clause:     d.clause || d.requirement_id || 'Unknown',
+                            reference:  ref,
+                            status:     d.status || '',
+                            risk_level: d.risk_level || '',
+                            reasoning:  d.reasoning || ''
+                        };
+                    });
 
-                    // data.compliance_score — from AnalysisResult.compliance_score
-                    this.complianceScore = Math.round(data.compliance_score ?? 0);
+                    const score    = Math.round(data.compliance_score ?? 0);
+                    const risk     = score >= 75 ? 'Low' : score >= 40 ? 'Medium' : 'High';
+                    const deptName = data.department || data.dept_name || 'General';
 
-                    // data.compliance.details — stored in AnalysisResult.raw_output
-                    // Same nested shape the old localStorage result had, so all
-                    // computed properties work without changes.
-                    this.allDetails = data.compliance?.details || [];
+                    // Build a synthetic dept object matching the batch shape so all
+                    // computed properties work identically regardless of mode.
+                    this.departments = [{
+                        id:                  singleId,
+                        dept_name:           deptName,
+                        compliance_score:    score,
+                        risk:                risk,
+                        improvements:        allIssues.length,
+                        top_gap:             allRecommendations[0]?.clause || 'None identified',
+                        improvement_list:    allRecommendations.slice(0, 5).map(r => r.clause),
+                        recommended_actions: allRecommendations.slice(0, 5).map(r => r.reference),
+                        all_recommendations: allRecommendations
+                    }];
 
-                } catch (e) {
-                    console.error('Failed to load comparison data:', e);
-                    this.loadError = 'Could not reach the server. Please check your connection.';
-                } finally {
-                    this.isLoading = false;
+                    this.hasData            = true;
+                    this.selectedDepartment = deptName;
+
+                } else {
+                    this.loadError = 'No analysis results found. Please upload and analyse a document first.';
                 }
-            },
 
-            methods: {
-                // Derives a human-readable PDPA reference string from a requirement ID.
-                // "SL-PDPA-S6-1"  → "Section 6(1) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)"
-                // "SL-PDPA-S23-1" → "Section 23(1) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)"
-                buildReferenceFromId(id) {
-                    const stripped = (id || '').replace(/^SL-PDPA-S/, '');
-                    const parts    = stripped.split('-');
-                    let ref = `Section ${parts[0]}`;
-                    if (parts[1]) ref += `(${parts[1]})`;
-                    return `${ref} of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)`;
-                },
-
-                showProfile() {
-                    window.location.href = 'profile.html';
-                },
-                goBack() {
-                    window.location.href = 'document_analysis.html';
-                },
-                goToHome() {
-                    window.location.href = 'home.html';
-                },
-                showGraphic() {
-                    window.location.href = 'comparison_dashboard_graphical.html';
-                }
+            } catch (e) {
+                console.error('Failed to load comparison data:', e);
+                this.loadError = 'Could not reach the server. Please check your connection.';
+            } finally {
+                this.isLoading = false;
             }
-        });
+        },
 
-        registerSidebarComponent(app);
-        app.mount('#app');
-    </script>
+        methods: {
+            showProfile() { window.location.href = 'profile.html'; },
+            goBack()      { window.location.href = 'document_analysis.html'; },
+            goToHome()    { window.location.href = 'home.html'; },
+            showGraphic() { window.location.href = 'comparison_dashboard_graphical.html'; }
+        }
+    });
+
+    registerSidebarComponent(app);
+    app.mount('#app');
+</script>
 </body>
 
 </html>

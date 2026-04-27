@@ -1,0 +1,13 @@
+{{ app_name }} — Your Compliance Report Is Ready
+================================================
+
+Hello,
+
+Your PDPA compliance report has been generated and is now available in your CyberComply dashboard.
+
+Report: {{ report_name }}
+
+Log in to your CyberComply account to view the full analysis, compliance gaps, and recommendations.
+
+---
+This email was sent by {{ app_name }}. If you did not request this report, please contact your administrator.

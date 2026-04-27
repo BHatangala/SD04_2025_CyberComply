@@ -2,8 +2,12 @@ import os
 import time
 import requests
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+_REPO_ROOT = Path(__file__).resolve().parents[2]   # SD04_2025/
+_ENV_PATH  = _REPO_ROOT / "DjangoManager" / ".env"
+
+load_dotenv(dotenv_path=_ENV_PATH)
 
 class DeepSeekLoader:
     def __init__(self):
@@ -18,14 +22,37 @@ class DeepSeekLoader:
             "HTTP-Referer": "http://localhost:5000", # Required for OpenRouter rankings
             "X-Title": "CyberComply AI App",
         }
-        # R1 Distill Qwen 32B: free, less congested than full R1, 
-        # outperforms o1-mini, ideal for legal compliance reasoning
-        self.model = "deepseek/deepseek-r1-distill-qwen-32b"
-        print(f"DeepSeek R1 Distill Qwen 32B configured via OpenRouter (free).")
+        # R1 Distill Qwen 32B: free, less congested than full R1,
+        # Fallback chain: tried in order when a provider returns HTTP 500.
+        self.model_fallback_chain = [
+            "deepseek/deepseek-r1-distill-qwen-32b",
+            "openrouter/free",
+        ]
+        # Tracks models confirmed down this session — skipped on all subsequent batches
+        self._dead_models: set = set()
+        print(f"DeepSeek R1 Distill Qwen 32B configured via OpenRouter (free). Fallback chain active.")
 
     def generate_response(self, prompt: str, max_length: int = 1024, temperature: float = 0.6, retries: int = 3) -> str:
+        # Walk the fallback chain. A 500/404 (provider down) marks the model as dead
+        # for the rest of this session and moves on — dead models are skipped instantly
+        # on all future calls without wasting a network round-trip.
+        for model in self.model_fallback_chain:
+            if model in self._dead_models:
+                print(f"[INFO] Skipping {model} (confirmed down this session)")
+                continue
+            print(f"[INFO] Trying model: {model}")
+            try:
+                return self._call_model(model, prompt, max_length, temperature, retries)
+            except _ProviderDownError:
+                print(f"[WARN] Model {model} returned provider error. Marking dead for this session.")
+                self._dead_models.add(model)
+                continue
+
+        raise RuntimeError("All models in fallback chain exhausted.")
+
+    def _call_model(self, model: str, prompt: str, max_length: int, temperature: float, retries: int) -> str:
         payload = {
-            "model": self.model,
+            "model": model,
             "messages": [
                 {"role": "user", "content": prompt}
             ],
@@ -54,21 +81,44 @@ class DeepSeekLoader:
                     time.sleep(wait_time)
                     continue
 
+                # 500 = upstream provider down; 404 = no endpoints for this model
+                if response.status_code in (500, 404):
+                    raise _ProviderDownError(f"{response.status_code} from {model}: {response.text[:200]}")
+
                 print(f"[DEBUG] Raw response preview: {response.text[:300]}")
                 response.raise_for_status()
                 result = response.json()
 
                 if isinstance(result, dict) and "choices" in result:
                     content = result["choices"][0]["message"]["content"]
+                    if not content:
+                        # Empty body on a 200 — provider is up but returned nothing.
+                        # Treat as provider fault and trigger fallback rather than
+                        # retrying the same dead model repeatedly.
+                        print(f"[DEBUG] Empty response body on attempt {attempt}. Treating as provider fault.")
+                        raise _ProviderDownError(f"Empty content from {model}")
                     print(f"[DEBUG] Success — Response length: {len(content)} chars")
                     print(f"[DEBUG] Response content: {content[:300]}")
                     return content
 
                 if isinstance(result, dict) and "error" in result:
-                    print(f"[DEBUG] OpenRouter error: {result['error']}")
-                    return ""
+                    error = result["error"]
+                    print(f"[DEBUG] OpenRouter error: {error}")
+                    # Any error object in the response body means the provider failed —
+                    # raise _ProviderDownError so the fallback chain triggers immediately.
+                    # Previously only code==500 was caught; 524 (Cloudflare gateway timeout)
+                    # and other upstream fault codes were silently returning "" instead of
+                    # falling through to openrouter/free.
+                    if isinstance(error, dict):
+                        raise _ProviderDownError(
+                            f"Upstream fault from {model}: code={error.get('code')} — {error.get('message', '')}"
+                        )
+                    raise _ProviderDownError(f"Upstream fault from {model}: {error}")
 
                 return str(result)
+
+            except _ProviderDownError:
+                raise  # Bubble up to generate_response so fallback triggers
 
             except requests.exceptions.Timeout:
                 print(f"[DEBUG] Attempt {attempt} timed out after 120s.")
@@ -84,6 +134,11 @@ class DeepSeekLoader:
                 raise
 
         raise RuntimeError("All retry attempts exhausted.")
+
+
+class _ProviderDownError(Exception):
+    """Raised internally when a model returns HTTP 500/404 so generate_response can try the next fallback."""
+    pass
 
 
 _model_instance = None

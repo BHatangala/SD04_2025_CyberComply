@@ -3,6 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <script>
+      const token = sessionStorage.getItem("authToken");
+
+      if (!token || token === "null" || token === "undefined") {
+        window.location.replace("login.html");
+      }
+    </script>     
+    
     <title>CyberComply - User Support</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
     <script src="sidebar_component.js"></script>
