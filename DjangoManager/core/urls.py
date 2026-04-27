@@ -63,6 +63,7 @@ urlpatterns = [
     path("api/departments/", views.list_departments, name="list_departments"),
     path("api/debug-reports-dept/", views.debug_reports_dept, name="debug_reports_dept"),
     path("api/reports/generate/", views.generate_report, name="generate_report"),
+    path("api/reports/resolve-token/", views.resolve_report_token, name="resolve_report_token"),
     path("api/reports/<uuid:report_id>/", views.get_report, name="get_report"),
     path("api/reports/<uuid:report_id>/delete/", views.delete_report, name="delete_report"),
     path("api/download-report/", views.download_report, name="download_report"),

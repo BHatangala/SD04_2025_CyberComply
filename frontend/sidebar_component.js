@@ -284,8 +284,12 @@ const CyberComplySidebar = {
     },
 
     openReport(report) {
-      // report is { report_id, display_name, ... }
-      window.location.href = `report_viewing.html?report_id=${encodeURIComponent(report.report_id)}`;
+      // report is { report_id, display_name, view_token, ... }
+      if (report.view_token) {
+        window.location.href = `report_viewing.html?token=${encodeURIComponent(report.view_token)}`;
+      } else {
+        window.location.href = `report_viewing.html?report_id=${encodeURIComponent(report.report_id)}`;
+      }
     },
 
     // ── Search / filter ───────────────────────────────────────────────────────

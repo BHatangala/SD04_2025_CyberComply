@@ -1129,10 +1129,14 @@ def upload_from_drive(request):
             _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
+        upload_start = time.time()
         s3_key, s3_url = upload_to_s3(temp_path, file_name)
+        upload_duration = time.time() - upload_start
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", file_name, profile.user_id)
             _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
+            push_upload_metric('UploadFailureCount', 1, unit='Count')
+            push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
             return JsonResponse({'error': 'Failed to upload file to S3. Please try again in a few minutes.'}, status=500)
 
         with open(temp_path, 'rb') as f:
@@ -1150,6 +1154,8 @@ def upload_from_drive(request):
             status=Document.Status.UPLOADED,
         )
 
+        push_upload_metric('UploadSuccessCount', 1, unit='Count')
+        push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
         _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request, AuditLog.Severity.LOW)
 
         def event_stream():
@@ -1291,10 +1297,14 @@ def upload_from_onedrive(request):
             return JsonResponse({'error': 'File rejected — malware detected'}, status=400)
 
         # ── Upload to S3 ──────────────────────────────────────────────────────
+        upload_start = time.time()
         s3_key, s3_url = upload_to_s3(temp_path, file_name)
+        upload_duration = time.time() - upload_start
         if s3_key is None:
             logger.error("S3 upload returned None for file %s, user %s", file_name, profile.user_id)
             _record_audit_log(profile, "UPLOAD_REJECTED", "document", None, False, request, AuditLog.Severity.HIGH)
+            push_upload_metric('UploadFailureCount', 1, unit='Count')
+            push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
             return JsonResponse({'error': 'S3 upload failed. Please try again in a few minutes.'}, status=500)
 
         # ── Cache file bytes for analysis ─────────────────────────────────────
@@ -1313,6 +1323,8 @@ def upload_from_onedrive(request):
             status=Document.Status.UPLOADED,
         )
 
+        push_upload_metric('UploadSuccessCount', 1, unit='Count')
+        push_upload_metric('UploadDuration', upload_duration, unit='Seconds')
         _record_audit_log(profile, "UPLOAD", "document", document.document_id, True, request, AuditLog.Severity.LOW)
 
         return JsonResponse({
@@ -2790,6 +2802,7 @@ def list_reports(request):
             "dept_id":      _get_effective_dept_id(r),
             "generated_at": r.generated_at.isoformat(),
             "expires_at":   r.expires_at.isoformat(),
+            "view_token":   r.view_token or "",
         }
 
     def _matches_dept(r):
@@ -2915,6 +2928,7 @@ def generate_report(request):
             report_s3_key=report_s3_key, file_size=int(file_size),
             expires_at=timezone.now() + timedelta(days=int(expires_in_days)),
             dept=dept,
+            view_token=str(uuid.uuid4()).replace('-', ''),
         )
     except Exception as e:
         logger.exception(
@@ -2934,6 +2948,7 @@ def generate_report(request):
 
     return JsonResponse(
         {"detail": "Report generated successfully", "report_id": str(report.report_id),
+         "view_token": report.view_token,
          "generated_at": report.generated_at.isoformat(), "expires_at": report.expires_at.isoformat()},
         status=201,
     )
@@ -2985,6 +3000,46 @@ def get_report(request, report_id):
         },
         status=200,
     )
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def resolve_report_token(request):
+    """GET /api/reports/resolve-token/?token=<view_token>"""
+    profile, auth_error = _get_profile_from_token(request)
+    if auth_error:
+        return auth_error
+    assert profile is not None
+
+    token = (request.GET.get("token") or "").strip()
+    if not token:
+        return JsonResponse({"detail": "token is required"}, status=400)
+
+    try:
+        report = Report.objects.select_related("result__document", "dept").get(view_token=token)
+    except Report.DoesNotExist:
+        return JsonResponse({"detail": "Invalid or expired report link"}, status=404)
+
+    if report.expires_at <= timezone.now():
+        return JsonResponse({"detail": "This report link has expired"}, status=403)
+
+    # If report exists but has no token yet (old reports), generate one now
+    if not report.view_token:
+        report.view_token = str(uuid.uuid4()).replace('-', '')
+        report.save(update_fields=["view_token"])
+
+    _record_audit_log(profile, "VIEW_REPORT", "report", report.report_id, True, request, AuditLog.Severity.LOW)
+
+    return JsonResponse({
+        "report_id":       str(report.report_id),
+        "result_id":       str(report.result.result_id),
+        "dept_id":         str(report.dept_id) if report.dept_id else None,
+        "report_snapshot": report.report_snapshot,
+        "report_s3_key":   report.report_s3_key,
+        "file_size":       report.file_size,
+        "generated_at":    report.generated_at.isoformat(),
+        "expires_at":      report.expires_at.isoformat(),
+    }, status=200)
 
 
 @csrf_exempt

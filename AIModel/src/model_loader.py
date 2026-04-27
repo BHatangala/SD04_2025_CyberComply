@@ -2,8 +2,12 @@ import os
 import time
 import requests
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+_REPO_ROOT = Path(__file__).resolve().parents[2]   # SD04_2025/
+_ENV_PATH  = _REPO_ROOT / "DjangoManager" / ".env"
+
+load_dotenv(dotenv_path=_ENV_PATH)
 
 class DeepSeekLoader:
     def __init__(self):
