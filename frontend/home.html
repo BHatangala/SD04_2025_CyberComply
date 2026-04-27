@@ -269,6 +269,30 @@
             text-transform: uppercase;
         }
 
+        /* ── PDPA Compliance Statement ── */
+        .pdpa-statement {
+            max-width: 800px;
+            margin: 12px auto 0;
+            background: rgba(74, 143, 231, 0.08);
+            border: 1px solid rgba(74, 143, 231, 0.3);
+            border-radius: 10px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .pdpa-statement-text {
+            font-size: 12px;
+            color: #8bb8f0;
+            line-height: 1.55;
+        }
+
+        .pdpa-statement-text strong {
+            color: #a9c7ff;
+            font-weight: 600;
+        }
+
         /* ── Temporary Storage Info Banner ── */
         .upload-info-block {
             max-width: 800px;
@@ -939,6 +963,16 @@
                 accept=".pdf,.docx,.txt"
                 @change="handleFileSelect"
             >
+
+            <!-- ── PDPA Compliance Statement ── -->
+            <div class="pdpa-statement">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4a8fe7" stroke-width="2" style="flex-shrink:0; margin-top:2px;">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span class="pdpa-statement-text">
+                    Documents are analysed against the <strong>Personal Data Protection Act No. 9 of 2022</strong> (Sri Lanka).
+                </span>
+            </div>
 
             <!-- ── Temporary Storage Info Banner ── -->
             <div class="upload-info-block" v-if="showStorageNotice">
