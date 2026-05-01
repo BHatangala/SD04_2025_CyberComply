@@ -2298,7 +2298,9 @@ def delete_account(request):
     doc_ids        = list(docs_qs.values_list("document_id", flat=True))
     s3_keys        = list(docs_qs.values_list("s3_key", flat=True))
     result_ids     = list(AnalysisResult.objects.filter(document_id__in=doc_ids).values_list("result_id", flat=True))
-    report_s3_keys = list(Report.objects.filter(result_id__in=result_ids).values_list("report_s3_key", flat=True))
+    report_qs      = Report.objects.filter(result_id__in=result_ids)
+    report_ids     = list(report_qs.values_list("report_id", flat=True))
+    report_s3_keys = list(report_qs.values_list("report_s3_key", flat=True))
 
     erasure_summary = {
         "documents_erased":        docs_qs.count(),
@@ -2306,8 +2308,13 @@ def delete_account(request):
         "analysis_results_erased": len(result_ids),
         "findings_erased":         Finding.objects.filter(result_id__in=result_ids).count(),
         "recommendations_erased":  Recommendation.objects.filter(result_id__in=result_ids).count(),
-        "reports_erased":          Report.objects.filter(result_id__in=result_ids).count(),
+        "reports_erased":          len(report_ids),
         "report_s3_keys_deleted":  report_s3_keys,
+        "report_shares_erased":        ReportShare.objects.filter(report_id__in=report_ids).count(),
+        "report_downloads_erased":     ReportDownload.objects.filter(report_id__in=report_ids).count(),
+        "notifications_erased":        Notification.objects.filter(user=profile).count(),
+        "admin_access_requests_erased": AdminAccessRequest.objects.filter(user=profile).count(),
+        "otp_records_erased":          OtpVerification.objects.filter(user=profile).count(),
     }
 
     deletion_record = DeletionRequest.objects.create(
@@ -2333,9 +2340,18 @@ def delete_account(request):
             profile.auth_user.is_active = False
             profile.auth_user.save(update_fields=["username", "email", "is_active"])
 
-            OtpVerification.objects.filter(
-                user=profile, purpose=OtpVerification.Purpose.DELETE_ACCOUNT, used_at__isnull=True
-            ).update(used_at=now)
+            ReportShare.objects.filter(report_id__in=report_ids).delete()
+            ReportDownload.objects.filter(report_id__in=report_ids).delete()
+            Notification.objects.filter(user=profile).delete()
+            Report.objects.filter(result_id__in=result_ids).delete()
+            Finding.objects.filter(result_id__in=result_ids).delete()
+            Recommendation.objects.filter(result_id__in=result_ids).delete()
+            AnalysisResult.objects.filter(result_id__in=result_ids).delete()
+            Document.objects.filter(user=profile).update(
+                status=Document.Status.DELETED, deleted_at=now
+            )
+            AdminAccessRequest.objects.filter(user=profile).delete()
+            OtpVerification.objects.filter(user=profile).delete()
 
             deletion_record.status       = DeletionRequest.Status.COMPLETED
             deletion_record.completed_at = now
