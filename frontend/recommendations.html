@@ -749,6 +749,13 @@
                 return;
             }
 
+            // ── Role guard — admin only ─────────────────────────────────
+            const role = sessionStorage.getItem('userRole');
+            if (role !== 'ADMINISTRATIVE_USER') {
+                history.back();
+                return;
+            }
+
             SessionManager.init({ timeoutMs: 1200000 });
 
             // ── Load PDPA requirements JSON from local file ─────────────
