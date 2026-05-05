@@ -8,23 +8,25 @@
 //   - Loading banner while fetch is in flight
 //   - Error / no-data banner on failed fetch and network abort
 //   - Company name displayed from DB response
-//   - Department dropdown shows department name from DB response
-//   - Compliance score displayed
-//   - Risk level derived from score (Low / Medium / High thresholds)
+//   - Department dropdown (single and multi-dept)
+//   - Compliance score displayed in metrics card
+//   - Risk level pill derived from score (Low / Medium / High)
+//   - Risk pill CSS class changes with risk level
 //   - Graphical View button gated behind isAdmin && hasMultipleDepartments
-//   - Departmental recommendations rendered from non_compliant + partial details
+//   - Departmental recommendations rendered from all_recommendations
 //   - buildReferenceFromId() produces correct PDPA reference string
 //   - Compliant-only result shows "fully compliant" empty state
-//   - Fallback to /api/analysis/latest/ when no latestResultId in sessionStorage
+//   - Single file path (latestResultId in sessionStorage)
+//   - Batch path (batchResultIds in sessionStorage)
+//   - Corrupted / empty batchResultIds shows error banner
 //   - Sidebar: open by default, toggle, shifted class on back/home/content
 //   - Navigation: back arrow → document_analysis.html, home → home.html, profile → profile.html
 //
 // MOCKING STRATEGY
 //   All route mocks use RegExp with /?$ to match URLs with or without trailing
-//   slash — same pattern as 7_compliance.spec.js.
-//   page.unrouteAll() is called inside loadPageWithData when freshRoutes: true
-//   (the default). Pass freshRoutes: false after loginAsGeneral/loginAsAdmin to
-//   preserve the auth session set up by the login helper.
+//   slash. page.unrouteAll() is called inside loadPageWithData when
+//   freshRoutes: true (the default). Pass freshRoutes: false after
+//   loginAsGeneral/loginAsAdmin to preserve the auth session.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const { test, expect } = require('@playwright/test');
@@ -37,13 +39,14 @@ const {
 const COMP_URL  = './comparison.html';
 const RESULT_ID = '42';
 
-const reResult = (id) => new RegExp(`/ai/api/analysis/${id}/?$`);
-const reLatest  = /\/ai\/api\/analysis\/latest\/?$/;
+const reResult  = (id) => new RegExp(`/ai/api/analysis/${id}/?$`);
+const reOrgComp = /\/ai\/api\/analysis\/org-comparison\//;
 
-// ── Shared fake data ──────────────────────────────────────────────────────────
+// ── Shared fake data — SINGLE FILE PATH ──────────────────────────────────────
+// Shape matches what the new mounted() single-file branch reads from the API.
+// The page builds a synthetic dept object from this response.
 
-// Mixed details: non_compliant, partial, and compliant entries
-const MIXED_DETAILS = [
+const SINGLE_DETAILS_MIXED = [
     {
         requirement_id: 'SL-PDPA-S6-1',
         clause:         'Lawful basis for processing personal data',
@@ -67,8 +70,7 @@ const MIXED_DETAILS = [
     },
 ];
 
-// All compliant — for empty-state test
-const COMPLIANT_DETAILS = [
+const SINGLE_DETAILS_COMPLIANT = [
     {
         requirement_id: 'SL-PDPA-S10-1',
         clause:         'Security of personal data',
@@ -78,8 +80,7 @@ const COMPLIANT_DETAILS = [
     },
 ];
 
-// ── Factory helpers ───────────────────────────────────────────────────────────
-function makeResult(details, overrides = {}) {
+function makeSingleResult(details, overrides = {}) {
     return {
         result_id:        RESULT_ID,
         company_name:     'Test Corp',
@@ -90,26 +91,76 @@ function makeResult(details, overrides = {}) {
     };
 }
 
-const MIXED_RESULT     = makeResult(MIXED_DETAILS);
-const COMPLIANT_RESULT = makeResult(COMPLIANT_DETAILS, { compliance_score: 100 });
-const HIGH_SCORE       = makeResult(MIXED_DETAILS,     { compliance_score: 80 });
-const LOW_SCORE        = makeResult(MIXED_DETAILS,     { compliance_score: 30 });
+const SINGLE_MIXED     = makeSingleResult(SINGLE_DETAILS_MIXED);
+const SINGLE_COMPLIANT = makeSingleResult(SINGLE_DETAILS_COMPLIANT, { compliance_score: 100 });
+const SINGLE_HIGH      = makeSingleResult(SINGLE_DETAILS_MIXED, { compliance_score: 80 });
+const SINGLE_LOW       = makeSingleResult(SINGLE_DETAILS_MIXED, { compliance_score: 30 });
 
-// ── Shared page loader ────────────────────────────────────────────────────────
-/**
- * Mocks backend endpoints and loads comparison.html.
- *
- * @param {import('@playwright/test').Page} page
- * @param {object} result         - Fake API result to serve
- * @param {object} options
- * @param {boolean} options.freshRoutes - Pass false after loginAs* helpers to
- *   avoid clearing the auth session.
- */
-async function loadPageWithData(page, result = MIXED_RESULT, { freshRoutes = true } = {}) {
+// ── Shared fake data — BATCH PATH ─────────────────────────────────────────────
+// Shape matches what the new mounted() batch branch reads from org-comparison API.
+
+const BATCH_RESULT_IDS = ['42', '43'];
+
+const BATCH_DEPT_IT = {
+    id:               '42',
+    dept_name:        'IT',
+    compliance_score: 60,
+    risk:             'Medium',
+    improvements:     2,
+    top_gap:          'Lawful basis for processing personal data',
+    improvement_list: [
+        'Lawful basis for processing personal data',
+        'Data subject access rights',
+    ],
+    recommended_actions: [
+        'Section 6(1) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)',
+        'Section 23(1) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)',
+    ],
+    all_recommendations: [
+        {
+            clause:     'Lawful basis for processing personal data',
+            reference:  'Section 6(1) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)',
+            status:     'non_compliant',
+            risk_level: 'critical',
+            reasoning:  'No evidence of a lawful basis documented.',
+        },
+        {
+            clause:     'Data subject access rights',
+            reference:  'Section 23(1) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)',
+            status:     'partial',
+            risk_level: 'high',
+            reasoning:  'Access rights process exists but is incomplete.',
+        },
+    ],
+};
+
+const BATCH_DEPT_HR = {
+    id:               '43',
+    dept_name:        'HR',
+    compliance_score: 80,
+    risk:             'Low',
+    improvements:     0,
+    top_gap:          'None identified',
+    improvement_list: [],
+    recommended_actions: [],
+    all_recommendations: [],
+};
+
+const BATCH_RESPONSE_MULTI = {
+    org_name:    'Test Corp',
+    departments: [BATCH_DEPT_IT, BATCH_DEPT_HR],
+};
+
+const BATCH_RESPONSE_SINGLE = {
+    org_name:    'Test Corp',
+    departments: [BATCH_DEPT_IT],
+};
+
+// ── Shared page loader — SINGLE FILE PATH ────────────────────────────────────
+async function loadSinglePath(page, result = SINGLE_MIXED, { freshRoutes = true } = {}) {
     if (freshRoutes) {
         await page.unrouteAll({ behavior: 'ignoreErrors' });
     }
-
     await page.route(reResult(RESULT_ID), async route => {
         await route.fulfill({
             status:      200,
@@ -117,16 +168,27 @@ async function loadPageWithData(page, result = MIXED_RESULT, { freshRoutes = tru
             body:        JSON.stringify(result),
         });
     });
+    await page.evaluate(() => sessionStorage.removeItem('batchResultIds'));
+    await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.goto(COMP_URL);
+    await page.waitForLoadState('networkidle', { timeout: 15000 });
+}
 
-    await page.route(reLatest, async route => {
+// ── Shared page loader — BATCH PATH ──────────────────────────────────────────
+async function loadBatchPath(page, batchResponse = BATCH_RESPONSE_MULTI, { freshRoutes = true } = {}) {
+    if (freshRoutes) {
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
+    await page.route(reOrgComp, async route => {
         await route.fulfill({
             status:      200,
             contentType: 'application/json',
-            body:        JSON.stringify(result),
+            body:        JSON.stringify(batchResponse),
         });
     });
-
-    await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
+    await page.evaluate((ids) => sessionStorage.setItem('batchResultIds', JSON.stringify(ids)), BATCH_RESULT_IDS);
+    await page.evaluate(() => sessionStorage.removeItem('latestResultId'));
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.goto(COMP_URL);
     await page.waitForLoadState('networkidle', { timeout: 15000 });
@@ -146,9 +208,10 @@ test.describe('Comparison — Auth Guard', () => {
         await page.waitForURL(/login\.html/, { timeout: 10000 });
     });
 
-    test('redirects to login.html when API returns 401', async ({ page }) => {
+    test('redirects to login.html when single-file API returns 401', async ({ page }) => {
         await loginAsGeneral(page);
         await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate(() => sessionStorage.removeItem('batchResultIds'));
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 401, contentType: 'application/json', body: '{"detail":"Unauthorized"}' });
@@ -158,9 +221,10 @@ test.describe('Comparison — Auth Guard', () => {
         await page.waitForURL(/login\.html/, { timeout: 10000 });
     });
 
-    test('redirects to login.html when API returns 403', async ({ page }) => {
+    test('redirects to login.html when single-file API returns 403', async ({ page }) => {
         await loginAsGeneral(page);
         await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate(() => sessionStorage.removeItem('batchResultIds'));
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 403, contentType: 'application/json', body: '{"detail":"Forbidden"}' });
@@ -170,9 +234,22 @@ test.describe('Comparison — Auth Guard', () => {
         await page.waitForURL(/login\.html/, { timeout: 10000 });
     });
 
+    test('redirects to login.html when batch API returns 401', async ({ page }) => {
+        await loginAsGeneral(page);
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate((ids) => sessionStorage.setItem('batchResultIds', JSON.stringify(ids)), BATCH_RESULT_IDS);
+        await page.route(reOrgComp, async route => {
+            await route.fulfill({ status: 401, contentType: 'application/json', body: '{"detail":"Unauthorized"}' });
+        });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.goto(COMP_URL);
+        await page.waitForURL(/login\.html/, { timeout: 10000 });
+    });
+
     test('clears sessionStorage before redirecting on 401', async ({ page }) => {
         await loginAsGeneral(page);
         await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate(() => sessionStorage.removeItem('batchResultIds'));
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 401, contentType: 'application/json', body: '{"detail":"Unauthorized"}' });
@@ -193,7 +270,7 @@ test.describe('Comparison — Page Rendering', () => {
 
     test.beforeEach(async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
     });
 
     test('stays on comparison.html after successful load', async ({ page }) => {
@@ -232,9 +309,10 @@ test.describe('Comparison — Page Rendering', () => {
 
 test.describe('Comparison — Loading and Error States', () => {
 
-    test('shows no-data banner when API returns 404', async ({ page }) => {
+    test('shows no-data banner when single-file API returns 404', async ({ page }) => {
         await loginAsGeneral(page);
         await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate(() => sessionStorage.removeItem('batchResultIds'));
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Not found"}' });
@@ -245,9 +323,10 @@ test.describe('Comparison — Loading and Error States', () => {
         await expect(page.locator('.no-data-banner')).toBeVisible();
     });
 
-    test('shows no-data banner when API returns 500', async ({ page }) => {
+    test('shows no-data banner when single-file API returns 500', async ({ page }) => {
         await loginAsGeneral(page);
         await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate(() => sessionStorage.removeItem('batchResultIds'));
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"Server error"}' });
@@ -258,9 +337,23 @@ test.describe('Comparison — Loading and Error States', () => {
         await expect(page.locator('.no-data-banner')).toBeVisible();
     });
 
-    test('shows server error banner when network request aborts', async ({ page }) => {
+    test('shows no-data banner when batch API returns 404', async ({ page }) => {
         await loginAsGeneral(page);
         await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate((ids) => sessionStorage.setItem('batchResultIds', JSON.stringify(ids)), BATCH_RESULT_IDS);
+        await page.route(reOrgComp, async route => {
+            await route.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Not found"}' });
+        });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.goto(COMP_URL);
+        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        await expect(page.locator('.no-data-banner')).toBeVisible();
+    });
+
+    test('shows error banner when network request aborts', async ({ page }) => {
+        await loginAsGeneral(page);
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate(() => sessionStorage.removeItem('batchResultIds'));
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
         await page.route(reResult(RESULT_ID), async route => {
             await route.abort();
@@ -274,6 +367,7 @@ test.describe('Comparison — Loading and Error States', () => {
     test('aborted request banner contains server connection message', async ({ page }) => {
         await loginAsGeneral(page);
         await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate(() => sessionStorage.removeItem('batchResultIds'));
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
         await page.route(reResult(RESULT_ID), async route => {
             await route.abort();
@@ -284,64 +378,90 @@ test.describe('Comparison — Loading and Error States', () => {
         await expect(page.locator('.no-data-banner')).toContainText('Could not reach the server');
     });
 
-    test('no error banner shown when data loads successfully', async ({ page }) => {
-        await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
-        await expect(page.locator('.no-data-banner')).not.toBeVisible();
-    });
-
-    test('falls back to /api/analysis/latest/ when latestResultId not in sessionStorage', async ({ page }) => {
+    test('shows error banner when batchResultIds is corrupted JSON', async ({ page }) => {
         await loginAsGeneral(page);
         await page.unrouteAll({ behavior: 'ignoreErrors' });
-        await page.evaluate(() => sessionStorage.removeItem('latestResultId'));
-
-        let latestCalled = false;
-        await page.route(reLatest, async route => {
-            latestCalled = true;
-            await route.fulfill({
-                status:      200,
-                contentType: 'application/json',
-                body:        JSON.stringify(MIXED_RESULT),
-            });
-        });
-
+        await page.evaluate(() => sessionStorage.setItem('batchResultIds', 'not-valid-json'));
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.goto(COMP_URL);
         await page.waitForLoadState('networkidle', { timeout: 15000 });
-        expect(latestCalled).toBe(true);
+        await expect(page.locator('.no-data-banner')).toBeVisible();
+    });
+
+    test('corrupted batchResultIds banner mentions re-run', async ({ page }) => {
+        await loginAsGeneral(page);
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate(() => sessionStorage.setItem('batchResultIds', 'not-valid-json'));
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.goto(COMP_URL);
+        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        await expect(page.locator('.no-data-banner')).toContainText('corrupted');
+    });
+
+    test('shows error banner when batchResultIds is empty array', async ({ page }) => {
+        await loginAsGeneral(page);
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate(() => sessionStorage.setItem('batchResultIds', JSON.stringify([])));
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.goto(COMP_URL);
+        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        await expect(page.locator('.no-data-banner')).toBeVisible();
+    });
+
+    test('shows error banner when neither batchResultIds nor latestResultId exists', async ({ page }) => {
+        await loginAsGeneral(page);
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate(() => {
+            sessionStorage.removeItem('batchResultIds');
+            sessionStorage.removeItem('latestResultId');
+        });
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.goto(COMP_URL);
+        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        await expect(page.locator('.no-data-banner')).toBeVisible();
+    });
+
+    test('no error banner shown when single-file data loads successfully', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
+        await expect(page.locator('.no-data-banner')).not.toBeVisible();
+    });
+
+    test('no error banner shown when batch data loads successfully', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadBatchPath(page, BATCH_RESPONSE_MULTI, { freshRoutes: false });
+        await expect(page.locator('.no-data-banner')).not.toBeVisible();
     });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Company and Department Display
+// Company Name
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('Comparison — Company and Department Display', () => {
+test.describe('Comparison — Company Name', () => {
 
-    test.beforeEach(async ({ page }) => {
+    test('company name is displayed from single-file API response', async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
+        await expect(page.locator('.company-name')).toContainText('Test Corp');
     });
 
-    test('company name is displayed from API response', async ({ page }) => {
+    test('company name is displayed from batch API response', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadBatchPath(page, BATCH_RESPONSE_MULTI, { freshRoutes: false });
         await expect(page.locator('.company-name')).toContainText('Test Corp');
     });
 
     test('company name label prefix is shown', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
         await expect(page.locator('.company-name')).toContainText('Company Name');
-    });
-
-    test('department dropdown is visible', async ({ page }) => {
-        await expect(page.locator('.custom-select')).toBeVisible();
-    });
-
-    test('department dropdown shows department name from API', async ({ page }) => {
-        await expect(page.locator('.custom-select')).toContainText('IT Department');
     });
 
     test('company name hidden when no data loaded', async ({ page }) => {
         await loginAsGeneral(page);
         await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate(() => sessionStorage.removeItem('batchResultIds'));
         await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
         await page.route(reResult(RESULT_ID), async route => {
             await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
@@ -354,40 +474,110 @@ test.describe('Comparison — Company and Department Display', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Department Dropdown
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Comparison — Department Dropdown', () => {
+
+    test('department dropdown is visible in single-file mode', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
+        await expect(page.locator('.dept-select')).toBeVisible({ timeout: 10000 });
+    });
+
+    test('department dropdown shows department name in single-file mode', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
+        await expect(page.locator('.dept-select')).toContainText('IT Department');
+    });
+
+    test('department dropdown is visible in batch mode', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadBatchPath(page, BATCH_RESPONSE_MULTI, { freshRoutes: false });
+        await expect(page.locator('.dept-select')).toBeVisible({ timeout: 10000 });
+    });
+
+    test('department dropdown shows all departments in batch mode', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadBatchPath(page, BATCH_RESPONSE_MULTI, { freshRoutes: false });
+        await expect(page.locator('.dept-select')).toContainText('IT Department');
+        await expect(page.locator('.dept-select')).toContainText('HR Department');
+    });
+
+    test('first department is auto-selected on batch load', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadBatchPath(page, BATCH_RESPONSE_MULTI, { freshRoutes: false });
+        const value = await page.locator('.dept-select').inputValue();
+        expect(value).toBe('IT');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Score and Risk Level
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe('Comparison — Score and Risk Level', () => {
 
-    test('compliance score is displayed', async ({ page }) => {
+    test('compliance score is displayed in metrics card (single-file)', async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
-        await expect(page.locator('.stat-box')).toContainText('Score : 60%');
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
+        await expect(page.locator('.metrics-score-value')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.metrics-score-value')).toContainText('60%');
     });
 
-    test('risk level shows Medium when score is 60', async ({ page }) => {
+    test('compliance score is displayed in metrics card (batch)', async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
-        await expect(page.locator('.stat-box')).toContainText('Risk Level : Medium');
+        await loadBatchPath(page, BATCH_RESPONSE_MULTI, { freshRoutes: false });
+        await expect(page.locator('.metrics-score-value')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.metrics-score-value')).toContainText('60%');
     });
 
-    test('risk level shows Low when score is 80 (>= 75)', async ({ page }) => {
+    test('risk pill shows MEDIUM when score is 60', async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, HIGH_SCORE, { freshRoutes: false });
-        await expect(page.locator('.stat-box')).toContainText('Risk Level : Low');
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
+        await expect(page.locator('.risk-pill')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.risk-pill')).toContainText('MEDIUM');
     });
 
-    test('risk level shows High when score is 30 (< 40)', async ({ page }) => {
+    test('risk pill shows LOW when score is 80 (>= 75)', async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, LOW_SCORE, { freshRoutes: false });
-        await expect(page.locator('.stat-box')).toBeVisible({ timeout: 10000 });
-        await expect(page.locator('.stat-box')).toContainText('Risk Level : High');
+        await loadSinglePath(page, SINGLE_HIGH, { freshRoutes: false });
+        await expect(page.locator('.risk-pill')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.risk-pill')).toContainText('LOW');
     });
 
-    test('stat box is visible when data is loaded', async ({ page }) => {
+    test('risk pill shows HIGH when score is 30 (< 40)', async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
-        await expect(page.locator('.stat-box')).toBeVisible({ timeout: 10000 });
+        await loadSinglePath(page, SINGLE_LOW, { freshRoutes: false });
+        await expect(page.locator('.risk-pill')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.risk-pill')).toContainText('HIGH');
+    });
+
+    test('risk pill has medium CSS class when score is 60', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
+        await expect(page.locator('.risk-pill')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.risk-pill')).toHaveClass(/medium/);
+    });
+
+    test('risk pill has low CSS class when score is 80', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadSinglePath(page, SINGLE_HIGH, { freshRoutes: false });
+        await expect(page.locator('.risk-pill')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.risk-pill')).toHaveClass(/low/);
+    });
+
+    test('risk pill has high CSS class when score is 30', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadSinglePath(page, SINGLE_LOW, { freshRoutes: false });
+        await expect(page.locator('.risk-pill')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('.risk-pill')).toHaveClass(/high/);
+    });
+
+    test('metrics card is visible when data is loaded', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
+        await expect(page.locator('.metrics-card')).toBeVisible({ timeout: 10000 });
     });
 });
 
@@ -397,29 +587,30 @@ test.describe('Comparison — Score and Risk Level', () => {
 
 test.describe('Comparison — Graphical View Button', () => {
 
-    test('Graphical View button is NOT shown to general user', async ({ page }) => {
+    test('Graphical View button is NOT shown to general user even with multiple departments', async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
-        await expect(page.locator('.metric-box', { hasText: 'Graphical View' })).not.toBeVisible();
+        await loadBatchPath(page, BATCH_RESPONSE_MULTI, { freshRoutes: false });
+        await expect(page.locator('.graphical-view-btn')).not.toBeVisible();
     });
 
-    test('Graphical View button is NOT shown to admin when only one department analysed', async ({ page }) => {
+    test('Graphical View button is NOT shown to admin when only one department', async ({ page }) => {
         await loginAsAdmin(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
-        await expect(page.locator('.metric-box', { hasText: 'Graphical View' })).not.toBeVisible();
+        await loadBatchPath(page, BATCH_RESPONSE_SINGLE, { freshRoutes: false });
+        await expect(page.locator('.graphical-view-btn')).not.toBeVisible();
     });
 
-    // Skipped: hasMultipleDepartments is always false until the multi-department
-    // API endpoint is implemented in a future sprint. When that lands, populate
-    // this.departments from the API in mounted() and remove the skip.
-    test.skip('Graphical View button IS shown to admin when multiple departments analysed', async ({ page }) => {
+    test('Graphical View button IS shown to admin when multiple departments analysed', async ({ page }) => {
         await loginAsAdmin(page);
-        await page.evaluate(() => {
-            // Simulate Vue data having multiple departments once the API populates it
-            window.__vueDepartments__ = ['IT', 'HR'];
-        });
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
-        await expect(page.locator('.metric-box', { hasText: 'Graphical View' })).toBeVisible();
+        await loadBatchPath(page, BATCH_RESPONSE_MULTI, { freshRoutes: false });
+        await expect(page.locator('.graphical-view-btn')).toBeVisible({ timeout: 10000 });
+    });
+
+    test('Graphical View button navigates to comparison_dashboard_graphical.html', async ({ page }) => {
+        await loginAsAdmin(page);
+        await loadBatchPath(page, BATCH_RESPONSE_MULTI, { freshRoutes: false });
+        await expect(page.locator('.graphical-view-btn')).toBeVisible({ timeout: 10000 });
+        await page.locator('.graphical-view-btn').click();
+        await page.waitForURL(/comparison_dashboard_graphical\.html/, { timeout: 10000 });
     });
 });
 
@@ -431,19 +622,15 @@ test.describe('Comparison — Departmental Recommendations', () => {
 
     test.beforeEach(async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
     });
 
     test('recommendations section is visible', async ({ page }) => {
         await expect(page.locator('.recommendations-section')).toBeVisible();
     });
 
-    test('recommendations section title contains department name', async ({ page }) => {
-        await expect(page.locator('.rec-title')).toContainText('IT');
-    });
-
-    test('recommendations section title contains DEPARTMENTAL RECOMMENDATIONS', async ({ page }) => {
-        await expect(page.locator('.rec-title')).toContainText('DEPARTMENTAL RECOMMENDATIONS');
+    test('recommendations section title shows correct heading', async ({ page }) => {
+        await expect(page.locator('.rec-title')).toContainText('Department Specific Recommendation Summary');
     });
 
     test('non_compliant item is shown in recommendations list', async ({ page }) => {
@@ -453,7 +640,7 @@ test.describe('Comparison — Departmental Recommendations', () => {
 
     test('partial item is also shown in recommendations list', async ({ page }) => {
         const items = page.locator('.rec-list > li');
-        await expect(items).toHaveCount(2); // non_compliant + partial; compliant excluded
+        await expect(items).toHaveCount(2);
     });
 
     test('compliant item is NOT shown in recommendations list', async ({ page }) => {
@@ -470,6 +657,15 @@ test.describe('Comparison — Departmental Recommendations', () => {
         const subItems = page.locator('.sub-rec-list li');
         await expect(subItems.nth(1)).toContainText('Section 23(1) of the Personal Data Protection Act No. 9 of 2022 (Sri Lanka)');
     });
+
+    test('recommendations update when department is switched in batch mode', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadBatchPath(page, BATCH_RESPONSE_MULTI, { freshRoutes: false });
+        // IT dept has 2 recommendations, HR has 0
+        await expect(page.locator('.rec-list > li')).toHaveCount(2);
+        await page.locator('.dept-select').selectOption('HR');
+        await expect(page.locator('.rec-list > li')).toHaveCount(1); // empty state li
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -478,23 +674,22 @@ test.describe('Comparison — Departmental Recommendations', () => {
 
 test.describe('Comparison — buildReferenceFromId', () => {
 
-    test('converts SL-PDPA-S6-1 to correct section reference', async ({ page }) => {
+    test.beforeEach(async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
+    });
+
+    test('converts SL-PDPA-S6-1 to correct section reference', async ({ page }) => {
         const refs = page.locator('.sub-rec-list li');
         await expect(refs.first()).toContainText('Section 6(1)');
     });
 
     test('converts SL-PDPA-S23-1 to correct section reference', async ({ page }) => {
-        await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
         const refs = page.locator('.sub-rec-list li');
         await expect(refs.nth(1)).toContainText('Section 23(1)');
     });
 
     test('reference string includes Act name and year', async ({ page }) => {
-        await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
         const refs = page.locator('.sub-rec-list li');
         await expect(refs.first()).toContainText('Personal Data Protection Act No. 9 of 2022 (Sri Lanka)');
     });
@@ -508,14 +703,13 @@ test.describe('Comparison — Fully Compliant Empty State', () => {
 
     test('shows fully compliant message when all details are compliant', async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, COMPLIANT_RESULT, { freshRoutes: false });
+        await loadSinglePath(page, SINGLE_COMPLIANT, { freshRoutes: false });
         await expect(page.locator('.rec-list')).toContainText('No recommendations');
     });
 
-    test('no recommendation list items rendered when all compliant', async ({ page }) => {
+    test('only the empty-state list item is present when all compliant', async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, COMPLIANT_RESULT, { freshRoutes: false });
-        // Only the empty-state <li> should be present, not real recommendation items
+        await loadSinglePath(page, SINGLE_COMPLIANT, { freshRoutes: false });
         const items = page.locator('.rec-list > li');
         await expect(items).toHaveCount(1);
     });
@@ -529,7 +723,7 @@ test.describe('Comparison — Sidebar', () => {
 
     test.beforeEach(async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
     });
 
     test('sidebar is open by default — back arrow has shifted class', async ({ page }) => {
@@ -551,11 +745,13 @@ test.describe('Comparison — Sidebar', () => {
     });
 
     test('closing sidebar removes shifted class from main content', async ({ page }) => {
+        await expect(page.locator('.menu-icon')).toBeVisible({ timeout: 10000 });
         await page.locator('.menu-icon').click();
         await expect(page.locator('.main-content')).not.toHaveClass(/shifted/);
     });
 
     test('re-opening sidebar restores shifted class on main content', async ({ page }) => {
+        await expect(page.locator('.menu-icon')).toBeVisible({ timeout: 10000 });
         await page.locator('.menu-icon').click();
         await page.locator('.menu-icon').click();
         await expect(page.locator('.main-content')).toHaveClass(/shifted/);
@@ -570,7 +766,7 @@ test.describe('Comparison — Navigation', () => {
 
     test.beforeEach(async ({ page }) => {
         await loginAsGeneral(page);
-        await loadPageWithData(page, MIXED_RESULT, { freshRoutes: false });
+        await loadSinglePath(page, SINGLE_MIXED, { freshRoutes: false });
     });
 
     test('user profile button navigates to profile.html', async ({ page }) => {
