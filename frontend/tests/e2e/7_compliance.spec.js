@@ -83,6 +83,45 @@ function makeResult(details) {
 const MIXED_RESULT = makeResult(MIXED_DETAILS);
 const EMPTY_RESULT = makeResult(EMPTY_DETAILS);
 
+// ── Batch mode fake data ──────────────────────────────────────────────────────
+
+const BATCH_RESULT_IDS = ['id-001', 'id-002'];
+
+const BATCH_API_RESPONSE = {
+    departments: [
+        {
+            dept_name: 'IT Department',
+            file_name: 'it_policy.pdf',
+            all_recommendations: [
+                { requirement_id: 'SL-PDPA-S7-1',  clause: 'Data minimisation',  status: 'non_compliant', risk_level: 'critical', reasoning: 'No minimisation policy.' },
+                { requirement_id: 'SL-PDPA-S6-1',  clause: 'Purpose limitation', status: 'non_compliant', risk_level: 'high',     reasoning: 'Purpose not documented.' },
+                { requirement_id: 'SL-PDPA-S10-1', clause: 'Security measures',  status: 'partial',       risk_level: 'medium',   reasoning: 'Partial controls.' },
+            ],
+        },
+        {
+            dept_name: 'HR Department',
+            file_name: 'hr_policy.pdf',
+            all_recommendations: [
+                { requirement_id: 'SL-PDPA-S15-1', clause: 'Data breach notice', status: 'non_compliant', risk_level: 'low', reasoning: 'No breach process.' },
+            ],
+        },
+    ],
+};
+
+const BATCH_RESPONSE_UNKNOWN_DEPT = {
+    departments: [
+        {
+            dept_name: 'Unknown Department',
+            file_name: 'uploaded_file.pdf',
+            all_recommendations: [
+                { requirement_id: 'SL-PDPA-S6-1', clause: 'Purpose limitation', status: 'non_compliant', risk_level: 'high', reasoning: 'Not documented.' },
+            ],
+        },
+    ],
+};
+
+const reBatchComparison = new RegExp(`/ai/api/analysis/org-comparison/`);
+
 // ── Shared page loader ────────────────────────────────────────────────────────
 /**
  * Mocks backend endpoints and loads compliance.html.
@@ -125,6 +164,33 @@ async function loadPageWithData(page, result = MIXED_RESULT, { freshRoutes = tru
 
     await page.evaluate((id) => sessionStorage.setItem('latestResultId', id), RESULT_ID);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.goto(COMP_URL);
+    await page.waitForLoadState('networkidle', { timeout: 15000 });
+}
+
+// ── Batch mode page loader ────────────────────────────────────────────────────
+async function loadBatchPage(page, batchResponse = BATCH_API_RESPONSE) {
+    await page.route(reBatchComparison, async route => {
+        await route.fulfill({
+            status:      200,
+            contentType: 'application/json',
+            body:        JSON.stringify(batchResponse),
+        });
+    });
+
+    await page.route(reMapping, async route => {
+        await route.fulfill({
+            status:      200,
+            contentType: 'application/json',
+            body:        JSON.stringify(FAKE_MAPPING),
+        });
+    });
+
+    await page.evaluate((ids) => {
+        sessionStorage.setItem('batchResultIds', JSON.stringify(ids));
+        sessionStorage.removeItem('latestResultId');
+    }, BATCH_RESULT_IDS);
+
     await page.goto(COMP_URL);
     await page.waitForLoadState('networkidle', { timeout: 15000 });
 }
@@ -674,5 +740,113 @@ test.describe('Compliance — Navigation', () => {
         await page.goto(COMP_URL);
         await page.locator('.back-arrow').click();
         await expect(page).toHaveURL(/document_analysis\.html/);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Batch Mode
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Compliance — Batch Mode', () => {
+
+    test.beforeEach(async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadBatchPage(page);
+    });
+
+    test('batch mode activates when batchResultIds is in sessionStorage', async ({ page }) => {
+        await expect(page).toHaveURL(/compliance\.html/);
+        await expect(page.locator('.doc-box').first()).toBeVisible();
+    });
+
+    test('document boxes are rendered for each department', async ({ page }) => {
+        await expect(page.locator('.doc-box')).toHaveCount(2);
+    });
+
+    test('first document box shows correct department name', async ({ page }) => {
+        await expect(
+            page.locator('.doc-box').first().locator('.doc-name')
+        ).toContainText('IT Department');
+    });
+
+    test('second document box shows correct department name', async ({ page }) => {
+        await expect(
+            page.locator('.doc-box').nth(1).locator('.doc-name')
+        ).toContainText('HR Department');
+    });
+
+    test('unknown department name falls back to filename', async ({ page }) => {
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await loadBatchPage(page, BATCH_RESPONSE_UNKNOWN_DEPT);
+        await expect(
+            page.locator('.doc-box').first().locator('.doc-name')
+        ).toContainText('uploaded_file.pdf');
+    });
+
+    test('single file mode sections are not shown in batch mode', async ({ page }) => {
+        await expect(page.locator('.info-section')).toHaveCount(0);
+    });
+
+    test('gap sub-body is hidden by default', async ({ page }) => {
+        await expect(
+            page.locator('.doc-box').first().locator('.sub-box').first().locator('.sub-body')
+        ).not.toBeVisible();
+    });
+
+    test('clicking gap sub-header expands the sub-body', async ({ page }) => {
+        await page.locator('.doc-box').first().locator('.sub-box').first().locator('.sub-header').click();
+        await expect(
+            page.locator('.doc-box').first().locator('.sub-box').first().locator('.sub-body')
+        ).toBeVisible();
+    });
+
+    test('clicking gap sub-header again collapses the sub-body', async ({ page }) => {
+        const subHeader = page.locator('.doc-box').first().locator('.sub-box').first().locator('.sub-header');
+        await subHeader.click();
+        await subHeader.click();
+        await expect(
+            page.locator('.doc-box').first().locator('.sub-box').first().locator('.sub-body')
+        ).not.toBeVisible();
+    });
+
+    test('redirects to login when batch API returns 401', async ({ page }) => {
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate((ids) => sessionStorage.setItem('batchResultIds', JSON.stringify(ids)), BATCH_RESULT_IDS);
+        await page.route(reBatchComparison, async route => {
+            await route.fulfill({ status: 401, contentType: 'application/json', body: '{}' });
+        });
+        await page.route(reMapping, async route => {
+            await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_MAPPING) });
+        });
+        await page.goto(COMP_URL);
+        await page.waitForURL(/login\.html/, { timeout: 10000 });
+    });
+
+    test('no-data banner shown when batch API returns 404', async ({ page }) => {
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate((ids) => sessionStorage.setItem('batchResultIds', JSON.stringify(ids)), BATCH_RESULT_IDS);
+        await page.route(reBatchComparison, async route => {
+            await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+        });
+        await page.route(reMapping, async route => {
+            await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_MAPPING) });
+        });
+        await page.goto(COMP_URL);
+        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        await expect(page.locator('.no-data-banner')).toBeVisible({ timeout: 5000 });
+    });
+
+    test('no-data banner shown when batch fetch throws', async ({ page }) => {
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.evaluate((ids) => sessionStorage.setItem('batchResultIds', JSON.stringify(ids)), BATCH_RESULT_IDS);
+        await page.route(reBatchComparison, async route => {
+            await route.abort('connectionreset');
+        });
+        await page.route(reMapping, async route => {
+            await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_MAPPING) });
+        });
+        await page.goto(COMP_URL);
+        await page.waitForLoadState('networkidle', { timeout: 15000 });
+        await expect(page.locator('.no-data-banner')).toContainText('Could not reach the server', { timeout: 5000 });
     });
 });
