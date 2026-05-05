@@ -1083,9 +1083,18 @@
                 },
 
                 async loadUserProfile() {
+                    const token = sessionStorage.getItem('authToken');
+                    if (!token) {
+                        this.setProfileMessage('error', 'Session expired. Redirecting to login...');
+                        sessionStorage.clear();
+                        setTimeout(() => window.location.href = 'login.html', 2000);
+                        return;
+                    }
+
                     const email = sessionStorage.getItem('userEmail');
                     if (!email) {
                         this.setProfileMessage('error', 'Not logged in. Redirecting to login...');
+                        sessionStorage.clear()
                         setTimeout(() => window.location.href = 'login.html', 2000);
                         return;
                     }
