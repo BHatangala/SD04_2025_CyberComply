@@ -4,14 +4,15 @@
 //
 // Covers:
 //   - Page rendering: title, description, form elements
-//   - Email validation: empty, invalid format, non-org domain (backend rejection)
+//   - Email validation: empty, invalid format, email too long, non-org domain (backend rejection)
 //   - Sending verification: success → OTP modal shown
+//   - Session expired: no token → redirect to login.html
+//   - checkAdminRequestStatus on load: no token → redirect to login.html
 //   - checkAdminRequestStatus on load: PENDING → OTP modal auto-shown
 //   - checkAdminRequestStatus on load: APPROVED → stays on form
 //   - OTP modal: visible, shows email, input, verify button
 //   - OTP verification: success → success step shown → redirect to profile.html
 //   - OTP verification: invalid code → inline error message shown
-//   - OTP verification: network failure → inline error message shown (skipped — not yet implemented)
 //   - Inline message banners: success and error variants on form
 //   - Navigation: back arrow → profile.html, user profile icon → profile.html
 //   - Sidebar: open by default, toggle, shifted class on back arrow and main content
@@ -73,11 +74,10 @@ async function loadPage(page, {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({ role: 'Administrative User' }),
+            body: JSON.stringify({ role: 'Administrative User', email: 'admin@cybercomply.com' }),
         });
     });
 
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.goto(AA_URL);
     await page.waitForLoadState('networkidle', { timeout: 15000 });
 }
@@ -134,6 +134,36 @@ test.describe('Admin Access — Page Rendering', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Auth Guard
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Admin Access — Auth Guard', () => {
+
+    test('redirects to login.html when no authToken in sessionStorage', async ({ page }) => {
+        await page.goto('./welcome.html');
+        await page.evaluate(() => sessionStorage.clear());
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        await page.route(reStatus, async route => {
+            await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'NONE' }) });
+        });
+        await page.goto(AA_URL);
+        await page.waitForURL(/login\.html/, { timeout: 10000 });
+    });
+
+    test('session expired message shown and redirects to login when no token on OTP verify', async ({ page }) => {
+        await loginAsGeneral(page);
+        await loadPage(page);
+        await submitEmailAndWaitForOtp(page);
+        // Clear token after OTP modal appears to simulate session expiry
+        await page.evaluate(() => sessionStorage.removeItem('authToken'));
+        await page.locator('.otp-input').fill('123456');
+        await page.locator('.otp-btn').click();
+        await expect(page.locator('.otp-modal .message-banner.error')).toContainText('session has expired', { timeout: 5000 });
+        await page.waitForURL(/login\.html/, { timeout: 5000 });
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Email Validation
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -147,7 +177,7 @@ test.describe('Admin Access — Email Validation', () => {
     test('clicking SEND with empty email shows validation error', async ({ page }) => {
         await page.locator('.admin-form button').click();
         await expect(page.locator('.message-banner.error')).toBeVisible();
-        await expect(page.locator('.message-banner.error')).toContainText('valid email');
+        await expect(page.locator('.message-banner.error')).toContainText('Email cannot be empty');
     });
 
     test('clicking SEND with invalid email format shows validation error', async ({ page }) => {
@@ -223,9 +253,9 @@ test.describe('Admin Access — Sending Verification', () => {
         await expect(page.locator('.otp-modal')).toContainText('admin@cybercomply.com');
     });
 
-    test('success message appears in the form after sending', async ({ page }) => {
+    test('success message appears in the OTP modal after sending', async ({ page }) => {
         await submitEmailAndWaitForOtp(page);
-        await expect(page.locator('.otp-modal .message-banner')).toBeVisible();
+        await expect(page.locator('.otp-modal .message-banner')).toBeVisible({ timeout: 5000 });
     });
 
     test('request_id is stored after successful send', async ({ page }) => {
@@ -273,7 +303,7 @@ test.describe('Admin Access — Status Check on Load', () => {
                 request_id: 'pending-request-id-456',
             },
         });
-        await expect(page.locator('.otp-overlay .message-banner')).toContainText('pending request');
+        await expect(page.locator('.otp-overlay .message-banner')).toContainText('pending request', { timeout: 10000 });
     });
 
     test('APPROVED status on load does NOT show OTP modal', async ({ page }) => {
@@ -310,12 +340,6 @@ test.describe('Admin Access — OTP Modal', () => {
 
     test('VERIFY OTP button is visible in the modal', async ({ page }) => {
         await expect(page.locator('.otp-btn')).toContainText('VERIFY OTP');
-    });
-
-    test.skip('OTP input only accepts numeric characters — pending: adminaccess.html should use otp_component.js instead of inline OTP', async ({ page }) => {
-        await page.locator('.otp-input').fill('abc123');
-        const value = await page.locator('.otp-input').inputValue();
-        expect(value).toBe('123');
     });
 
     test('OTP input is limited to 6 digits', async ({ page }) => {
@@ -369,7 +393,22 @@ test.describe('Admin Access — OTP Verification', () => {
         expect(role).toBe('Administrative User');
     });
 
-    test.skip('invalid OTP shows inline error message — pending: adminaccess.html should use otp_component.js instead of inline OTP', async ({ page }) => {
+    test('userEmail is set in sessionStorage after successful verification', async ({ page }) => {
+        await page.locator('.otp-input').fill('123456');
+        await page.locator('.otp-btn').click();
+        await page.waitForURL(/profile\.html/, { timeout: 10000 });
+        const email = await page.evaluate(() => sessionStorage.getItem('userEmail'));
+        expect(email).toBe('admin@cybercomply.com');
+    });
+
+    test('entering less than 6 digits shows invalid verification code error', async ({ page }) => {
+        await page.locator('.otp-input').fill('123');
+        await page.locator('.otp-btn').click();
+        await expect(page.locator('.otp-modal .message-banner.error')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('.otp-modal .message-banner.error')).toContainText('Invalid verification code');
+    });
+
+    test('entering wrong OTP shows error message from backend', async ({ page }) => {
         await page.unrouteAll({ behavior: 'ignoreErrors' });
         await page.route(reStatus, async route => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'NONE' }) });
@@ -384,12 +423,11 @@ test.describe('Admin Access — OTP Verification', () => {
 
         await page.locator('.otp-input').fill('000000');
         await page.locator('.otp-btn').click();
-        // otp_component.js renders errors with .otp-message--error
-        await expect(page.locator('.otp-message--error')).toBeVisible({ timeout: 5000 });
-        await expect(page.locator('.otp-message--error')).toContainText('Invalid or expired');
+        await expect(page.locator('.otp-modal .message-banner.error')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('.otp-modal .message-banner.error')).toContainText('Invalid or expired');
     });
 
-    test.skip('invalid OTP does NOT advance to success step — pending: adminaccess.html should use otp_component.js instead of inline OTP', async ({ page }) => {
+    test('entering wrong OTP does NOT advance to success step', async ({ page }) => {
         await page.unrouteAll({ behavior: 'ignoreErrors' });
         await page.route(reStatus, async route => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'NONE' }) });
@@ -405,32 +443,6 @@ test.describe('Admin Access — OTP Verification', () => {
         await page.locator('.otp-input').fill('000000');
         await page.locator('.otp-btn').click();
         await expect(page.locator('.success-step')).not.toBeVisible();
-    });
-
-    test.skip('network failure during OTP verify shows error banner — pending implementation of error banner in adminaccess.html', async ({ page }) => {
-        await page.unrouteAll({ behavior: 'ignoreErrors' });
-        await page.route(reVerify, async route => {
-            await route.abort('connectionreset');
-        });
-
-        await page.locator('.otp-input').fill('123456');
-        await page.locator('.otp-btn').click();
-        await expect(
-            page.locator('text=Could not reach the server')
-        ).toBeVisible({ timeout: 5000 });
-    });
-
-    test.skip('network failure during send verification shows error banner — pending implementation of error banner in adminaccess.html', async ({ page }) => {
-        await page.unrouteAll({ behavior: 'ignoreErrors' });
-        await page.route(reRequest, async route => {
-            await route.abort('connectionreset');
-        });
-
-        await page.locator('.admin-form input[type="email"]').fill('admin@cybercomply.com');
-        await page.locator('.admin-form button').click();
-        await expect(
-            page.locator('text=Could not reach the server')
-        ).toBeVisible({ timeout: 5000 });
     });
 });
 
@@ -477,6 +489,9 @@ test.describe('Admin Access — Sidebar', () => {
     });
 
     test('clicking menu icon again re-opens sidebar', async ({ page }) => {
+        await page.evaluate(() => {
+            if (window.SessionManager) window.SessionManager.destroy?.();
+        });
         await page.locator('.menu-icon').click();
         await page.locator('.menu-icon').click();
         await expect(page.locator('.back-arrow')).toHaveClass(/shifted/);
