@@ -5,7 +5,7 @@
 CyberComply is a full-stack regulatory compliance management system. This guide covers the complete setup for all modules across all branches.
 
 **System Architecture:**
-- **Web Interface:** Django (Port 8000) — `SD04_2025/Database/DjangoManager/`
+- **Web Interface:** Django (Port 8000) — `SD04_2025/DjangoManager/`
 - **AI Engine:** Flask + Celery (Port 5000) — `SD04_2025/AIModel/`
 - **Task Queue:** Celery + Redis
 - **Database:** PostgreSQL
@@ -198,7 +198,7 @@ Set `BACKUP_INTERVAL_HOURS=1` for hourly backups, `24` for once a day.
 ## 7. Apply Database Migrations
 
 ```bash
-cd Database/DjangoManager
+cd DjangoManager
 python manage.py migrate
 ```
 
@@ -241,6 +241,10 @@ The system requires **four terminal windows**. Start them in the order listed be
 > **Resuming after a previous session?** Clear any leftover jobs from Redis first to avoid stale tasks:
 > ```bash
 > redis-cli FLUSHDB
+> ```
+> If using Memurai, use the following instead:
+> ```bash
+> memurai-cli FLUSHDB
 > ```
 
 ### Terminal A — Redis Server
@@ -288,7 +292,7 @@ Leave this terminal running.
 cd SD04_2025
 .\venv\Scripts\activate        # Windows
 # source venv/bin/activate     # macOS/Linux
-cd Database/DjangoManager
+cd DjangoManager
 python manage.py runserver
 ```
 
@@ -319,7 +323,7 @@ If `status` is `healthy` and `queue_depth` is `0`, all services (Redis, Flask, C
 
 ## 11. Database Backups
 
-All backup scripts are located in `Database/DjangoManager/backups/`. Run all commands from the `Database/DjangoManager/` directory.
+All backup scripts are located in `DjangoManager/backups/`. Run all commands from the `DjangoManager/` directory.
 
 ### Take a Manual Backup
 ```bash
@@ -381,7 +385,7 @@ Exit:
 ## 13. Running Tests
 
 ```bash
-cd Database/DjangoManager
+cd DjangoManager
 python manage.py test core
 ```
 
