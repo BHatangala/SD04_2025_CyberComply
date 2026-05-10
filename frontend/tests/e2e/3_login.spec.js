@@ -247,9 +247,9 @@ test.describe('Login — OTP Step: Wrong Inputs', () => {
         // No route mock — hits the real backend
         await page.fill(OTP_INPUT, '000000');
         await page.click(OTP_BTN);
-        // Backend returns 400: "OTP not required for this account."
-        // The OTP component displays whatever detail the backend sends
-        await expect(page.locator(OTP_ERROR_MSG)).toContainText('OTP not required', { timeout: 10000 });
+        // Backend returns an error (no real OTP was generated)
+        // Response varies by server state: "OTP not required" or "Invalid or expired"
+        await expect(page.locator(OTP_ERROR_MSG)).toContainText(/OTP not required|Invalid or expired/, { timeout: 10000 });
     });
 
     test('OTP is cleared from input after wrong-OTP error', async ({ page }) => {

@@ -15,7 +15,7 @@ const path         = require('path');
 // ── Edit these two values ─────────────────────────────────────────────────────
 const DJANGO_PROJECT_ROOT    = path.resolve(__dirname, '../../../../DjangoManager'); // ← folder with manage.py
 const DJANGO_SETTINGS_MODULE = 'DjangoManager.settings';                         // ← your settings module
-const PYTHON_BIN             = 'E:\\Capstone Computing Project\\sd04_2025\\AIModel\\venv\\Scripts\\python';  // change to 'python3' or venv path if needed
+const PYTHON_BIN             = '/Users/ibrahim/Documents/ccp/sd04_2025/venv/bin/python';  // change to 'python3' or venv path if needed
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Fixed OTP value seeded into the DB for all tests. */

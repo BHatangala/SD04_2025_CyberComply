@@ -20,7 +20,8 @@ const OTP_INPUT  = 'input.otp-input';
 const OTP_BTN    = 'button.otp-btn';
 
 /**
- * Logs in as a verified general user (no OTP required).
+ * Logs in as a verified general user.
+ * Handles OTP step gracefully in case the account is in unverified state.
  * Waits until home.html is fully loaded.
  */
 async function loginAsGeneral(page) {
@@ -34,11 +35,34 @@ async function loginAsGeneral(page) {
     await page.fill('#email', GENERAL_EMAIL);
     await page.fill('#password', GENERAL_PASS);
     await page.click('button[type="submit"]');
+
+    // Handle OTP step if account is unverified (e.g. left in that state by a concurrent test)
+    const otpVisible = await page.locator('h1:has-text("Verify OTP")').waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+    if (otpVisible) {
+        // Seed both types — concurrent tests may have left the account in either state
+        seedOtp(GENERAL_EMAIL, 'FIRST_LOGIN');
+        seedOtp(GENERAL_EMAIL, 'LOGIN_2FA');
+        await page.waitForTimeout(300);
+        await page.fill(OTP_INPUT, KNOWN_OTP);
+        await page.click(OTP_BTN);
+
+        // Race condition: if another test re-verified the account between login and OTP submit,
+        // backend returns "OTP not required". Retry login directly — account is now verified.
+        const rejected = await page.locator('text=/OTP not required|Invalid or expired/').waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
+        if (rejected) {
+            await page.goto('./login.html');
+            await page.fill('#email', GENERAL_EMAIL);
+            await page.fill('#password', GENERAL_PASS);
+            await page.click('button[type="submit"]');
+        }
+    }
+
     await page.waitForURL('**/home.html', { timeout: 30000 });
 }
 
 /**
- * Logs in as an admin user (no OTP required).
+ * Logs in as an admin user.
+ * Handles OTP step gracefully if triggered.
  * Waits until home.html is fully loaded.
  */
 async function loginAsAdmin(page) {
@@ -51,6 +75,25 @@ async function loginAsAdmin(page) {
     await page.fill('#email', ADMIN_EMAIL);
     await page.fill('#password', ADMIN_PASS);
     await page.click('button[type="submit"]');
+
+    // Handle OTP step if triggered (e.g. first login after account creation or concurrent test state change)
+    const otpVisible = await page.locator('h1:has-text("Verify OTP")').waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+    if (otpVisible) {
+        seedOtp(ADMIN_EMAIL, 'FIRST_LOGIN');
+        seedOtp(ADMIN_EMAIL, 'LOGIN_2FA');
+        await page.waitForTimeout(300);
+        await page.fill(OTP_INPUT, KNOWN_OTP);
+        await page.click(OTP_BTN);
+
+        const rejected = await page.locator('text=/OTP not required|Invalid or expired/').waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
+        if (rejected) {
+            await page.goto('./login.html');
+            await page.fill('#email', ADMIN_EMAIL);
+            await page.fill('#password', ADMIN_PASS);
+            await page.click('button[type="submit"]');
+        }
+    }
+
     await page.waitForURL('**/home.html', { timeout: 30000 });
 }
 

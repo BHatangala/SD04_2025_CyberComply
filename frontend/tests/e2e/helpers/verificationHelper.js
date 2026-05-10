@@ -17,7 +17,7 @@ const path         = require('path');
 // ── Edit these values to match your machine ───────────────────────────────────
 const DJANGO_PROJECT_ROOT    = path.resolve(__dirname, '../../../../DjangoManager');
 const DJANGO_SETTINGS_MODULE = 'DjangoManager.settings';                              
-const PYTHON_BIN             = 'E:\\Capstone Computing Project\\sd04_2025\\AIModel\\venv\\Scripts\\python'; // ← your venv python
+const PYTHON_BIN             = '/Users/ibrahim/Documents/ccp/sd04_2025/venv/bin/python'; // ← your venv python
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
