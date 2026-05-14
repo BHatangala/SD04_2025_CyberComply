@@ -14,6 +14,8 @@ CyberComply is a full-stack regulatory compliance management system. This guide 
 - **Malware Scanning:** ClamAV (via Docker)
 - **AI Model:** DeepSeek R1 Distill Qwen 32B (via OpenRouter API)
 
+> **Note:** All terminal commands in this guide assume you are running them from the `SD04_2025` root directory unless stated otherwise.
+
 ---
 
 ## Prerequisites
@@ -24,9 +26,9 @@ CyberComply is a full-stack regulatory compliance management system. This guide 
 ### Software
 Ensure the following are installed before proceeding:
 - Python 3.10 or higher
-- PostgreSQL (v14 recommended)
+- PostgreSQL (v14 recommended) — download from https://www.postgresql.org/download/
 - Git
-- Docker Desktop
+- Docker Desktop — download from https://www.docker.com/products/docker-desktop/ (required for ClamAV)
 - Redis (see Section 4)
 
 ---
@@ -79,6 +81,8 @@ pip install -r requirements.txt
 
 Redis is required for the Celery task queue and must be running before starting the AI engine.
 
+> **Note:** `celery` and `redis` Python packages are already included in `requirements.txt` and will have been installed in Section 3. This section covers installing Redis as a system service.
+
 **Option A — Via WSL (Windows):**
 ```bash
 wsl
@@ -112,107 +116,10 @@ brew services start redis
 
 ---
 
-## 5. PostgreSQL Database Setup
 
-### Create the Database
+## 5. ClamAV Setup (Docker)
 
-```bash
-psql -U postgres
-```
-
-Inside `psql`, run:
-
-```sql
-CREATE DATABASE cybercomply_db;
-CREATE USER cybercomply_user WITH PASSWORD 'your_secure_password';
-ALTER USER cybercomply_user CREATEDB;
-GRANT ALL PRIVILEGES ON DATABASE cybercomply_db TO cybercomply_user;
-ALTER DATABASE cybercomply_db OWNER TO cybercomply_user;
-\q
-```
-
----
-
-## 6. Environment Configuration
-
-Create a `.env` file inside the **DjangoManager** folder (same level as `manage.py`). Use `.env.example` as the template:
-
-```bash
-cp .env.example .env
-```
-
-Then fill in the values as described below.
-
-### Django
-
-```
-SECRET_KEY=
-DEBUG=True
-```
-
-### Database
-
-```
-DB_NAME=cybercomply_db
-DB_USER=cybercomply_user
-DB_PASSWORD=your_secure_password
-DB_HOST=127.0.0.1
-DB_PORT=5432
-```
-
-### AI Engine
-
-```
-OPENROUTER_API_KEY=your_api_key_here
-```
-
-Get your key from https://openrouter.ai/
-
-### AWS (S3 and SES)
-
-```
-AWS_ACCESS_KEY_ID=your_aws_access_key_here
-AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key_here
-AWS_STORAGE_BUCKET_NAME=
-AWS_REGION=
-AWS_SHARED_REPORTS_BUCKET_NAME=
-EMAIL_HOST_USER=
-EMAIL_HOST_PASSWORD=
-```
-
-Only fill in `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` with your own credentials. Leave the remaining values unchanged unless instructed otherwise by the team.
-
-### Database Backups
-
-```
-BACKUP_DIR=./backups/dumps
-BACKUP_INTERVAL_HOURS=24
-```
-
-Set `BACKUP_INTERVAL_HOURS=1` for hourly backups, `24` for once a day.
-
-> The actual `.env` file must never be committed to Bitbucket. It is already listed in `.gitignore`.
-
----
-
-## 7. Apply Database Migrations
-
-```bash
-cd DjangoManager
-python manage.py migrate
-```
-
-### Create a Superuser (optional, for admin panel access)
-
-```bash
-python manage.py createsuperuser
-```
-
----
-
-## 8. ClamAV Setup (Docker)
-
-ClamAV handles malware scanning for uploaded files. Docker Desktop must be running before starting the Django server.
+ClamAV handles malware scanning for uploaded files. Open Docker Desktop and wait for it to fully start before running the commands below.
 
 **First-time setup:**
 ```bash
@@ -234,9 +141,116 @@ The `STATUS` column should show `healthy` next to the `clamav` container. If it 
 
 ---
 
+## 6. PostgreSQL Database Setup
+
+### Create the Database
+
+```bash
+psql -U postgres
+```
+
+Inside `psql`, run:
+
+```sql
+CREATE DATABASE cybercomply_db;
+CREATE USER cybercomply_user WITH PASSWORD 'your_secure_password';
+ALTER USER cybercomply_user CREATEDB;
+GRANT ALL PRIVILEGES ON DATABASE cybercomply_db TO cybercomply_user;
+ALTER DATABASE cybercomply_db OWNER TO cybercomply_user;
+\q
+```
+
+---
+
+## 7. Environment Configuration
+
+Create a `.env` file inside the **DjangoManager** folder (same level as `manage.py`). Use `.env.example` as the template:
+
+```bash
+cp .env.example .env
+```
+
+Then fill in the values as described below.
+
+### Django
+
+```
+SECRET_KEY=
+DEBUG=True
+```
+
+> **Note:** The `SECRET_KEY` value is already provided in `.env.example`. Do not change it.
+
+### Database
+
+```
+DB_NAME=cybercomply_db
+DB_USER=cybercomply_user
+DB_PASSWORD=your_secure_password
+DB_HOST=127.0.0.1
+DB_PORT=5432
+```
+
+### AI Engine
+
+```
+OPENROUTER_API_KEY=your_api_key_here
+```
+
+Get your key from https://openrouter.ai/ — note that the free tier has rate limits and requires credits to be loaded for the primary model to work. Analysis may stall or fail if credits are exhausted.
+
+### AWS (S3 and SES)
+
+```
+AWS_ACCESS_KEY_ID=your_aws_access_key_here
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key_here
+AWS_STORAGE_BUCKET_NAME=
+AWS_REGION=
+AWS_SHARED_REPORTS_BUCKET_NAME=
+EMAIL_HOST_USER=
+EMAIL_HOST_PASSWORD=
+```
+
+Only fill in `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` with your own credentials. Leave the remaining values unchanged unless instructed otherwise by the team.
+
+> **Note:** AWS SES is currently in sandbox mode. Before testing any OTP or password reset functionality, you will need to manually verify your email address through the AWS Console under SES → Verified Identities. Only verified email addresses can receive emails from the system.
+
+### Database Backups
+
+```
+BACKUP_DIR=./backups/dumps
+BACKUP_INTERVAL_HOURS=24
+```
+
+Set `BACKUP_INTERVAL_HOURS=1` for hourly backups, `24` for once a day.
+
+> The actual `.env` file must never be committed to Bitbucket. It is already listed in `.gitignore`.
+
+---
+
+## 8. Apply Database Migrations
+
+```bash
+cd DjangoManager
+python manage.py migrate
+```
+
+### Create a Superuser (optional, for admin panel access)
+
+```bash
+python manage.py createsuperuser
+```
+> **Note:** Each team member runs their own local database. To access the system, sign up through the application at `http://127.0.0.1:5500` and complete the OTP verification step. Make sure AWS SES is configured correctly in your `.env` before attempting to sign up, as OTP delivery depends on it.
+
+---
+
 ## 9. Running the Full System
 
 The system requires **four terminal windows**. Start them in the order listed below.
+
+> **Before proceeding, ensure the following are already running:**
+> - Redis (WSL or Memurai)
+> - Docker Desktop with ClamAV container started (`docker start clamav`)
 
 > **Resuming after a previous session?** Clear any leftover jobs from Redis first to avoid stale tasks:
 > ```bash
@@ -305,6 +319,8 @@ Install the **Live Server** extension in VS Code if you haven't already:
 
 Then open the `SD04_2025/frontend/` folder in VS Code, right-click `welcome.html` and select **Open with Live Server**.
 
+> **Note:** Before launching Live Server, go to VS Code Settings (`Ctrl + ,`), search for `liveServer.settings.host` and set it to `localhost` instead of `127.0.0.1`.
+
 Access the application at: `http://127.0.0.1:5500`
 
 ---
@@ -358,21 +374,22 @@ Connect to the database directly:
 psql -U cybercomply_user -d cybercomply_db
 ```
 
+Current database tables:
+`admin_access_request, analysis_result, audit_logs, auth_group, auth_group_permissions, auth_permission, auth_user, auth_user_groups, auth_user_user_permissions, deletion_request, department, django_admin_log, django_content_type, django_migrations, django_session, document, finding, login_history, notification, organization, otp_verification, recommendations, report_downloads, report_shares, reports, user_profile`
+
 List all tables:
 ```sql
 \dt
 ```
 
-Inspect a table:
+To inspect a table's structure, use `\d <tablename>`, e.g.:
 ```sql
 \d organization
-\d user_profile
 ```
 
-Run sample queries:
+Run a sample query, e.g.:
 ```sql
 SELECT * FROM organization;
-SELECT * FROM user_profile;
 ```
 
 Exit:
@@ -382,16 +399,8 @@ Exit:
 
 ---
 
-## 13. Running Tests
 
-```bash
-cd DjangoManager
-python manage.py test core
-```
-
----
-
-## 14. Before Pushing to Bitbucket
+## 13. Before Pushing to Bitbucket
 
 - Ensure `.env` is not staged or committed
 - If new packages were installed, update the requirements file:
@@ -402,14 +411,6 @@ pip freeze > requirements.txt
 - All changes must pass unit tests before committing
 - Do not commit sensitive files (`.env`, dump files)
 
----
-
-## 15. AWS SES — Testing Notes
-
-AWS SES is currently in sandbox mode. Only verified email addresses can receive emails. Use a verified email address when testing OTP functionality.
-
-**Supported file upload formats:** `.pdf`, `.docx`, `.txt`  
-**Maximum file size:** 50MB — all files are scanned with ClamAV before processing.
 
 ---
 
