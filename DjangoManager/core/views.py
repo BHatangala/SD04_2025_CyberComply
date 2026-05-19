@@ -3181,6 +3181,7 @@ def share_report(request):
     ).first()
 
     if existing_share:
+        _record_audit_log(profile, "SHARE_REPORT", "report", report.report_id, True, request, AuditLog.Severity.MEDIUM)
         return JsonResponse({
             "message": "Report shared successfully",
             "share_url": existing_share.access_token
