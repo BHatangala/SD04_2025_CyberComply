@@ -717,7 +717,7 @@
                     Batch: "ORG — COMBINED COMPLIANCE ANALYSIS REPORT"
                 -->
                 <div class="document-subtitle" v-if="!isBatchMode">
-                    {{ analysedCompany }} — COMPLIANCE ANALYSIS REPORT
+                    {{ analysedCompany ? analysedCompany + ' — ' : '' }}COMPLIANCE ANALYSIS REPORT
                 </div>
                 <div class="document-subtitle" v-if="isBatchMode">
                     {{ analysedCompany ? analysedCompany + ' — ' : '' }}COMBINED COMPLIANCE ANALYSIS REPORT
@@ -725,7 +725,7 @@
 
                 <!-- Badge showing number of departments — batch mode only -->
                 <div class="batch-badge" v-if="isBatchMode">
-                    {{ deptCount }} DEPARTMENT{{ deptCount !== 1 ? 'S' : '' }} ANALYSED
+                    {{ deptCount }} {{ isAdmin ? 'DEPARTMENT' : 'DOCUMENT' }}{{ deptCount !== 1 ? 'S' : '' }} ANALYSED
                 </div>
             </div>
 
