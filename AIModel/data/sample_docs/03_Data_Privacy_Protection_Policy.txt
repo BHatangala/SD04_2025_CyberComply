@@ -1,0 +1,50 @@
+DATA PRIVACY AND PERSONAL DATA PROTECTION POLICY
+Department: Legal / Compliance / Data Protection Office
+Version: 3.0 | Effective: January 2026 | Review: January 2027
+
+1. PURPOSE AND SCOPE
+This Policy is established by Nexacore Technologies Sdn Bhd in full compliance with the Personal Data Protection Act No. 9 of 2022 (PDPA) of Sri Lanka. It governs the collection, storage, use, disclosure, and disposal of personal data across all departments and operations. It applies to all employees, contractors, and vendors who process personal data.
+
+2. CONDITIONS FOR CONSENT — HOW CONSENT IS OBTAINED
+Where consent is the lawful basis for processing, the organisation applies the following:
+
+Consent is freely given, specific, informed, and unambiguous. Data subjects receive a clear privacy notice before giving consent, explaining what data is collected, why, how long it is kept, and who it is shared with.
+
+Consent is captured through written declaration or electronic confirmation using a tick-box requiring an affirmative action. Pre-ticked boxes are never used. Bundled consent forms are not used — separate consent is obtained for each distinct purpose.
+
+A Consent Register is maintained recording: the data subject's identity, the date consent was given, what was consented to, and the version of the privacy notice presented. Consent records are retained for the duration of processing plus 3 years.
+
+Data subjects may withdraw consent at any time by contacting the DPO at dpo@nexacore.lk or submitting a withdrawal form on the company portal. Withdrawal is processed within 5 business days and does not affect the lawfulness of processing prior to withdrawal.
+
+3. DATA MINIMISATION AND PURPOSE LIMITATION
+Personal data collected is adequate, relevant, and limited to what is strictly necessary for the stated and documented purpose. The organisation applies data minimisation as follows:
+
+Before any new data collection activity, the responsible department completes a Data Minimisation Assessment documenting: each data element required, why it is necessary, and whether the same purpose can be achieved with less or anonymised data.
+
+Personal data is collected for specified, explicit, and legitimate purposes only. It is not used for any purpose incompatible with the original purpose. Purpose changes require a new assessment and, where consent is the basis, fresh consent from data subjects.
+
+Collecting data speculatively or for potential future use is prohibited. Data that is no longer necessary is deleted or anonymised without delay.
+
+4. DATA SUBJECT RIGHTS
+Data subjects have the following rights under PDPA Sections 20-28:
+- Right of access: fulfilled within 30 days. Identity verification required before disclosure.
+- Right to rectification: corrections processed within 15 working days.
+- Right to erasure: requests processed within 30 days. Legal retention exceptions apply.
+- Right to restriction, portability, and objection: handled per PDPA requirements.
+- Automated decisions: human review required for decisions with significant effect.
+Contact the DPO: dpo@nexacore.lk | +94 11 456 7890
+
+5. SECURITY MEASURES
+AES-256 encryption at rest. TLS 1.3 in transit. MFA for all privileged access. Quarterly vulnerability assessments. Audit logs retained 2 years. RBAC enforced. Annual data protection training mandatory. Confidentiality agreements for all staff.
+
+6. DATA BREACH NOTIFICATION
+Upon breach discovery: log immediately, escalate to DPO within 2 hours, assess risk within 24 hours, notify Personal Data Protection Authority within 72 hours if risk exists, notify affected data subjects without undue delay. Breach Register maintained.
+
+7. THIRD-PARTY PROCESSORS
+All processors sign a Data Processing Agreement before processing personal data. DPA requires: instructions-only processing, confidentiality, security measures, data subject rights assistance, audit rights, deletion on contract end.
+
+8. DATA PROTECTION OFFICER
+DPO appointed: Ms. Priya Ramanathan | dpo@nexacore.lk | +94 11 456 7890
+
+9. DATA RETENTION SCHEDULE
+Customer records: 7 years. Employee files: 7 years post-termination. Consent records: duration plus 3 years. CCTV: 30 days. Audit logs: 2 years. Recruitment data: 6 months. Secure disposal applied on reaching limits.

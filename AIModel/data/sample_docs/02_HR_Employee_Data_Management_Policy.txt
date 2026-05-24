@@ -1,0 +1,32 @@
+HUMAN RESOURCES EMPLOYEE DATA MANAGEMENT POLICY
+Department: Human Resources
+Version: 1.4 | Effective: March 2025 | Review: March 2026
+
+1. PURPOSE AND SCOPE
+This policy governs the collection, processing, storage, and disposal of personal data relating to employees, former employees, and job applicants of Nexacore Technologies Sdn Bhd under the Personal Data Protection Act No. 9 of 2022 (PDPA).
+
+2. DATA MINIMISATION — HR DATA COLLECTION
+The HR department strictly applies data minimisation to all employee data collection. Only data that is necessary for the employment relationship is collected and retained. Each data element collected must have a specific and documented HR purpose. The following data is collected only because it is necessary:
+  - Full name and identification number: required for payroll and statutory filings
+  - Bank account details: required for salary processing only
+  - Emergency contact: required for workplace safety obligations
+  - Health declarations: collected only where legally required
+Data that is no longer necessary for its original purpose is promptly disposed of. Collecting employee data 'just in case' is prohibited. Processing is limited to what is adequate, relevant, and necessary for the stated HR purpose.
+
+3. LAWFUL BASIS AND CONSENT — PARTIAL IMPLEMENTATION
+Most HR data processing relies on contractual necessity (employment contract) or legal obligation (statutory reporting) as the lawful basis under PDPA Schedule I. Where neither applies — such as for publishing employee photographs in internal communications — written consent is requested from the employee and recorded in the individual employee file. However, the organisation does not maintain a centralised consent register. A formal documented procedure for employees to withdraw consent has not yet been established. Staff are not systematically informed of their right to withdraw consent at the time consent is collected.
+
+4. SENSITIVE PERSONAL DATA
+Health information and criminal record checks are handled with heightened care. Access is restricted to the HR Director only. Collection occurs only where legally required or with explicit written consent from the employee.
+
+5. SECURITY MEASURES
+Employee records are stored in the HRIS system, encrypted and access-controlled. Access is restricted to authorised HR staff and relevant line managers. Physical files are kept in locked cabinets. Annual data protection training is mandatory.
+
+6. THIRD-PARTY SHARING
+Employee data is shared with: payroll vendor (under Data Processing Agreement), government authorities as required by law, health insurance providers (with employee consent). No sharing beyond the stated lawful basis.
+
+7. DATA RETENTION
+Active employee files: employment duration plus 7 years. Unsuccessful applications: 6 months. Payroll records: 7 years. Data reaching retention limits is securely disposed of.
+
+8. BREACH NOTIFICATION
+HR data incidents are reported to the DPO immediately. The DPO manages regulatory notification within 72 hours where required. Affected employees are notified promptly.
