@@ -5,566 +5,947 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberComply - Recommendations</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
     <style>
-      *{
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-      }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    body {
-        font-family: 'Arial', sans-serif;
-        background-color: #101726;
-        color: #ffffff;
-        overflow-x: hidden;
-    }
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #101726;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
 
-    #app {
-      position: relative;
-      min-height: 100vh;
-    }
+        #app {
+            position: relative;
+            min-height: 100vh;
+        }
 
-    /* Top Header */
-    .top-header {
-      background-color: #1a2845;
-      padding: 15px 30px;
-      display: flex;
-      align-items: center;
-      position: relative;
-      z-index: 100;
-    }
+        /* Top Header (fixed — sprint-2) */
+        .top-header {
+            background-color: #1a2845;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 100;
+        }
 
-    .menu-icon {
-      cursor: pointer;
-      font-size: 24px;
-      color: #8b9dc3;
-      transition: color 0.3s;
-    }
+        .menu-icon {
+            cursor: pointer;
+            font-size: 24px;
+            color: #8b9dc3;
+            transition: color 0.3s;
+        }
 
-    .menu-icon:hover {
-      color: #ffffff;
-    }
+        .menu-icon:hover {
+            color: #ffffff;
+        }
 
-    /* Back Arrow */
-    .back-arrow {
-      position: absolute;
-      left: 30px;
-      top: 80px;
-      cursor: pointer;
-      font-size: 32px;
-      color: #8b9dc3;
-      transition: all 0.3s;
-      font-weight: 300;
-      z-index: 95;
-    }
+        /* Back Arrow */
+        .back-arrow {
+            position: absolute;
+            left: 30px;
+            top: 80px;
+            cursor: pointer;
+            font-size: 32px;
+            color: #8b9dc3;
+            transition: all 0.3s;
+            font-weight: 300;
+            z-index: 95;
+        }
 
-    .back-arrow::after {
-      content: "Back to Previous Page";
-      position: absolute;
-      left: 0px;
-      top: 150%;
-      transform: translateY(-50%);
-      background: #1a2845;
-      color: white;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 14px;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-  }
+        .back-arrow::after {
+            content: "Back to Previous Page";
+            position: absolute;
+            left: 0px;
+            top: 150%;
+            transform: translateY(-50%);
+            background: #1a2845;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
 
-  .back-arrow:hover::after {
-      opacity: 1;
-  }
+        .back-arrow:hover::after {
+            opacity: 1;
+        }
 
-    .back-arrow.shifted {
-      left: 310px;
-    }
+        .back-arrow.shifted {
+            left: 310px;
+        }
 
-    .back-arrow:hover {
-      color: #ffffff;
-    }
+        .back-arrow:hover {
+            color: #ffffff;
+        }
 
-    /* Home Button */
-    .home-button {
-      position: absolute;
-      left: 100px;
-      top: 85px;
-      cursor: pointer;
-      font-size: 28px;
-      color: #8b9dc3;
-      transition: all 0.3s;
-      z-index: 95;
-    }
+        /* Home Button */
+        .home-button {
+            position: absolute;
+            left: 100px;
+            top: 85px;
+            cursor: pointer;
+            font-size: 28px;
+            color: #8b9dc3;
+            transition: all 0.3s;
+            z-index: 95;
+        }
 
-    .home-button::after {
-      content: "Back to Home Page";
-      position: absolute;
-      left: 10px;
-      top: 150%;
-      transform: translateY(-50%);
-      background: #1a2845;
-      color: white;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 14px;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-  }
+        .home-button::after {
+            content: "Back to Home Page";
+            position: absolute;
+            left: 10px;
+            top: 150%;
+            transform: translateY(-50%);
+            background: #1a2845;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
 
-  .home-button:hover::after {
-      opacity: 1;
-  }
+        .home-button:hover::after {
+            opacity: 1;
+        }
 
-    .home-button.shifted {
-      left: 360px; /* moves along with the sidebar shift */
-    }
+        .home-button.shifted {
+            left: 360px;
+        }
 
-    .home-button:hover {
-      color: #ffffff;
-    }
+        .home-button:hover {
+            color: #ffffff;
+        }
 
-    .user-profile {
-      position: absolute;
-      right: 30px;
-      width: 50px;
-      height: 50px;
-      background-color: #ffffff;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 3px solid #2a3f5f;
-      transition: transform 0.3s, border-color 0.3s;
-    }
+        .user-profile {
+            position: absolute;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #2a3f5f;
+            transition: transform 0.3s, border-color 0.3s;
+        }
 
-    .user-profile:hover {
-      transform: scale(1.05);
-      border-color: #4a8fe7;
-    }
+        .user-profile:hover {
+            transform: scale(1.05);
+            border-color: #4a8fe7;
+        }
 
-    .user-profile svg {
-      width: 30px;
-      height: 30px;
-      fill: #1a2845;
-    }
+        .user-profile svg {
+            width: 30px;
+            height: 30px;
+            fill: #1a2845;
+        }
 
-    /* Sidebar */
-    .sidebar {
-      position: absolute;
-      left: 0;
-      top: 60px;
-      width: 280px;
-      height: calc(100vh - 60px);
-      background-color: #0d1420;
-      transform: translateX(-100%);
-      transition: transform 0.3s ease-in-out;
-      z-index: 90;
-      overflow-y: auto;
-      padding: 20px 0;
-      box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
-    }
+        /* Main content */
+        .main-content {
+            transition: margin-left 0.3s ease-in-out;
+            padding: 60px 80px;
+            position: relative;
+            z-index: 1;
+        }
 
-    .sidebar.open {
-      transform: translateX(0);
-    }
+        .main-content.shifted {
+            margin-left: 280px;
+        }
 
-    /* Sidebar icon bar (search + add) */
-    .sidebar-icon-bar {
-      display: flex;
-      justify-content: space-between; /* ← THIS is what pushes icons left & right */
-      align-items: center;
-      padding: 0px 10px 15px 10px;
-      margin-bottom: 20px;
-      border-bottom: 2px solid #1a2845;
-    }
+        /* Logo — margin-top: 55px clears the fixed header (sprint-2) */
+        .logo {
+            text-align: center;
+            margin-top: 55px;
+            margin-bottom: 60px;
+        }
 
-    .sidebar-icon {
-      width: 45px;
-      height: 45px;
-      background-color: #1a2845;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
+        .logo h1 {
+            font-size: 48px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
 
-    .sidebar-icon:hover {
-      background-color: #2a4a7c;
-      transform: scale(1.05);
-    }
+        /* Batch summary badge shown below logo in multi-dept mode */
+        .batch-summary-badge {
+            display: inline-block;
+            margin-top: 16px;
+            background: rgba(74, 143, 231, 0.15);
+            border: 1px solid rgba(74, 143, 231, 0.35);
+            color: #4a8fe7;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            padding: 5px 18px;
+            border-radius: 20px;
+        }
 
-    .sidebar-icon svg {
-      width: 22px;
-      height: 22px;
-      fill: #8b9dc3;
-    }
+        /* ── Department accordion wrapper (batch mode) ── */
+        .dept-accordion {
+            max-width: 900px;
+            margin: 0 auto 16px;
+            border: 1px solid rgba(74, 143, 231, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+        }
 
-    .sidebar-icon:hover svg {
-      fill: #ffffff;
-    }
+        .dept-accordion-header {
+            background: #1a2845;
+            padding: 16px 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: background 0.2s;
+            user-select: none;
+        }
 
-    /* Search Input */
-    .search-container {
-      padding: 0 20px 20px;
-      display: none;
-    }
+        .dept-accordion-header:hover {
+            background: #1e3058;
+        }
 
-    .search-container.active {
-      display: block;
-    }
+        .dept-accordion-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
 
-    .search-input {
-      width: 100%;
-      padding: 10px 15px;
-      background-color: #1a2845;
-      border: 2px solid #2a4a7c;
-      border-radius: 8px;
-      color: #ffffff;
-      font-size: 14px;
-      transition: border-color 0.3s;
-      }
+        .dept-accordion-name {
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #ffffff;
+        }
 
-    .search-input:focus {
-      outline: none;
-      border-color: #4a8fe7;
-    }
+        .dept-accordion-count {
+            font-size: 12px;
+            color: #8b9dc3;
+        }
 
-    .search-input::placeholder {
-      color: #6b7a99;
-    }
+        .dept-accordion-chevron {
+            font-size: 18px;
+            color: #4a8fe7;
+            font-weight: 300;
+            transition: transform 0.25s ease;
+            line-height: 1;
+            flex-shrink: 0;
+        }
 
-    .sidebar-section {
-      margin-bottom: 30px;
-    }
+        .dept-accordion-chevron.open {
+            transform: rotate(180deg);
+        }
 
-    .sidebar-header {
-      padding: 10px 20px;
-      font-size: 11px;
-      font-weight: 600;
-      color: #6b7a99;
-      letter-spacing: 1.5px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      }
+        /* Body uses max-height transition for smooth open/close */
+        .dept-accordion-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease, padding 0.35s ease;
+            padding: 0 22px;
+        }
 
-    .sidebar-header svg {
-      width: 14px;
-      height: 14px;
-      fill: #6b7a99;
-    }
+        .dept-accordion-body.open {
+            max-height: 9999px;
+            padding: 16px 22px;
+        }
 
-    .sidebar-item {
-      padding: 12px 20px;
-      cursor: pointer;
-      color: #c5d0e6;
-    }
+        /* Recommendation card base */
+        .recommendation {
+            max-width: 900px;
+            margin: 0 auto 25px;
+            background-color: #1a2845;
+            padding: 25px 30px;
+            border-radius: 12px;
+            border-left: 5px solid #4a8fe7;
+        }
 
-    .sidebar-item:hover {
-      background-color: #1a2845;
-      color: #ffffff;
-    }
-     
-    .no-results {
-      padding: 12px 20px;
-      color: #6b7a99;
-      font-size: 12px;
-      font-style: italic;
-    }
+        /* Inside accordion body the card loses auto-margin since accordion provides padding */
+        .dept-accordion-body .recommendation {
+            max-width: 100%;
+            margin: 0 0 14px;
+        }
 
-    /*main content*/
-    .main-content {
-      transition: margin-left 0.3s ease-in-out;
-      padding: 60px 80px;
-      position: relative;
-      z-index: 1;
-    }
+        .dept-accordion-body .recommendation:last-child {
+            margin-bottom: 0;
+        }
 
-    .main-content.shifted {
-      margin-left: 280px;
-    }
+        /* Wavy Background */
+        .wavy-background {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 85%;
+            z-index: 0;
+            opacity: 0.6;
+            pointer-events: none;
+        }
 
-    /* Logo */
-    .logo {
-      text-align: center;
-      margin-bottom: 60px;
-    }
+        .wavy-background img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
 
-    .logo h1 {
-      font-size: 48px;
-      font-weight: bold;
-      letter-spacing: 4px;
-      color: #ffffff;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-      }
+        /* Scrollbar */
+        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar::-webkit-scrollbar-track { background: #0d1420; }
+        .sidebar::-webkit-scrollbar-thumb { background: #2a4a7c; border-radius: 3px; }
+        .sidebar::-webkit-scrollbar-thumb:hover { background: #4a8fe7; }
 
-    /* Recommendations */
-    .recommendation {
-      max-width: 900px;
-      margin: 0 auto 25px;
-      background-color: #1a2845;
-      padding: 25px 30px;
-      border-radius: 12px;
-      border-left: 5px solid #4a8fe7;
-    }
+        /* ── Dynamic recommendation card styles (ai-development — unchanged) ── */
+        .rec-heading {
+            font-size: 15px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
 
-    .recommendation ul {
-      margin-top: 10px;
-      padding-left: 20px;
-    }
+        .rec-reasoning {
+            font-size: 13px;
+            color: #8b9dc3;
+            line-height: 1.55;
+            margin-bottom: 14px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(74,143,231,0.12);
+        }
 
-    .recommendation li {
-      margin-bottom: 8px;
-      color: #c5d0e6;
-    }
+        .rec-steps-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: #4a8fe7;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
 
-    .reference {
-      font-size: 13px;
-      color: #8b9dc3;
-      margin-top: 6px;
-    }
+        .rec-steps {
+            padding-left: 0;
+            list-style: none;
+            margin-bottom: 14px;
+        }
 
-    /* Wavy Background */
-    .wavy-background {
-      position: fixed;
-      bottom: 0;
-      right: 0;
-      width: 85%;
-      z-index: 0;
-      opacity: 0.6;
-      pointer-events: none;
-    }
+        .rec-steps li {
+            font-size: 13px;
+            color: #c5d0e6;
+            padding: 5px 0 5px 22px;
+            position: relative;
+            line-height: 1.5;
+        }
 
-    .wavy-background img {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
+        .rec-steps li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #4a8fe7;
+            font-size: 12px;
+        }
 
-    /* Scrollbar Styling */
-    .sidebar::-webkit-scrollbar {
-      width: 6px;
-    }
+        .rec-reference {
+            font-size: 12px;
+            color: #6b7a99;
+            padding-top: 10px;
+            border-top: 1px solid rgba(74,143,231,0.12);
+            letter-spacing: 0.3px;
+        }
 
-    .sidebar::-webkit-scrollbar-track {
-      background: #0d1420;
-    }
+        .risk-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            padding: 3px 9px;
+            border-radius: 99px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
 
-    .sidebar::-webkit-scrollbar-thumb {
-      background: #2a4a7c;
-      border-radius: 3px;
-    }
+        .risk-critical { background: rgba(231,74,74,0.15);  color: #e74a4a; border: 1px solid rgba(231,74,74,0.4); }
+        .risk-high     { background: rgba(231,150,74,0.15); color: #e7964a; border: 1px solid rgba(231,150,74,0.4); }
+        .risk-medium   { background: rgba(231,210,74,0.15); color: #d4bf2e; border: 1px solid rgba(231,210,74,0.4); }
+        .risk-low      { background: rgba(74,143,231,0.15); color: #66cc66; border: 1px solid rgba(144,238,144,0.4); }
+        .risk-unknown  { background: rgba(139,157,195,0.15); color: #8b9dc3; border: 1px solid rgba(139,157,195,0.3); }
 
-    .sidebar::-webkit-scrollbar-thumb:hover {
-      background: #4a8fe7;
-    }
+        /* No data / loading / error banners */
+        .no-data-banner {
+            max-width: 900px;
+            margin: 0 auto 30px;
+            background: rgba(231,74,74,0.08);
+            border: 1px solid rgba(231,74,74,0.25);
+            border-radius: 10px;
+            padding: 18px 24px;
+            font-size: 14px;
+            color: #e74a4a;
+        }
 
-  </style>
+        .loading-banner {
+            max-width: 900px;
+            margin: 0 auto 30px;
+            background: rgba(74,143,231,0.08);
+            border: 1px solid rgba(74,143,231,0.25);
+            border-radius: 10px;
+            padding: 18px 24px;
+            font-size: 14px;
+            color: #8bb8f0;
+        }
+
+        .rec-count {
+            max-width: 900px;
+            margin: 0 auto 20px;
+            font-size: 12px;
+            color: #6b7a99;
+            letter-spacing: 0.4px;
+        }
+
+        @media screen and (max-width: 1200px) {
+            .main-content.shifted { margin-left: 0; }
+        }
+    </style>
 </head>
 
 <body>
 <div id="app">
 
-  <!-- Top Header -->
-  <div class="top-header">
-      <div class="menu-icon" @click="toggleSidebar">●●●</div>
-      <div class="user-profile" @click="showProfile">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-          </svg>
-      </div>
-  </div>
-
-  <!-- Back Arrow -->
-   <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←
-   </div>
-
-  <!-- Home Button -->
-   <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goHome">
-    <svg viewBox="0 0 24 24" width="30" height="30" fill="#8b9dc3">
-        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-    </svg>
-  </div>
-
-
-  <!-- Sidebar -->
-  <div class="sidebar" :class="{ open: sidebarOpen }">
-      <!-- Icon Bar (Search and Plus) -->
-      <div class="sidebar-icon-bar">
-          <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
-              <svg viewBox="0 0 24 24">
-                  <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-              </svg>
-          </div>
-          <div class="sidebar-icon" @click="goHome" title="Start new analysis">
-              <svg viewBox="0 0 24 24">
-                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-              </svg>
-          </div>
-      </div>
-
-      <!-- Search Input (Hidden by default) -->
-      <div class="search-container" :class="{ active: searchActive }">
-          <input 
-              type="text" 
-              class="search-input" 
-              v-model="searchQuery" 
-              placeholder="Search documents..."
-              @input="filterReports"
-          >
-      </div>  
-    
-    <div class="sidebar-section">
-        <div class="sidebar-header">
+    <!-- Top Header -->
+    <div class="top-header">
+        <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
+        <div class="user-profile" @click="showProfile">
             <svg viewBox="0 0 24 24">
-                <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
             </svg>
-            LAST 7 DAYS
         </div>
-        <div v-if="filteredLast7Days.length === 0" class="no-results">
-            No results to display
-        </div>
-        <div v-else>
-          <div 
-              v-for="report in filteredLast7Days" 
-              :key="report"
-              class="sidebar-item"
-              @click="openReport(report)"
-          >
-              {{ report }}
-          </div>
-        </div>
-      </div>
-
-      <div class="sidebar-section">
-          <div class="sidebar-header">
-              <svg viewBox="0 0 24 24">
-                  <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-              </svg>
-              LAST 30 DAYS
-          </div>
-          <div v-if="filteredLast30Days.length === 0" class="no-results">
-              No results to display
-          </div>
-          <div v-else>
-              <div 
-                  v-for="report in filteredLast30Days" 
-                  :key="report"
-                  class="sidebar-item"
-                  @click="openReport(report)"
-              >
-                  {{ report }}
-              </div>
-          </div>
-      </div>
     </div>
 
-  <!-- Main Content -->
-  <div class="main-content" :class="{ shifted: sidebarOpen }">
-    <div class="logo">
-      <h1>CYBERCOMPLY<br/>RECOMMENDATIONS</h1>
+    <!-- Back Arrow -->
+    <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="goBack">←</div>
+
+    <!-- Home Button -->
+    <div class="home-button" :class="{ shifted: sidebarOpen }" @click="goHome">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="#8b9dc3">
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+        </svg>
     </div>
 
-    <div class="recommendation" v-for="(rec, index) in recommendations" :key="index">
-      <strong>{{ rec.title }}</strong>
-      <ul>
-        <li v-for="point in rec.points" :key="point">{{ point }}</li>
-      </ul>
-      <div class="reference">{{ rec.reference }}</div>
-    </div>
-  </div>
+    <!-- Sidebar (external component — sprint-2) -->
+    <cybercomply-sidebar
+        :sidebar-open="sidebarOpen"
+        @toggle="sidebarOpen = !sidebarOpen"
+    ></cybercomply-sidebar>
 
-  <!-- Wavy Background -->
-  <div class="wavy-background">
-      <img src="img2.png" alt="Wavy Design">
-  </div> 
+    <!-- Main Content -->
+    <div class="main-content" :class="{ shifted: sidebarOpen }">
+        <div class="logo">
+            <h1>CYBERCOMPLY<br/>RECOMMENDATIONS</h1>
+
+            <!-- Batch summary badge — shown only in multi-dept mode -->
+            <div class="batch-summary-badge" v-if="isBatchMode">
+                {{ deptGroups.length }} DEPARTMENT{{ deptGroups.length !== 1 ? 'S' : '' }}
+                &nbsp;·&nbsp;
+                {{ totalRecommendations }} RECOMMENDATION{{ totalRecommendations !== 1 ? 'S' : '' }}
+            </div>
+        </div>
+
+        <!-- Loading state -->
+        <div class="loading-banner" v-if="isLoading">
+            ⏳ Loading recommendations…
+        </div>
+
+        <!-- No data / error state -->
+        <div
+            class="no-data-banner"
+            v-if="!isLoading && (loadError || (!isBatchMode && recommendations.length === 0))"
+        >
+            ⚠ {{ loadError || 'No analysis result found. Please run a document analysis first from the home page.' }}
+        </div>
+
+        <!-- ── SINGLE FILE MODE: original flat card list ── -->
+        <template v-if="!isLoading && !isBatchMode && recommendations.length > 0">
+
+            <div class="rec-count">
+                {{ recommendations.length }} recommendation{{ recommendations.length !== 1 ? 's' : '' }}
+                generated from non-compliant and partially compliant requirements
+            </div>
+
+            <div
+                class="recommendation"
+                v-for="(rec, index) in recommendations"
+                :key="rec.requirementId"
+            >
+                <div class="rec-heading">
+                    <span>{{ index + 1 }}. {{ rec.clauseTitle }}</span>
+                    <span class="risk-badge" :class="`risk-${rec.riskLevel}`">{{ rec.riskLevel }}</span>
+                </div>
+                <div class="rec-reasoning">{{ rec.reasoning }}</div>
+                <div class="rec-steps-label">Steps to Achieve Compliance</div>
+                <ul class="rec-steps">
+                    <li v-for="step in rec.steps" :key="step">{{ step }}</li>
+                </ul>
+                <div class="rec-reference">
+                    Personal Data Protection Act No. 9 of 2022 (Sri Lanka) — {{ rec.reference }}
+                </div>
+            </div>
+
+        </template>
+
+        <!-- ── BATCH MODE: one collapsible accordion per department ── -->
+        <template v-if="!isLoading && isBatchMode">
+
+            <div
+                class="dept-accordion"
+                v-for="(group, gi) in deptGroups"
+                :key="group.deptName"
+            >
+                <!-- Accordion header — click to expand/collapse -->
+                <div class="dept-accordion-header" @click="toggleGroup(gi)">
+                    <div class="dept-accordion-left">
+                        <span class="dept-accordion-name">{{ group.deptName }}</span>
+                        <span class="dept-accordion-count">
+                            {{ group.recommendations.length }}
+                            recommendation{{ group.recommendations.length !== 1 ? 's' : '' }}
+                        </span>
+                    </div>
+                    <span class="dept-accordion-chevron" :class="{ open: group.expanded }">&#8964;</span>
+                </div>
+
+                <!-- Accordion body — individual recommendation cards -->
+                <div class="dept-accordion-body" :class="{ open: group.expanded }">
+
+                    <div
+                        class="recommendation"
+                        v-for="(rec, index) in group.recommendations"
+                        :key="rec.requirementId"
+                    >
+                        <div class="rec-heading">
+                            <span>{{ index + 1 }}. {{ rec.clauseTitle }}</span>
+                            <span class="risk-badge" :class="`risk-${rec.riskLevel}`">{{ rec.riskLevel }}</span>
+                        </div>
+                        <div class="rec-reasoning">{{ rec.reasoning }}</div>
+                        <div class="rec-steps-label">Steps to Achieve Compliance</div>
+                        <ul class="rec-steps">
+                            <li v-for="step in rec.steps" :key="step">{{ step }}</li>
+                        </ul>
+                        <div class="rec-reference">
+                            Personal Data Protection Act No. 9 of 2022 (Sri Lanka) — {{ rec.reference }}
+                        </div>
+                    </div>
+
+                    <!-- Empty state for a fully compliant department -->
+                    <div
+                        v-if="group.recommendations.length === 0"
+                        style="padding: 20px 0; font-size: 13px; color: #4caf50; letter-spacing: 0.5px;"
+                    >
+                        ✓ This department is fully compliant — no recommendations at this time.
+                    </div>
+
+                </div>
+            </div>
+
+        </template>
+
+    </div>
+
+    <!-- Wavy Background -->
+    <div class="wavy-background">
+        <img src="img2.png" alt="Wavy Design">
+    </div>
 
 </div>
 
 <script>
-const { createApp } = Vue;
+    const { createApp } = Vue;
 
-createApp({
-  data() {
-    return {
-      sidebarOpen: false,
-      searchActive: false,
-      searchQuery: '',
-      last7Days: ['Curtin Report', 'IFS Report', 'Pearson Report', 'Wiley Report'],
-      last30Days: ['Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report', 'Example Report'],
-      filteredLast7Days: [],
-      filteredLast30Days: [],
-      recommendations: [
-        {
-          title: 'Implement stronger access controls',
-          points: [
-            'Use role-based access control (RBAC)',
-            'Enforce least privilege principles'
-          ],
-          reference: 'As mentioned in page 15, line 18 of the Data Protection Act'
-        },
-        {
-          title: 'Improve data encryption practices',
-          points: [
-            'Encrypt sensitive data at rest',
-            'Use TLS for data in transit'
-          ],
-          reference: 'As mentioned in page 22, line 7 of the Data Protection Act'
+    const BASE = 'http://127.0.0.1:8000/ai';
+
+    // ── Helpers (ai-development — fully preserved) ────────────────────────────
+
+    // Builds a human-readable PDPA reference string from a requirement object.
+    function buildReference(req) {
+        let ref = `Section ${req.section}`;
+        if (req.subsection) ref += `(${req.subsection})`;
+        if (req.clause)     ref += `(${req.clause})`;
+        ref += ` — ${req.clause_title}`;
+        return ref;
+    }
+
+    // Rephrases legal third-person language into second-person action language.
+    function actionify(text) {
+        return text
+            .replace(/^Every controller shall\s+/i,  'Ensure that the organisation ')
+            .replace(/^The controller shall\s+/i,     'Ensure that the organisation ')
+            .replace(/^A controller shall\s+/i,       'Ensure that the organisation ')
+            .replace(/^Controllers must\s+/i,         'Ensure that the organisation ')
+            .replace(/^Processing must\s+/i,          'Ensure that all processing ')
+            .replace(/^Processing is\s+/i,            'Ensure processing is ')
+            .replace(/^Personal data shall\s+/i,      'Ensure personal data is ')
+            .replace(/^Personal data must\s+/i,       'Ensure personal data is ')
+            .replace(/^The processor shall\s+/i,      'Ensure the processor ')
+            .replace(/^Processors must\s+/i,          'Ensure processors ')
+            .replace(/^[a-z]/, c => c.toUpperCase());
+    }
+
+    // Transforms a legal requirement string into plain-English action steps.
+    function deriveSteps(req) {
+        const raw = req.requirement;
+        const steps = [];
+        const subClauseMatches = [...raw.matchAll(/\([a-z]\)\s+/g)];
+
+        if (subClauseMatches.length >= 2) {
+            const parts = raw.split(/\([a-z]\)\s+/).filter(p => p.trim().length > 10);
+            for (const part of parts.slice(0, 4)) {
+                const clean = part.replace(/\.$/, '').trim();
+                if (clean.length > 10) steps.push(actionify(clean));
+            }
+        } else {
+            const sentences = raw.split(/\.\s+/).filter(s => s.trim().length > 15);
+            for (const s of sentences.slice(0, 4)) {
+                steps.push(actionify(s.trim()));
+            }
         }
-      ]
+
+        if (req.schedule_content && steps.length < 4) {
+            for (const [, sched] of Object.entries(req.schedule_content)) {
+                if (sched.conditions && sched.conditions.length > 0) {
+                    const cond = sched.conditions[0].replace(/^\([a-z]\)\s+/, '');
+                    const condTrimmed = cond.length > 220
+                        ? cond.substring(0, cond.lastIndexOf(' ', 220)) + '...'
+                        : cond;
+                    steps.push(`Ensure compliance with ${sched.description}: ${condTrimmed}`);
+                    if (steps.length >= 4) break;
+                }
+            }
+        }
+
+        return steps.length > 0
+            ? steps
+            : [`Implement controls to satisfy: ${raw.substring(0, 150)}...`];
     }
-  },
-  mounted() {
-    //Initialize filtered lists
-    this.filteredLast7Days = [...this.last7Days];
-    this.filteredLast30Days = [...this.last30Days];
-  },
-  methods: {
-    toggleSidebar() {
-      this.sidebarOpen = !this.sidebarOpen;
-    },
-    toggleSearch() {
-      this.searchActive = !this.searchActive;
-      if (!this.searchActive) {
-          this.searchQuery = '';
-          this.filterReports();
-      }
-    },
-    showProfile() {
-      window.location.href = 'profile.html';
-    },
-    goBack() {
-      window.location.href = 'document_analysis.html';
-    },
-    goHome() {
-      window.location.href = 'home.html';
-    },
-    filterReports() {
-      const query = this.searchQuery.toLowerCase();
-      if (query === '') {
-          this.filteredLast7Days = [...this.last7Days];
-          this.filteredLast30Days = [...this.last30Days];
-      } else {
-          this.filteredLast7Days = this.last7Days.filter(report => 
-              report.toLowerCase().includes(query)
-          );
-          this.filteredLast30Days = this.last30Days.filter(report => 
-              report.toLowerCase().includes(query)
-          );
-      }
-    },
-    openReport(reportName) {
-      window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
+
+    // Builds a recommendation card object from a compliance detail item + pdpaIndex.
+    // Includes backend-ready fields needed for the DB save step.
+    function buildRecCard(d, pdpaIndex) {
+        const req       = pdpaIndex[d.requirement_id];
+        const steps     = req
+            ? deriveSteps(req)
+            : [`Address the requirements under ${d.requirement_id}.`];
+        const reference = req ? buildReference(req) : d.requirement_id;
+        return {
+            requirementId:       d.requirement_id,
+            clauseTitle:         d.clause || (req?.clause_title ?? d.requirement_id),
+            reasoning:           d.reasoning,
+            riskLevel:           d.risk_level || 'unknown',
+            steps,
+            reference,
+            // backend-ready fields (used in saveRecommendations)
+            recommendation_text: d.reasoning,
+            act_name:            d.clause || (req?.clause_title ?? d.requirement_id),
+            status:              (d.risk_level || 'unknown').toUpperCase(),
+            steps_to_achieve:    steps,
+            section:             reference
+        };
     }
-  }
-}).mount('#app');
+
+    // ── Saves recommendations to the backend DB for a given result_id ─────────
+    // Uses a sessionStorage flag per result_id to avoid duplicate saves on
+    // page re-visits. Called from both loadSingle() and loadBatch().
+    async function saveRecommendations(token, resultId, recs) {
+        const alreadySaved = sessionStorage.getItem(`recsSaved_${resultId}`);
+        if (!recs.length || !resultId || alreadySaved) return;
+
+        try {
+            const payload = {
+                result_id: resultId,
+                recommendations: recs.map(rec => ({
+                    recommendation_text: rec.recommendation_text,
+                    act_name:            rec.act_name,
+                    status:              rec.status,
+                    steps_to_achieve:    rec.steps_to_achieve,
+                    section:             rec.section
+                }))
+            };
+            const saveRes = await fetch(`${BASE}/api/recommendations/save/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            if (saveRes.ok) {
+                console.log(`[INFO] Recommendations saved to DB for result ${resultId}.`);
+                sessionStorage.setItem(`recsSaved_${resultId}`, '1');
+            } else {
+                console.warn('[WARN] Failed to save recommendations:', await saveRes.text());
+            }
+        } catch (saveErr) {
+            console.warn('[WARN] Could not save recommendations to DB:', saveErr.message);
+        }
+    }
+
+    // ── Vue App ───────────────────────────────────────────────────────────────
+
+    const app = createApp({
+        data() {
+            return {
+                sidebarOpen: true,
+
+                // PDPA requirements lookup — built from static local JSON file.
+                // This is NOT a Django endpoint. Same pattern as risk_mapping.json.
+                // Path: ../AIModel/data/pdpa_requirements_full.json
+                pdpaIndex: {},
+
+                // ── Single file mode fields ──
+                // isBatchMode=false: flat list rendered directly
+                recommendations: [],
+
+                // ── Batch mode fields ──
+                // isBatchMode=true: array of dept groups rendered as accordions
+                // Each entry: { deptName, recommendations: [...], expanded: bool }
+                isBatchMode: false,
+                deptGroups:  [],
+
+                // Loading / error state
+                isLoading: true,
+                loadError: ''
+            };
+        },
+
+        computed: {
+            // Total recommendation count across all departments (batch mode only)
+            totalRecommendations() {
+                return this.deptGroups.reduce((sum, g) => sum + g.recommendations.length, 0);
+            }
+        },
+
+        async mounted() {
+            // ── Auth guard ──────────────────────────────────────────────
+            const token = sessionStorage.getItem('authToken');
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // ── Role guard — admin only ─────────────────────────────────
+            const role = sessionStorage.getItem('userRole');
+            if (role !== 'ADMINISTRATIVE_USER') {
+                history.back();
+                return;
+            }
+
+            SessionManager.init({ timeoutMs: 1200000 });
+
+            // ── Load PDPA requirements JSON from local file ─────────────
+            // Static file fetch — identical to ai-development approach.
+            // Not served by Django; lives at ../AIModel/data/ relative to frontend.
+            const PDPA_PATH = '../AIModel/data/pdpa_requirements_full.json';
+            try {
+                const res = await fetch(PDPA_PATH);
+                if (res.ok) {
+                    const json = await res.json();
+                    for (const req of json.requirements) {
+                        this.pdpaIndex[req.id] = req;
+                    }
+                    console.log('[INFO] PDPA index built —', Object.keys(this.pdpaIndex).length, 'entries');
+                } else {
+                    console.warn('[WARN] pdpa_requirements_full.json not found at', PDPA_PATH);
+                }
+            } catch (e) {
+                console.warn('[WARN] Could not load PDPA JSON:', e.message);
+            }
+
+            // ── Detect mode: batch or single ───────────────────────────
+            // batchResultIds takes priority (written by home.html on batch_complete).
+            // latestResultId is the single-file path (unchanged behaviour).
+            const batchIdsRaw = sessionStorage.getItem('batchResultIds');
+            const singleId    = sessionStorage.getItem('latestResultId');
+
+            if (batchIdsRaw) {
+                await this.loadBatch(token, batchIdsRaw);
+            } else {
+                await this.loadSingle(token, singleId);
+            }
+        },
+
+        methods: {
+
+            // ── Batch loader ──────────────────────────────────────────────
+            // Fetches the full compliance details for each result_id individually,
+            // builds per-dept recommendation cards, and saves each dept's
+            // recommendations to the backend DB before moving to the next.
+            async loadBatch(token, batchIdsRaw) {
+                let resultIds = [];
+                try {
+                    resultIds = JSON.parse(batchIdsRaw);
+                } catch {
+                    this.loadError = 'Batch result data is corrupted. Please re-run the analysis.';
+                    this.isLoading = false;
+                    return;
+                }
+
+                if (!Array.isArray(resultIds) || resultIds.length === 0) {
+                    this.loadError = 'No batch results found. Please re-run the analysis.';
+                    this.isLoading = false;
+                    return;
+                }
+
+                const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+
+                try {
+                    const groups = [];
+
+                    for (let i = 0; i < resultIds.length; i++) {
+                        const rid = resultIds[i];
+                        try {
+                            const res = await fetch(`${BASE}/api/analysis/${rid}/`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+
+                            if (res.status === 401 || res.status === 403) {
+                                sessionStorage.clear();
+                                window.location.href = 'login.html';
+                                return;
+                            }
+
+                            if (!res.ok) {
+                                console.warn(`[WARN] Could not fetch result ${rid} — skipping`);
+                                continue;
+                            }
+
+                            const data     = await res.json();
+                            const details  = data.compliance?.details || [];
+                            const deptName = data.department || data.dept_name || `Department ${i + 1}`;
+
+                            const flagged = details
+                                .filter(d => d.status === 'non_compliant' || d.status === 'partial')
+                                .sort((a, b) =>
+                                    (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4)
+                                );
+
+                            const recs = flagged.map(d => buildRecCard(d, this.pdpaIndex));
+
+                            // ── Save this dept's recommendations to the DB ──
+                            await saveRecommendations(token, rid, recs);
+
+                            groups.push({
+                                deptName,
+                                recommendations: recs,
+                                // First dept auto-expanded, rest collapsed
+                                expanded: i === 0
+                            });
+
+                        } catch (e) {
+                            console.warn(`[WARN] Failed to load result ${rid}:`, e.message);
+                        }
+                    }
+
+                    if (groups.length === 0) {
+                        this.loadError = 'No recommendation data found. Please re-run the analysis.';
+                        this.isLoading = false;
+                        return;
+                    }
+
+                    this.isBatchMode = true;
+                    this.deptGroups  = groups;
+                    console.log('[INFO] Batch recommendations built —', groups.length, 'departments');
+
+                } catch (e) {
+                    console.error('Failed to load batch recommendations:', e);
+                    this.loadError = 'Could not reach the server. Please check your connection.';
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            // ── Single file loader ────────────────────────────────────────
+            // Original logic from database branch — fetches a single result,
+            // builds recommendation cards, and saves them to the backend DB.
+            async loadSingle(token, resultId) {
+                const url = resultId
+                    ? `${BASE}/api/analysis/${resultId}/`
+                    : `${BASE}/api/analysis/latest/`;
+
+                const RISK_ORDER = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+
+                try {
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (res.status === 401 || res.status === 403) {
+                        sessionStorage.clear();
+                        window.location.href = 'login.html';
+                        return;
+                    }
+
+                    if (!res.ok) {
+                        this.loadError = 'No analysis results found. Please upload and analyse a document first.';
+                        this.isLoading = false;
+                        return;
+                    }
+
+                    const data    = await res.json();
+                    const details = data.compliance?.details || [];
+
+                    const flagged = details
+                        .filter(d => d.status === 'non_compliant' || d.status === 'partial')
+                        .sort((a, b) =>
+                            (RISK_ORDER[a.risk_level] ?? 4) - (RISK_ORDER[b.risk_level] ?? 4)
+                        );
+
+                    this.recommendations = flagged.map(d => buildRecCard(d, this.pdpaIndex));
+                    console.log('[INFO] Recommendations built —', this.recommendations.length, 'cards');
+
+                    // ── Save recommendations to the backend DB ────────────
+                    // Uses the result_id from the fetched data if available,
+                    // otherwise falls back to the sessionStorage value.
+                    const savedResultId = data.result_id || resultId;
+                    await saveRecommendations(token, savedResultId, this.recommendations);
+
+                } catch (e) {
+                    console.error('Failed to load recommendations:', e);
+                    this.loadError = 'Could not reach the server. Please check your connection.';
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            // ── Toggle a department accordion open/closed ─────────────────
+            toggleGroup(index) {
+                this.deptGroups[index].expanded = !this.deptGroups[index].expanded;
+            },
+
+            showProfile() { window.location.href = 'profile.html'; },
+            goBack()      { window.location.href = 'document_analysis.html'; },
+            goHome()      { window.location.href = 'home.html'; }
+        }
+    });
+
+    registerSidebarComponent(app);
+    app.mount('#app');
 </script>
 
 </body>

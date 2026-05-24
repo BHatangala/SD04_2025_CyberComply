@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CyberComply - Comparison Dashboard Graphical</title>
-
-    <!-- Vue 3 (CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="sidebar_component.js"></script>
+    <script src="session-manager.js"></script>
 
     <style>
       /* Global Reset and Base Theme */
@@ -47,7 +47,10 @@
         padding: 15px 30px;
         display: flex;
         align-items: center;
-        position: relative;
+        position: fixed;       
+        top: 0;                
+        left: 0;                
+        width: 100%;            
         z-index: 100;
       }
 
@@ -131,150 +134,6 @@
         fill: #1a2845;
       }
 
-      /* Sidebar Navigation */
-      .sidebar {
-        position: absolute;
-        left: 0;
-        top: 60px;
-        width: 280px;
-        height: calc(100vh - 60px);
-        background-color: #0d1420;
-        transform: translateX(-100%);
-        transition: transform 0.3s ease-in-out;
-        z-index: 90;
-        overflow-y: auto;
-        padding: 20px 0;
-        box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
-      }
-
-      .sidebar.open {
-        transform: translateX(0);
-      }
-
-      .sidebar-icon-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0px 10px 15px 10px;
-        margin-bottom: 20px;
-        border-bottom: 2px solid #1a2845;
-      }
-
-      .sidebar-icon {
-        width: 45px;
-        height: 45px;
-        background-color: #1a2845;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.3s;
-      }
-
-      .sidebar-icon:hover {
-        background-color: #2a4a7c;
-        transform: scale(1.05);
-      }
-
-      .sidebar-icon svg {
-        width: 22px;
-        height: 22px;
-        fill: #8b9dc3;
-        transition: fill 0.3s;
-      }
-
-      .sidebar-icon:hover svg {
-        fill: #ffffff;
-      }
-
-      .search-container {
-        padding: 0 20px 20px;
-        display: none;
-      }
-
-      .search-container.active {
-        display: block;
-      }
-
-      .search-input {
-        width: 100%;
-        padding: 10px 15px;
-        background-color: #1a2845;
-        border: 2px solid #2a4a7c;
-        border-radius: 8px;
-        color: #ffffff;
-        font-size: 14px;
-        transition: border-color 0.3s;
-      }
-
-      .search-input:focus {
-        outline: none;
-        border-color: #4a8fe7;
-      }
-
-      .search-input::placeholder {
-        color: #6b7a99;
-      }
-
-      .sidebar-section {
-        margin-bottom: 30px;
-      }
-
-      .sidebar-header {
-        padding: 10px 20px;
-        font-size: 11px;
-        font-weight: 600;
-        color: #6b7a99;
-        letter-spacing: 1.5px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .sidebar-header svg {
-        width: 14px;
-        height: 14px;
-        fill: #6b7a99;
-      }
-
-      .sidebar-item {
-        padding: 12px 20px;
-        color: #c5d0e6;
-        cursor: pointer;
-        transition: all 0.2s;
-        border-left: 3px solid transparent;
-        font-size: 14px;
-      }
-
-      .sidebar-item:hover {
-        background-color: #1a2845;
-        border-left-color: #4a8fe7;
-        color: #ffffff;
-      }
-
-      .no-results {
-        padding: 12px 20px;
-        color: #6b7a99;
-        font-size: 12px;
-        font-style: italic;
-      }
-
-      /* Scrollbar Styling (Sidebar) */
-      .sidebar::-webkit-scrollbar {
-        width: 6px;
-      }
-      .sidebar::-webkit-scrollbar-track {
-        background: #0d1420;
-      }
-      .sidebar::-webkit-scrollbar-thumb {
-        background: #2a4a7c;
-        border-radius: 3px;
-      }
-      .sidebar::-webkit-scrollbar-thumb:hover {
-        background: #4a8fe7;
-      }
-
       /* Main Content Wrapper */
       .main-content {
         transition: margin-left 0.3s ease-in-out;
@@ -291,7 +150,7 @@
       /* Dashboard Titles */
       .dashboard-titles {
         text-align: center;
-        margin-top: 28px;
+        margin-top: 55px;
       }
 
       .dashboard-title-main {
@@ -306,14 +165,6 @@
         font-size: 28px;
         font-weight: 400;
         color: #cfd9ea;
-      }
-
-      .prototype-note {
-        margin-top: 10px;
-        font-size: 12px;
-        color: #a9b8d6;
-        letter-spacing: 0.6px;
-        opacity: 0.95;
       }
 
       /* Control Bar */
@@ -641,7 +492,7 @@
         border-color: #4a8fe7;
       }
 
-      /* Drill-Down Model */
+      /* Drill-Down Modal */
       .modal-backdrop {
         position: fixed;
         inset: 0;
@@ -655,7 +506,7 @@
 
       .modal {
         width: 100%;
-        max-width: 760px;
+        max-width: 1000px;
         border-radius: 18px;
         background: rgba(13, 20, 32, 0.92);
         border: 1px solid rgba(96, 122, 146, 0.4);
@@ -780,7 +631,7 @@
 
       <!-- Top Bar -->
       <div class="top-header">
-        <div class="menu-icon" @click="toggleSidebar">●●●</div>
+        <div class="menu-icon" @click="sidebarOpen = !sidebarOpen">●●●</div>
 
         <div class="user-profile" @click="showProfile">
           <svg viewBox="0 0 24 24">
@@ -795,99 +646,30 @@
       <div class="back-arrow" :class="{ shifted: sidebarOpen }" @click="onBack">←</div>
 
       <!-- Sidebar -->
-      <div class="sidebar" :class="{ open: sidebarOpen }">
-        <div class="sidebar-icon-bar">
-          <div class="sidebar-icon" @click="toggleSearch" title="Search documents">
-            <svg viewBox="0 0 24 24">
-              <path
-                d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
-              />
-            </svg>
-          </div>
-
-          <div class="sidebar-icon" @click="goToHome" title="Start new analysis">
-            <svg viewBox="0 0 24 24">
-              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-            </svg>
-          </div>
-        </div>
-
-        <div class="search-container" :class="{ active: searchActive }">
-          <input
-            type="text"
-            class="search-input"
-            v-model="searchQuery"
-            placeholder="Search documents..."
-            @input="filterReports"
-          />
-        </div>
-
-        <!-- Last 7 Days -->
-        <div class="sidebar-section">
-          <div class="sidebar-header">
-            <svg viewBox="0 0 24 24">
-              <path
-                d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"
-              />
-            </svg>
-            LAST 7 DAYS
-          </div>
-
-          <div v-if="filteredLast7Days.length === 0" class="no-results">
-            No results to display
-          </div>
-          <div v-else>
-            <div
-              v-for="report in filteredLast7Days"
-              :key="report"
-              class="sidebar-item"
-              @click="openReport(report)"
-            >
-              {{ report }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Last 30 Days -->
-        <div class="sidebar-section">
-          <div class="sidebar-header">
-            <svg viewBox="0 0 24 24">
-              <path
-                d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h-2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"
-              />
-            </svg>
-            LAST 30 DAYS
-          </div>
-
-          <div v-if="filteredLast30Days.length === 0" class="no-results">
-            No results to display
-          </div>
-          <div v-else>
-            <div
-              v-for="report in filteredLast30Days"
-              :key="report"
-              class="sidebar-item"
-              @click="openReport(report)"
-            >
-              {{ report }}
-            </div>
-          </div>
-        </div>
-      </div>
+      <cybercomply-sidebar
+            :sidebar-open="sidebarOpen"
+            @toggle="sidebarOpen = !sidebarOpen"
+      ></cybercomply-sidebar>
 
       <!-- Main Dashboard Area -->
       <div class="main-content" :class="{ shifted: sidebarOpen }">
-        <div class="dashboard-titles">
+        <!-- Loading state -->
+        <div v-if="isLoading" style="text-align:center; padding: 80px 0; color: #8bb8f0; font-size: 15px; letter-spacing: 1px;">
+            ⏳ Loading department comparison data…
+        </div>
+
+        <!-- Error state -->
+        <div v-if="!isLoading && loadError" style="max-width:700px; margin: 80px auto; background: rgba(231,74,74,0.08); border: 1px solid rgba(231,74,74,0.25); border-radius: 10px; padding: 20px 24px; color: #e74a4a; font-size: 14px;">
+            ⚠ {{ loadError }}
+        </div>
+
+        <div class="dashboard-titles" v-if="!isLoading && !loadError">
           <div class="dashboard-title-main">COMPARISON DASHBOARD</div>
           <div class="dashboard-title-sub">Graphical view</div>
-
-          <div class="prototype-note">
-            Prototype view - sample (dummy) data is shown for demonstration purposes.
-          </div>
         </div>
 
         <!-- Dashboard Controls -->
-        <div class="controls-wrap">
+        <div class="controls-wrap" v-if="!isLoading && !loadError">
           <div class="controls-row">
             <div class="control-group">
               <div class="control-label">Risk Filter</div>
@@ -916,7 +698,7 @@
           </div>
         </div>
 
-        <div class="dashboard-shell">
+        <div class="dashboard-shell" v-if="!isLoading && !loadError">
           <!-- Chart Card -->
           <div class="card">
             <div class="card-title">
@@ -987,7 +769,8 @@
             </div>
 
             <div class="pie-note">
-              Note: Pie slice sizes are proportional to each department’s compliance percentage.
+              Note: Pie slice sizes are proportional to each department's
+              {{ sortBy === 'improvements' ? 'number of improvement needs' : sortBy === 'risk' ? 'risk level (High = largest)' : 'compliance percentage' }}.
             </div>
           </div>
 
@@ -1043,7 +826,7 @@
         </div>
       </div>
 
-      <!-- Drill-Down Model -->
+      <!-- Drill-Down Modal -->
       <div v-if="detailOpen && selectedDept" class="modal-backdrop" @click.self="closeDetail">
         <div class="modal">
           <div class="modal-head">
@@ -1098,87 +881,30 @@
     <script>
       const { createApp } = Vue;
 
-      createApp({
+      const BASE = 'http://127.0.0.1:8000/ai';
+
+      const app = createApp({
         data() {
           return {
-            sidebarOpen: false,
+            sidebarOpen: true,
+            isAdmin: false,
 
-            searchActive: false,
-            searchQuery: "",
-
-            last7Days: ["Curtin Report", "IFS Report", "Pearson Report", "Wiley Report"],
-            last30Days: [
-              "Example Report",
-              "Example Report",
-              "Example Report",
-              "Example Report",
-              "Example Report",
-              "Example Report",
-              "Example Report",
-              "Example Report",
-            ],
-
-            filteredLast7Days: [],
-            filteredLast30Days: [],
-
-            companyLabel: "ABC Company",
+            companyLabel: "Unknown Organisation",
 
             riskFilter: "All",
             sortBy: "compliance",
             sortOrder: "desc",
 
-            departments: [
-              {
-                id: "d1",
-                name: "Department 1",
-                compliance: 72,
-                risk: "Medium",
-                improvements: 5,
-                topGap: "Access control reviews",
-                improvementList: ["Review user access quarterly", "Enforce strong password policy", "Audit shared accounts"],
-                recommendedActions: ["Enable MFA for all users", "Run an access review workshop", "Update access approval flow"],
-              },
-              {
-                id: "d2",
-                name: "Department 2",
-                compliance: 58,
-                risk: "High",
-                improvements: 8,
-                topGap: "Incident response readiness",
-                improvementList: ["Update incident playbook", "Improve logging coverage", "Run a tabletop exercise"],
-                recommendedActions: ["Assign IR owners", "Enable centralized logging", "Test response procedures monthly"],
-              },
-              {
-                id: "d3",
-                name: "Department 3",
-                compliance: 84,
-                risk: "Low",
-                improvements: 3,
-                topGap: "Data retention alignment",
-                improvementList: ["Document retention periods", "Label sensitive data", "Review disposal process"],
-                recommendedActions: ["Publish retention policy", "Train staff on retention", "Automate deletion reminders"],
-              },
-              {
-                id: "d4",
-                name: "Department 4",
-                compliance: 66,
-                risk: "Medium",
-                improvements: 6,
-                topGap: "Vendor / third-party checks",
-                improvementList: ["Collect vendor evidence", "Review DPAs", "Maintain vendor risk register"],
-                recommendedActions: ["Create vendor checklist", "Schedule annual vendor reviews", "Add contract compliance clause"],
-              },
-              {
-                id: "d5",
-                name: "Department 5",
-                compliance: 47,
-                risk: "High",
-                improvements: 9,
-                topGap: "Encryption & backups",
-                improvementList: ["Encrypt stored files", "Validate backups", "Rotate keys regularly"],
-                recommendedActions: ["Enable encryption at rest", "Test restore drills", "Implement key rotation policy"],
-              },
-            ],
+            // Populated from get_org_comparison in mounted().
+            departments: [],
+
+            // Clause summary map — loaded from clause_summaries.json.
+            // Maps requirement_id → short one-line action string.
+            clauseSummaries: {},
+
+            // Loading / error state
+            isLoading: true,
+            loadError: '',
 
             activeSliceIndex: null,
 
@@ -1194,19 +920,14 @@
           };
         },
 
-        mounted() {
-          this.filteredLast7Days = [...this.last7Days];
-          this.filteredLast30Days = [...this.last30Days];
-        },
-
         computed: {
           displayedDepartments() {
             const riskRank = { High: 3, Medium: 2, Low: 1 };
-            const palette = ["#f2f6fa", "#94a6b4", "#1c3f60", "#355679", "#afc1cf", "#7b8ea3"];
+            const palette  = ["#f2f6fa", "#94a6b4", "#1c3f60", "#355679", "#afc1cf", "#7b8ea3"];
 
             let list = this.departments.map((d, idx) => ({
               ...d,
-              color: palette[idx % palette.length],
+              color:    palette[idx % palette.length],
               riskRank: riskRank[d.risk] || 0,
             }));
 
@@ -1217,9 +938,9 @@
             const dir = this.sortOrder === "asc" ? 1 : -1;
 
             list.sort((a, b) => {
-              if (this.sortBy === "compliance") return (a.compliance - b.compliance) * dir;
+              if (this.sortBy === "compliance")   return (a.compliance   - b.compliance)   * dir;
               if (this.sortBy === "improvements") return (a.improvements - b.improvements) * dir;
-              if (this.sortBy === "risk") return (a.riskRank - b.riskRank) * dir;
+              if (this.sortBy === "risk")         return (a.riskRank     - b.riskRank)     * dir;
               return 0;
             });
 
@@ -1230,13 +951,18 @@
             const center = { x: 100, y: 100 };
             const radius = 95;
 
-            const total = this.displayedDepartments.reduce((sum, d) => sum + d.compliance, 0) || 1;
+            const getMetricValue = (d) => {
+              if (this.sortBy === 'improvements') return d.improvements;
+              if (this.sortBy === 'risk')         return { High: 3, Medium: 2, Low: 1 }[d.risk] || 1;
+              return d.compliance;
+            };
+            const total = this.displayedDepartments.reduce((sum, d) => sum + getMetricValue(d), 0) || 1;
 
             let startAngle = -90;
 
             return this.displayedDepartments.map((dept) => {
-              const value = (dept.compliance / total) * 100;
-              const sweep = (value / 100) * 360;
+              const value    = (getMetricValue(dept) / total) * 100;
+              const sweep    = (value / 100) * 360;
               const endAngle = startAngle + sweep;
               const midAngle = (startAngle + endAngle) / 2;
 
@@ -1244,20 +970,144 @@
               startAngle = endAngle;
 
               return {
-                id: dept.id,
+                id:                dept.id,
                 d,
-                fill: dept.color,
+                fill:              dept.color,
                 midAngle,
-                name: dept.name,
-                compliance: dept.compliance,
-                risk: dept.risk,
-                improvements: dept.improvements,
-                topGap: dept.topGap,
-                improvementList: dept.improvementList,
+                name:              dept.name,
+                compliance:        dept.compliance,
+                risk:              dept.risk,
+                improvements:      dept.improvements,
+                topGap:            dept.topGap,
+                improvementList:   dept.improvementList,
                 recommendedActions: dept.recommendedActions,
               };
             });
           },
+        },
+
+        // ── Single merged mounted() ───────────────────────────────────────
+        // Combines feature/database additions (isAdmin flag, SessionManager)
+        // with the sprint-3 full data-loading logic.
+        async mounted() {
+          // ── Auth guard ──────────────────────────────────────────────────
+          const token = sessionStorage.getItem('authToken');
+          if (!token) {
+            window.location.href = 'login.html';
+            return;
+          }
+
+          // ── Set RBAC flag + session timeout (from feature/database) ─────
+          const roleRaw = sessionStorage.getItem('userRole');
+          this.isAdmin = (roleRaw === 'ADMINISTRATIVE_USER');
+          SessionManager.init({ timeoutMs: 1200000 });
+
+          // ── Admin guard ─────────────────────────────────────────────────
+          // This page is only for admins — redirect general users back to
+          // comparison.html which shows the single-result view.
+          if (roleRaw !== 'ADMINISTRATIVE_USER') {
+            window.location.href = 'comparison.html';
+            return;
+          }
+
+          // ── Read batch result IDs from sessionStorage ───────────────────
+          const batchIdsRaw = sessionStorage.getItem('batchResultIds');
+
+          if (!batchIdsRaw) {
+            this.loadError = 'No batch results found. Please run a multi-department analysis first.';
+            this.isLoading = false;
+            return;
+          }
+
+          let resultIds = [];
+          try {
+            resultIds = JSON.parse(batchIdsRaw);
+          } catch {
+            this.loadError = 'Batch result data is corrupted. Please re-run the analysis.';
+            this.isLoading = false;
+            return;
+          }
+
+          if (!Array.isArray(resultIds) || resultIds.length === 0) {
+            this.loadError = 'No batch results found. Please re-run the analysis.';
+            this.isLoading = false;
+            return;
+          }
+
+          // ── Load clause summary map ─────────────────────────────────────
+          // clause_summaries.json maps requirement_id → short one-line action.
+          // Sits alongside the HTML files in the frontend directory.
+          try {
+            const sumRes = await fetch('clause_summaries.json');
+            if (sumRes.ok) {
+              this.clauseSummaries = await sumRes.json();
+              console.log('[INFO] Clause summaries loaded —', Object.keys(this.clauseSummaries).length, 'entries');
+            } else {
+              console.warn('[WARN] clause_summaries.json not found — falling back to clause titles');
+            }
+          } catch (e) {
+            console.warn('[WARN] Could not load clause summaries:', e.message);
+          }
+
+          // ── Fetch org comparison data ───────────────────────────────────
+          try {
+            const url = `${BASE}/api/analysis/org-comparison/?result_ids=${resultIds.join(',')}`;
+            const res = await fetch(url, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.status === 401 || res.status === 403) {
+              sessionStorage.clear();
+              window.location.href = 'login.html';
+              return;
+            }
+
+            if (!res.ok) {
+              this.loadError = 'Could not load comparison data. Please re-run the analysis.';
+              this.isLoading = false;
+              return;
+            }
+
+            const data = await res.json();
+
+            this.companyLabel = data.org_name || 'Unknown Organisation';
+
+            // ── Normalise backend field names to match template expectations ──
+            // Also defensively handles top_gap and improvement_list whether the
+            // backend returns plain strings or { clause, requirement_id } objects,
+            // ensuring the Summary card and modal always render clean strings.
+            this.departments = (data.departments || []).map(d => ({
+              id:           d.id,
+              name:         d.dept_name,
+              compliance:   d.compliance_score,
+              risk:         d.risk,
+              improvements: d.improvements,
+
+              // top_gap: extract .clause if the backend returned an object,
+              // otherwise use the string directly
+              topGap: typeof d.top_gap === 'object'
+                ? (d.top_gap.clause || 'None identified')
+                : (d.top_gap || 'None identified'),
+
+              // improvement_list: normalise each entry to { clause, requirement_id }
+              // regardless of whether the backend sent strings or objects
+              improvementList: (d.improvement_list || []).map(item =>
+                typeof item === 'object'
+                  ? item
+                  : { clause: item, requirement_id: '' }
+              ),
+
+              // recommended_actions kept for reference but will be overridden
+              // per-dept in openDept() using the clause summary lookup
+              recommendedActions: d.recommended_actions || [],
+            }));
+
+          } catch (e) {
+            console.error('Failed to load graphical comparison data:', e);
+            this.loadError = 'Could not reach the server. Please check your connection.';
+          } finally {
+            this.isLoading = false;
+          }
         },
 
         methods: {
@@ -1265,86 +1115,95 @@
             this.sidebarOpen = !this.sidebarOpen;
           },
 
-          toggleSearch() {
-            this.searchActive = !this.searchActive;
-            if (!this.searchActive) {
-              this.searchQuery = "";
-              this.filterReports();
-            }
-          },
-
           goToHome() {
             window.location.href = "home.html";
           },
 
-          filterReports() {
-            const q = this.searchQuery.toLowerCase().trim();
-
-            if (!q) {
-              this.filteredLast7Days = [...this.last7Days];
-              this.filteredLast30Days = [...this.last30Days];
-              return;
-            }
-
-            this.filteredLast7Days = this.last7Days.filter((r) => r.toLowerCase().includes(q));
-            this.filteredLast30Days = this.last30Days.filter((r) => r.toLowerCase().includes(q));
-          },
-
           resetControls() {
             this.riskFilter = "All";
-            this.sortBy = "compliance";
-            this.sortOrder = "desc";
+            this.sortBy     = "compliance";
+            this.sortOrder  = "desc";
           },
 
           showProfile() {
             window.location.href = "profile.html";
           },
 
-          openReport(reportName) {
-            window.location.href = `report_viewing.html?report=${encodeURIComponent(reportName)}`;
-          },
-
           hoverDeptById(id) {
             const idx = this.pieSlices.findIndex((s) => s.id === id);
             if (idx !== -1) {
               this.activeSliceIndex = idx;
-              this.tooltip.data = this.pieSlices[idx];
-              this.tooltip.show = true;
+              this.tooltip.data     = this.pieSlices[idx];
+              this.tooltip.show     = true;
             }
           },
 
           onSliceEnter(i, slice) {
             this.activeSliceIndex = i;
-            this.tooltip.data = slice;
-            this.tooltip.show = true;
+            this.tooltip.data     = slice;
+            this.tooltip.show     = true;
           },
 
           onSliceLeave() {
             this.activeSliceIndex = null;
-            this.tooltip.show = false;
-            this.tooltip.data = null;
+            this.tooltip.show     = false;
+            this.tooltip.data     = null;
           },
 
           onMouseMove(e) {
-            const rect = e.currentTarget.getBoundingClientRect();
+            const rect     = e.currentTarget.getBoundingClientRect();
             this.tooltip.x = e.clientX - rect.left;
             this.tooltip.y = e.clientY - rect.top;
           },
 
           openDept(deptOrSlice) {
-            const id = deptOrSlice.id;
+            const id    = deptOrSlice.id;
             const found = this.departments.find((d) => d.id === id) || deptOrSlice;
-            this.selectedDept = found;
+
+            // ── Compute recommended actions from clause_summaries.json ──────
+            // For each top improvement need (up to 5), look up the requirement_id
+            // in clauseSummaries for a short plain-English action sentence.
+            // Falls back to the clause title if no mapping exists.
+            const computedActions = (found.improvementList || []).slice(0, 5).map(item => {
+              const reqId  = typeof item === 'object' ? (item.requirement_id || '') : '';
+              const clause = typeof item === 'object' ? (item.clause || item) : item;
+
+              if (reqId) {
+                // Try exact ID match first (e.g. "SL-PDPA-S11-2")
+                const exact = this.clauseSummaries[reqId];
+                if (exact) return exact;
+
+                // Fall back to section-level key (e.g. "SL-PDPA-S11")
+                const sectionKey = reqId.replace(/-\d+$/, '');
+                const sectionMatch = this.clauseSummaries[sectionKey];
+                if (sectionMatch) return sectionMatch;
+              }
+
+              // Last resort — use clause title itself
+              return `Address compliance gap: ${clause}`;
+            });
+
+            // Build a display-ready copy with:
+            // - improvementList as plain strings for the bullet list
+            // - recommendedActions replaced with clause-summary-derived actions
+            this.selectedDept = {
+              ...found,
+              improvementList: (found.improvementList || []).map(
+                item => typeof item === 'object' ? (item.clause || item) : item
+              ),
+              recommendedActions: computedActions,
+            };
+
             this.detailOpen = true;
           },
 
           closeDetail() {
-            this.detailOpen = false;
+            this.detailOpen   = false;
             this.selectedDept = null;
           },
 
           riskClass(r) {
-            if (r === "High") return "high";
+            if (r === "High")   return "high";
             if (r === "Medium") return "medium";
             return "low";
           },
@@ -1353,8 +1212,8 @@
             if (this.activeSliceIndex !== i) return "";
             const pop = 8;
             const rad = (slice.midAngle * Math.PI) / 180;
-            const dx = pop * Math.cos(rad);
-            const dy = pop * Math.sin(rad);
+            const dx  = pop * Math.cos(rad);
+            const dy  = pop * Math.sin(rad);
             return `translate(${dx} ${dy})`;
           },
 
@@ -1364,8 +1223,8 @@
           },
 
           describeArc(cx, cy, r, startAngle, endAngle) {
-            const start = this.polarToCartesian(cx, cy, r, startAngle);
-            const end = this.polarToCartesian(cx, cy, r, endAngle);
+            const start        = this.polarToCartesian(cx, cy, r, startAngle);
+            const end          = this.polarToCartesian(cx, cy, r, endAngle);
             const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
             return [
               `M ${cx} ${cy}`,
@@ -1379,7 +1238,10 @@
             window.location.href = "comparison.html";
           },
         },
-      }).mount("#app");
+      });
+
+      registerSidebarComponent(app);
+      app.mount('#app');
     </script>
   </body>
 </html>

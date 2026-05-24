@@ -1,0 +1,30 @@
+CLOUD COMPUTING AND SAAS APPLICATION USAGE POLICY
+Department: Information Technology / Cloud Operations
+Version: 1.3 | Effective: October 2025 | Review: October 2026
+
+1. PURPOSE AND SCOPE
+This policy governs the use of cloud computing services and SaaS applications at Nexacore Technologies Sdn Bhd to ensure cloud-based data processing is conducted securely.
+
+2. APPROVED CLOUD SERVICES
+Only services listed on the IT-approved catalogue may be used for company data: Microsoft 365, AWS, Salesforce, Workday, Zoom. Personal cloud accounts may not be used for company data. New cloud service requests require IT approval.
+
+3. DATA HELD IN CLOUD SYSTEMS
+Departments must assess what data is uploaded to cloud services before deployment. Only data required for the specific business function of the cloud service may be uploaded. Data stored in cloud systems is reviewed annually. Data that is no longer required for the business function it was uploaded for must be deleted. Cloud services are not to be used to store data beyond the scope of their approved purpose. Processing in cloud environments is limited to the approved and necessary purpose only.
+
+4. DATA PROCESSING AGREEMENTS
+Data Processing Agreements are in place with: Microsoft 365, AWS, Salesforce, Workday. Zoom DPA is under review. No cloud service may process personal data without a DPA.
+
+5. DATA RESIDENCY
+Company data must not be stored in jurisdictions without adequate protection unless appropriate safeguards are confirmed. Providers confirm data residency locations before approval. IT maintains a data residency register.
+
+6. CLOUD SECURITY
+6.1 All approved cloud services must support multi-factor authentication.
+6.2 Encryption at rest and in transit must be enabled for company data.
+6.3 Cloud access logs are reviewed monthly for anomalous activity.
+6.4 Annual security configuration reviews are required for all approved services.
+
+7. SHADOW IT
+Staff must not use unapproved cloud services or personal cloud accounts for company data. Unapproved cloud usage discovered by IT will be blocked and reported to the department head.
+
+8. INCIDENT MANAGEMENT
+Cloud security incidents are reported to IT Security immediately. Provider breach notifications are escalated to the IT Director and Legal team for assessment.
